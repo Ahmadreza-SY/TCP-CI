@@ -6,7 +6,7 @@ This project aims to extract and compute all available source-code-related featu
 
 ## Usage
 
-```Bash
+```
 usage: main.py [-h] -d DB_PATH -l {function,file} -o OUTPUT_DIR
                [--language {c}]
 
