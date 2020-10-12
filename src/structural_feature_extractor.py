@@ -37,7 +37,8 @@ class StructuralFeatureExtractor:
       for ref in self.get_dependencies(entity):
         if ref.ent().id() in ent_id_set:
           graph.setdefault(entity.id(), [])
-          graph[entity.id()].append(ref.ent().id())
+					if ref.ent().id() not in graph[entity.id()]:
+          	graph[entity.id()].append(ref.ent().id())
     return graph
 
 
