@@ -6,11 +6,11 @@ import os
 
 
 def extract_and_save_structural_features(db, args):
-	extractor_type = StructuralFeatureExtractor
+	extractor_type = DEPExtractor
 	if args.level == "file":
-		extractor_type = FileStructuralFeatureExtractor
+		extractor_type = FileDEPExtractor
 	elif args.level == "function":
-		extractor_type = FunctionStructuralFeatureExtractor
+		extractor_type = FunctionDEPExtractor
 
 	extractor = extractor_type(db, args.language)
 	metadata = extractor.extract_metadata()
