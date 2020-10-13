@@ -3,6 +3,7 @@ from pydriller.domain.commit import ModificationType
 from datetime import datetime
 from src.association_miner import *
 import pandas as pd
+from tqdm import tqdm
 
 
 class DEPExtractor:
@@ -10,8 +11,8 @@ class DEPExtractor:
 	NAME_FIELD = "Name"
 	FILE_PATH_FIELD = "FilePath"
 
-	def __init__(self, db, lang):
-		self.db = db
+	def __init__(self, understand_db, lang):
+		self.understand_db = understand_db
 		self.lang = lang
 
 	def get_ents(self):
@@ -28,7 +29,7 @@ class DEPExtractor:
 		metadata.setdefault(DEPExtractor.ID_FIELD, [])
 		metadata.setdefault(DEPExtractor.NAME_FIELD, [])
 		entities = self.get_ents()
-		for entity in entities:
+		for entity in tqdm(entities, desc="Extracting metadata"):
 			metadata[DEPExtractor.ID_FIELD].append(entity.id())
 			metadata[DEPExtractor.NAME_FIELD].append(entity.name())
 			metric_names = entity.metrics()
@@ -42,7 +43,7 @@ class DEPExtractor:
 		structural_graph = {}
 		entities = self.get_ents()
 		ent_id_set = set(map(lambda e: e.id(), entities))
-		for entity in entities:
+		for entity in tqdm(entities, desc="Extracting structural graph"):
 			for ref in self.get_dependencies(entity):
 				if ref.ent().id() in ent_id_set:
 					structural_graph.setdefault(entity.id(), [])
@@ -52,7 +53,7 @@ class DEPExtractor:
 
 	def extract_logical_dependency_graph(self, structural_graph, association_map):
 		logical_graph = {}
-		for edge_start, dependencies in structural_graph.items():
+		for edge_start, dependencies in tqdm(structural_graph.items(), desc="Extracting logical graph"):
 			dep_weights = []
 			for edge_end in dependencies:
 				pair = frozenset({edge_start, edge_end})
@@ -69,7 +70,7 @@ class DEPExtractor:
 
 class FileDEPExtractor(DEPExtractor):
 	def get_ents(self):
-		return self.db.ents(f"{self.lang} file ~unresolved ~unknown")
+		return self.understand_db.ents(f"{self.lang} file ~unresolved ~unknown")
 
 	def get_dependencies(self, entity):
 		return entity.refs(f'{self.lang} include')
@@ -82,7 +83,7 @@ class FileDEPExtractor(DEPExtractor):
 		metadata.setdefault(DEPExtractor.FILE_PATH_FIELD, [])
 		ids = metadata[DEPExtractor.ID_FIELD]
 		for id in ids:
-			entity = self.db.ent_from_id(id)
+			entity = self.understand_db.ent_from_id(id)
 			metadata[DEPExtractor.FILE_PATH_FIELD].append(entity.relname())
 		return metadata
 
@@ -92,7 +93,7 @@ class FunctionDEPExtractor(DEPExtractor):
 	PARAMETERS_FIELD = "Parameters"
 
 	def get_ents(self):
-		return self.db.ents(f"{self.lang} function ~unresolved ~unknown")
+		return self.understand_db.ents(f"{self.lang} function ~unresolved ~unknown")
 
 	def get_dependencies(self, entity):
 		return entity.refs(f'{self.lang} call')
@@ -107,7 +108,7 @@ class FunctionDEPExtractor(DEPExtractor):
 		metadata.setdefault(FunctionDEPExtractor.PARAMETERS_FIELD, [])
 		ids = metadata[DEPExtractor.ID_FIELD]
 		for id in ids:
-			entity = self.db.ent_from_id(id)
+			entity = self.understand_db.ent_from_id(id)
 			metadata[FunctionDEPExtractor.FULL_NAME_FIELD].append(entity.longname())
 			define_in_ref = entity.ref("definein")
 			metadata[DEPExtractor.FILE_PATH_FIELD].append(

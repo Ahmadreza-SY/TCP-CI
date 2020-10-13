@@ -1,4 +1,4 @@
-from src.structural_feature_extractor import *
+from src.dep_feature_extractor import *
 import argparse
 import understand
 import pandas as pd
@@ -30,6 +30,7 @@ def extract_and_save_dep_features(db, args):
 	dep_df = pd.DataFrame({'entity_id': list(structural_graph.keys()), 'dependencies': list(structural_graph.values())})
 	dep_df['weights'] = [logical_graph[ent_id] for ent_id in structural_graph.keys()]
 	dep_df.to_csv(f"{output_dir}/dep_graph.csv", sep=';', index=False)
+	print(f'All finished, results are saved in {output_dir}')
 
 
 def valid_date(s):
