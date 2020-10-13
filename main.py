@@ -21,7 +21,7 @@ def extract_and_save_dep_features(db, args):
 	metadata_df = pd.DataFrame(metadata)
 	metadata_df.to_csv(f"{output_dir}/metadata.csv", index=False)
 
-	structural_graph = extractor.extract_structural_dependency_graph()
+	structural_graph = extractor.extract_structural_dependency_graph(metadata_df)
 	miner_type = extractor.get_association_miner()
 	miner = miner_type(args.project_path, metadata_df, args.since, args.branch)
 	association_map = miner.compute_association_map()

@@ -25,24 +25,12 @@ class DEPExtractor:
 		pass
 
 	def extract_metadata(self):
-		metadata = {}
-		metadata.setdefault(DEPExtractor.ID_FIELD, [])
-		metadata.setdefault(DEPExtractor.NAME_FIELD, [])
-		entities = self.get_ents()
-		for entity in tqdm(entities, desc="Extracting metadata"):
-			metadata[DEPExtractor.ID_FIELD].append(entity.id())
-			metadata[DEPExtractor.NAME_FIELD].append(entity.name())
-			metric_names = entity.metrics()
-			metrics = entity.metric(metric_names)
-			for name, value in metrics.items():
-				metadata.setdefault(name, [])
-				metadata[name].append(value)
-		return metadata
+		pass
 
-	def extract_structural_dependency_graph(self):
+	def extract_structural_dependency_graph(self, metadata):
 		structural_graph = {}
 		entities = self.get_ents()
-		ent_id_set = set(map(lambda e: e.id(), entities))
+		ent_id_set = set(metadata.Id.values)
 		for entity in tqdm(entities, desc="Extracting structural graph"):
 			for ref in self.get_dependencies(entity):
 				if ref.ent().id() in ent_id_set:
@@ -79,12 +67,22 @@ class FileDEPExtractor(DEPExtractor):
 		return FileAssociationMiner
 
 	def extract_metadata(self):
-		metadata = DEPExtractor.extract_metadata(self)
+		metadata = {}
+		metadata.setdefault(DEPExtractor.ID_FIELD, [])
+		metadata.setdefault(DEPExtractor.NAME_FIELD, [])
 		metadata.setdefault(DEPExtractor.FILE_PATH_FIELD, [])
-		ids = metadata[DEPExtractor.ID_FIELD]
-		for id in ids:
-			entity = self.understand_db.ent_from_id(id)
+		entities = self.get_ents()
+		for entity in tqdm(entities, desc="Extracting metadata"):
+			if "/_deps/" in entity.relname():
+				continue
+			metadata[DEPExtractor.ID_FIELD].append(entity.id())
+			metadata[DEPExtractor.NAME_FIELD].append(entity.name())
 			metadata[DEPExtractor.FILE_PATH_FIELD].append(entity.relname())
+			metric_names = entity.metrics()
+			metrics = entity.metric(metric_names)
+			for name, value in metrics.items():
+				metadata.setdefault(name, [])
+				metadata[name].append(value)
 		return metadata
 
 
@@ -102,18 +100,26 @@ class FunctionDEPExtractor(DEPExtractor):
 		return FunctionAssociationMiner
 
 	def extract_metadata(self):
-		metadata = DEPExtractor.extract_metadata(self)
-		metadata.setdefault(DEPExtractor.FILE_PATH_FIELD, [])
+		metadata = {}
+		metadata.setdefault(DEPExtractor.ID_FIELD, [])
+		metadata.setdefault(DEPExtractor.NAME_FIELD, [])
 		metadata.setdefault(FunctionDEPExtractor.FULL_NAME_FIELD, [])
+		metadata.setdefault(DEPExtractor.FILE_PATH_FIELD, [])
 		metadata.setdefault(FunctionDEPExtractor.PARAMETERS_FIELD, [])
-		ids = metadata[DEPExtractor.ID_FIELD]
-		for id in ids:
-			entity = self.understand_db.ent_from_id(id)
-			metadata[FunctionDEPExtractor.FULL_NAME_FIELD].append(entity.longname())
+		entities = self.get_ents()
+		for entity in tqdm(entities, desc="Extracting metadata"):
 			define_in_ref = entity.ref("definein")
-			metadata[DEPExtractor.FILE_PATH_FIELD].append(
-					None if define_in_ref is None else define_in_ref.file().relname()
-			)
+			if define_in_ref is None or "/_deps/" in define_in_ref.file().relname():
+				continue
+			metadata[DEPExtractor.ID_FIELD].append(entity.id())
+			metadata[DEPExtractor.NAME_FIELD].append(entity.name())
+			metadata[FunctionDEPExtractor.FULL_NAME_FIELD].append(entity.longname())
+			metadata[DEPExtractor.FILE_PATH_FIELD].append(define_in_ref.file().relname())
 			parameters = entity.parameters(False)
 			metadata[FunctionDEPExtractor.PARAMETERS_FIELD].append(None if not parameters else parameters)
+			metric_names = entity.metrics()
+			metrics = entity.metric(metric_names)
+			for name, value in metrics.items():
+				metadata.setdefault(name, [])
+				metadata[name].append(value)
 		return metadata
