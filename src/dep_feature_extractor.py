@@ -35,7 +35,7 @@ class DEPExtractor:
 			for ref in self.get_dependencies(entity):
 				if ref.ent().id() in ent_id_set:
 					structural_graph.setdefault(entity.id(), [])
-					if ref.ent().id() not in structural_graph[entity.id()]:
+					if ref.ent().id() not in structural_graph[entity.id()] and ref.ent().id() != entity.id():
 						structural_graph[entity.id()].append(ref.ent().id())
 		return structural_graph
 
