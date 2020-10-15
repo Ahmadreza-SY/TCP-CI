@@ -56,6 +56,7 @@ def main():
 											default=None)
 	args = parser.parse_args()
 
+	print("Loading understand database ...")
 	db = understand.open(args.db_path)
 	extract_and_save_dep_features(db, args)
 

@@ -16,16 +16,16 @@ class AssociationMiner:
 		pass
 
 	def compute_changed_sets(self):
+		print("Reading commits ...")
+		commits = list(self.repository.traverse_commits())
 		changed_sets = []
 		global_changed_set = set()
-		commit_count = 0
-		for commit in tqdm(self.repository.traverse_commits(), desc="Traversing commits"):
-			commit_count += 1
+		for commit in tqdm(commits, desc="Traversing commits"):
 			changed_set = self.compute_changed_set(commit)
 			if len(changed_set) > 0:
 				changed_sets.append(changed_set)
 				global_changed_set = global_changed_set.union(changed_set)
-		print(f"Found {len(changed_sets)} change transactions with the total of {len(global_changed_set)} entities among {commit_count} commits")
+		print(f"Found {len(changed_sets)} change transactions with the total of {len(global_changed_set)} entities among {len(commits)} commits")
 		return changed_sets
 
 	def compute_association_map(self):
