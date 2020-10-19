@@ -108,6 +108,8 @@ class FunctionDEPExtractor(DEPExtractor):
 		metadata.setdefault(FunctionDEPExtractor.PARAMETERS_FIELD, [])
 		entities = self.get_ents()
 		for entity in tqdm(entities, desc="Extracting metadata"):
+			if entity.name() == "[unnamed]":
+				continue
 			define_in_ref = entity.ref("definein")
 			if define_in_ref is None or "/_deps/" in define_in_ref.file().relname():
 				continue
