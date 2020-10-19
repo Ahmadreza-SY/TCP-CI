@@ -2,7 +2,9 @@
 
 ## Table of Contents
 - **[Intorduction](#introduction)**<br>
+- **[Instructions for Obtaining Understand Database](#instructions-for-obtaining-understand-database)**<br>
 - **[Usage Instructions](#usage-instructions)**<br>
+- **[Outputs](#outputs)**<br>
 
 ## Introduction
 
