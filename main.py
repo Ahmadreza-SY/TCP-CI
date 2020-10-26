@@ -1,4 +1,5 @@
 from src.dep_feature_extractor import *
+from src.understand_database import *
 import argparse
 import understand
 import pandas as pd
@@ -15,15 +16,25 @@ def extract_and_save_dep_features(db, args):
 		extractor_type = FileDEPExtractor
 	elif args.level == "function":
 		extractor_type = FunctionDEPExtractor
+	
+	understand_db_type = UnderstandDatabase
+	if args.language == "c":
+		understand_db_type = CUnderstandDatabase
+	elif args.language == "java":
+		understand_db_type = JavaUnderstandDatabase
 
-	extractor = extractor_type(db, args.language)
+	understand_db = understand_db_type(db, args.level, args.project_path)
+	extractor = extractor_type(understand_db, args.language)
 	metadata = extractor.extract_metadata()
 	metadata_df = pd.DataFrame(metadata)
-	metadata_df.to_csv(f"{output_dir}/metadata.csv", index=False)
+	metadata_cols = metadata_df.columns.values.tolist()
+	if 'UniqueName' in metadata_cols:
+		metadata_cols.remove('UniqueName')
+	metadata_df.to_csv(f"{output_dir}/metadata.csv", index=False, columns=metadata_cols)
 
 	structural_graph = extractor.extract_structural_dependency_graph(metadata_df)
 	miner_type = extractor.get_association_miner()
-	miner = miner_type(args.project_path, metadata_df, args.since, args.branch)
+	miner = miner_type(args.project_path, metadata_df, understand_db, args.since, args.branch)
 	association_map = miner.compute_association_map()
 	logical_graph = extractor.extract_logical_dependency_graph(structural_graph, association_map)
 
@@ -48,7 +59,7 @@ def main():
 	parser.add_argument('-l', '--level', help="Specifies the granularity of feature extraction.",
 											choices=['function', 'file'], required=True)
 	parser.add_argument('-o', '--output-dir', help="Specifies the directory to save resulting datasets.", required=True)
-	parser.add_argument('--language', help="Project's main language", default="c", choices=["c"])
+	parser.add_argument('--language', help="Project's main language", choices=["c", "java"], required=True)
 	parser.add_argument('--branch', help="Git branch to analyze.", default="master")
 	parser.add_argument('--since',
 											help="Start date for commits to analyze - format YYYY-MM-DD. Not providing this arguments means to analyze all commits.",

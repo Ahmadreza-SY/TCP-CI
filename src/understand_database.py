@@ -1,0 +1,126 @@
+import os
+import re
+
+
+class UnderstandDatabase:
+	def __init__(self, db, level, project_path):
+		self.db = db
+		self.level = level
+		self.project_path = project_path
+
+	def get_valid_rel_path(self, rel_path):
+		valid_rel_path = rel_path
+		while not os.path.isfile(f'{self.project_path}/{valid_rel_path}'):
+			valid_rel_path = "/".join(valid_rel_path.split("/")[1:])
+			if valid_rel_path == "":
+				return rel_path
+		return valid_rel_path
+
+	@staticmethod
+	def get_files_from_ref(ref):
+		if "file" in ref.ent().kind().longname().lower():
+			return [ref.ent()]
+		files = []
+		for define_ref in ref.ent().refs('definein'):
+			files.append(define_ref.file())
+		return files
+
+	def get_ents_by_id(self, ids):
+		return list(map(lambda id: self.db.ent_from_id(id), ids))
+
+	def get_ents(self):
+		return self.db.ents(f"{self.lang} {self.level} ~unresolved ~unknown")
+
+	def get_dependencies(self, entity):
+		pass
+
+	def get_und_function_unique_name(self, und_function):
+		pass
+
+	def get_pydriller_function_unique_name(self, und_function):
+		pass
+
+	def entity_is_valid(self, entity):
+		entity_file_path = None
+		if self.level == 'file':
+			entity_file_path = entity.relname()
+		elif self.level == 'function':
+			define_ref = entity.ref('definein')
+			if define_ref is None:
+				return False
+			entity_file_path = define_ref.file().relname()
+		if entity_file_path is not None and entity_file_path[0] == "/":
+			return False
+		return True
+
+
+class CUnderstandDatabase(UnderstandDatabase):
+	def __init__(self, db, level, project_path):
+		UnderstandDatabase.__init__(self, db, level, project_path)
+		self.lang = "c"
+
+	def get_dependencies(self, entity):
+		if self.level == "file":
+			return list(map(lambda ref: ref.ent(), entity.refs('c include')))
+		elif self.level == "function":
+			return list(map(lambda ref: ref.ent(), entity.refs('c call')))
+
+	def get_und_function_unique_name(self, und_function):
+		return und_function.longname()
+
+	def get_pydriller_function_unique_name(self, pydriller_function):
+		return pydriller_function.name
+
+	def entity_is_valid(self, entity):
+		if not UnderstandDatabase.entity_is_valid(self, entity):
+			return False
+		if self.level == "file" and "/_deps/" in entity.relname():
+			return False
+		elif self.level == "function":
+			if entity.name() == "[unnamed]":
+				return False
+			define_in_ref = entity.ref("definein")
+			if define_in_ref is None or "/_deps/" in define_in_ref.file().relname():
+				return False
+		return True
+
+
+class JavaUnderstandDatabase(UnderstandDatabase):
+	def __init__(self, db, level, project_path):
+		UnderstandDatabase.__init__(self, db, level, project_path)
+		self.lang = "java"
+
+	def get_ents(self):
+		entity_kind = self.level
+		if self.level == "function":
+			entity_kind = "method"
+		return self.db.ents(f"{self.lang} {entity_kind} ~unresolved ~unknown")
+
+	def get_dependencies(self, entity):
+		if self.level == "file":
+			file_refs = []
+			for import_ref in entity.refs(f'java import'):
+				file_refs.extend(UnderstandDatabase.get_files_from_ref(import_ref))
+			return file_refs
+		elif self.level == "function":
+			return list(map(lambda ref: ref.ent(), entity.refs('java call')))
+
+	def get_und_function_unique_name(self, und_function):
+		und_parameters = und_function.parameters() if und_function.parameters() is not None else ""
+		und_name = und_function.name().replace('.', '::') + f"({und_parameters})".replace(' ', '')
+		return und_name
+
+	def get_pydriller_function_unique_name(self, pydriller_function):
+		return pydriller_function.long_name.replace(' ', '')
+
+	def entity_is_valid(self, entity):
+		if not UnderstandDatabase.entity_is_valid(self, entity):
+			return False
+		if self.level == "file" and ".class" in entity.name():
+			return False
+		if self.level == "function":
+			if re.search("\(Anon_\d+\)", entity.name()) is not None:
+				return False
+			if re.search("\(lambda_expr_\d+\)", entity.name()) is not None:
+				return False
+		return True

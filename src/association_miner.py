@@ -6,11 +6,12 @@ from apyori import apriori
 
 
 class AssociationMiner:
-	def __init__(self, project_path, metadata, since, branch):
+	def __init__(self, project_path, metadata, understand_db, since, branch):
 		self.repository = RepositoryMining(project_path, since=since, only_no_merge=True, only_in_branch=branch)
 		self.metadata = metadata
 		self.min_support = 0.0001
 		self.min_confidence = 0.002
+		self.understand_db = understand_db
 
 	def compute_changed_set(self, commit):
 		pass
@@ -55,13 +56,8 @@ class FunctionAssociationMiner(AssociationMiner):
 		changed_set = set()
 		for mod in commit.modifications:
 			for method in mod.changed_methods:
-				changed_method_meta = self.metadata[self.metadata.FullName == method.name]
-				if len(changed_method_meta) == 1:
+				method_unique_name = self.understand_db.get_pydriller_function_unique_name(method)
+				changed_method_meta = self.metadata[self.metadata.UniqueName == method_unique_name]
+				if len(changed_method_meta) > 0:
 					changed_set.add(changed_method_meta.Id.values[0])
-					continue
-				elif len(changed_method_meta) > 1:
-					changed_method_meta = changed_method_meta[changed_method_meta.FilePath.str.contains(method.filename)]
-					if len(changed_method_meta) == 1:
-						changed_set.add(changed_method_meta.Id.values[0])
-						continue
 		return changed_set
