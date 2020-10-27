@@ -16,7 +16,7 @@ def extract_and_save_dep_features(db, args):
 		extractor_type = FileDEPExtractor
 	elif args.level == "function":
 		extractor_type = FunctionDEPExtractor
-	
+
 	understand_db_type = UnderstandDatabase
 	if args.language == "c":
 		understand_db_type = CUnderstandDatabase

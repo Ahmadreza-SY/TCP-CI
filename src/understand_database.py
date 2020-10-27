@@ -16,15 +16,6 @@ class UnderstandDatabase:
 				return rel_path
 		return valid_rel_path
 
-	@staticmethod
-	def get_files_from_ref(ref):
-		if "file" in ref.ent().kind().longname().lower():
-			return [ref.ent()]
-		files = []
-		for define_ref in ref.ent().refs('definein'):
-			files.append(define_ref.file())
-		return files
-
 	def get_ents_by_id(self, ids):
 		return list(map(lambda id: self.db.ent_from_id(id), ids))
 
@@ -61,7 +52,7 @@ class CUnderstandDatabase(UnderstandDatabase):
 
 	def get_dependencies(self, entity):
 		if self.level == "file":
-			return list(map(lambda ref: ref.ent(), entity.refs('c include')))
+			return list(entity.depends().keys())
 		elif self.level == "function":
 			return list(map(lambda ref: ref.ent(), entity.refs('c call')))
 
@@ -98,10 +89,7 @@ class JavaUnderstandDatabase(UnderstandDatabase):
 
 	def get_dependencies(self, entity):
 		if self.level == "file":
-			file_refs = []
-			for import_ref in entity.refs(f'java import'):
-				file_refs.extend(UnderstandDatabase.get_files_from_ref(import_ref))
-			return file_refs
+			return list(entity.depends().keys())
 		elif self.level == "function":
 			return list(map(lambda ref: ref.ent(), entity.refs('java call')))
 
