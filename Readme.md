@@ -110,7 +110,7 @@ In other words, among all analyzed commits, there is no commit in which these bo
 
 On the other hand, the four real numbers represent `support`, `forward_confidence`, `backward_confidence`, and `lift`.
 These metrics are popular among the association rule mining algorithms.
-Note that assuming A has a dependency to B, `forward_confidence` is the confidence for A give B (A|B) and `backward_confidence` is the confidence for B give A (B|A).
+Note that assuming A has a dependency to B, `forward_confidence` is the confidence for A given B (A|B) and `backward_confidence` is the confidence for B given A (B|A).
 For details about these association metrics, visit [this link](https://www.kdnuggets.com/2016/04/association-rules-apriori-algorithm-tutorial.html).
 
 Here's how the dependency graph file looks like:
