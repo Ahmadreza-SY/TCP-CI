@@ -6,8 +6,8 @@ from apyori import apriori
 
 
 class AssociationMiner:
-	def __init__(self, project_path, metadata, understand_db, since, branch):
-		self.repository = RepositoryMining(project_path, since=since, only_no_merge=True, only_in_branch=branch)
+	def __init__(self, repository, metadata, understand_db):
+		self.repository = repository
 		self.metadata = metadata
 		self.min_support = 0.0001
 		self.min_confidence = 0.002
