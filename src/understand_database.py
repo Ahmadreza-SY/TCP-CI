@@ -8,13 +8,18 @@ class UnderstandDatabase:
 		self.level = level
 		self.project_path = project_path
 
-	def get_valid_rel_path(self, rel_path):
-		valid_rel_path = rel_path
-		while not os.path.isfile(f'{self.project_path}/{valid_rel_path}'):
-			valid_rel_path = "/".join(valid_rel_path.split("/")[1:])
-			if valid_rel_path == "":
-				return rel_path
-		return valid_rel_path
+	def get_valid_rel_path(self, entity):
+		full_project_path = os.path.abspath(self.project_path)
+		full_path = entity.longname()
+		if full_project_path not in full_path:
+			full_path = full_path.replace("RELATIVE:/", '')
+			dirs = full_path.split('/')
+			for dir in dirs:
+				if ('/' + dir) in full_project_path:
+					full_path = full_path.replace(dir + '/', '')
+				else:
+					break
+		return full_path.replace(full_project_path + '/', '')
 
 	def get_ents_by_id(self, ids):
 		return list(map(lambda id: self.db.ent_from_id(id), ids))

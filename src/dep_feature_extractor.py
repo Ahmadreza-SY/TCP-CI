@@ -36,7 +36,7 @@ class DEPExtractor:
 
 	def extract_logical_dependency_graph(self, structural_graph, association_map):
 		logical_graph = {}
-		for edge_start, dependencies in tqdm(structural_graph.items(), desc="Extracting logical graph"):
+		for edge_start, dependencies in tqdm(structural_graph.items(), desc="Extracting edge weights"):
 			dep_weights = []
 			for edge_end in dependencies:
 				pair = frozenset({edge_start, edge_end})
@@ -66,7 +66,7 @@ class FileDEPExtractor(DEPExtractor):
 				continue
 			metadata[DEPExtractor.ID_FIELD].append(entity.id())
 			metadata[DEPExtractor.NAME_FIELD].append(entity.name())
-			rel_path = self.understand_db.get_valid_rel_path(entity.relname())
+			rel_path = self.understand_db.get_valid_rel_path(entity)
 			metadata[DEPExtractor.FILE_PATH_FIELD].append(rel_path)
 			metric_names = entity.metrics()
 			metrics = entity.metric(metric_names)
