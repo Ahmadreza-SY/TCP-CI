@@ -11,14 +11,9 @@ class UnderstandDatabase:
 	def get_valid_rel_path(self, entity):
 		full_project_path = os.path.abspath(self.project_path)
 		full_path = entity.longname()
-		if full_project_path not in full_path:
+		if full_project_path not in full_path and "RELATIVE:/" in full_path:
 			full_path = full_path.replace("RELATIVE:/", '')
-			dirs = full_path.split('/')
-			for dir in dirs:
-				if ('/' + dir) in full_project_path:
-					full_path = full_path.replace(dir + '/', '')
-				else:
-					break
+			full_path = '/'.join(full_path.split('/')[1:])
 		return full_path.replace(full_project_path + '/', '')
 
 	def get_ents_by_id(self, ids):
