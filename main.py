@@ -1,17 +1,13 @@
 from src.services import *
 import argparse
 import os
-import sys
-import json
-
 
 def history(args):
+	args.db_path = DataCollectionService.create_understand_database(args)
 	DataCollectionService.compute_and_save_historical_data(args)
-
 
 def release(args):
 	DataCollectionService.compute_and_save_release_data(args)
-
 
 def valid_date(s):
 	try:
@@ -38,7 +34,6 @@ def main():
 
 	add_common_arguments(history_parser)
 	history_parser.set_defaults(func=history)
-	history_parser.add_argument('-d', '--db-path', help="Understand's database path with the .udb format.", required=True)
 	history_parser.add_argument('--branch', help="Git branch to analyze.", default="master")
 	history_parser.add_argument('--since', help="Start date for commits to analyze - format YYYY-MM-DD. Not providing this arguments means to analyze all commits.",
 															type=valid_date,
@@ -51,6 +46,8 @@ def main():
 	release_parser.add_argument('-hist', '--histories-dir', help="Path to outputs of the history command.", required=True)
 
 	args = parser.parse_args()
+	if not os.path.exists(args.output_dir):
+		os.makedirs(args.output_dir)
 	args.func(args)
 
 
