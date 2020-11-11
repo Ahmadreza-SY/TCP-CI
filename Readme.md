@@ -6,9 +6,9 @@ This project aims to extract and compute source-code-related features from a sof
 
 ## Instructions for Obtaining Understand Database
 ### Understand
-Understand is a code analysis enterprise software which provides static dependencies available in a source code between files, functions, classes, etc. For more details on this software, visit [this link](https://scitools.com/features). In this project, we utilize Understand to create a static call graph as a base for other features. 
+Understand is a code analysis enterprise software with a wide variety of [supported languages](https://support.scitools.com/t/supported-languages/153) which provides static dependencies available in a source code between files, functions, classes, etc. For more details on this software, visit [this link](https://scitools.com/features). In this project, we utilize Understand to create a static call graph as a base for other features. 
 
-In this section, we explain how to obtain the Understand database, a file with `.und` format which is the output of Understand's analysis. Note that this project needs Understand's database for extracting features and won't work without it.
+In this section, we explain how to install and set up Understand for our script to obtain a file with `.und` format which is the output of Understand's analysis. Note that this project needs Understand's database for extracting features and won't work without it.
 
 ### Installing Understand's CLI
 You can download the latest stable version of Understand from [this link](https://licensing.scitools.com/download). In order to run this project, you need to add the `und` command to your PATH environment variable so the `und` command is recognized in the shell. `und` is located in the `bin` directory of Understand's software.
@@ -25,11 +25,11 @@ $ und version
 ```
 
 ### Adding Understand Python Package/Library
-Unlike typical projects, Understand doesn't provide its Python library in the well-known pip package installer, and you need to manually add the package to your Python environment. The instructions of adding the package are explained in [this link](https://scitools.com/support/python-api/).
+Unlike typical projects, Understand doesn't provide its Python library in the well-known pip package installer, and you need to manually add the package to your Python environment. The instructions of adding the package are explained in [this link](https://support.scitools.com/t/getting-started-with-the-python-api/51).
 
 ## Usage Instructions
 ### Arguments
-After creating Understand's database, you're ready to run our script. The following table demonstrates available arguments to run the script:
+After setting up Understand's environment, you're ready to run our script. The following table demonstrates available arguments to run the script:
 
 Argument Name | Description | Required
 --- | --- | ---
@@ -42,11 +42,11 @@ Argument Name | Description | Required
 --since | The start date of commits to analyze with the format of YYYY-MM-DD. Not providing this argument means to analyze all commits. | No
 
 ### Usage Examples
-- This example analyzes ceph's nautilus branch in the file granularity level for only commits since 2020-04-16:
+This example analyzes ceph's nautilus branch in the file granularity level for only commits since 2020-04-16:
 ```
 python main.py -p ../sample-projects/ceph -l file -o ./ceph-file --branch nautilus --since 2020-04-16
 ```
-- This example analyzes ceph's master branch in the function granularity level for all available commits:
+This example analyzes ceph's master branch in the function granularity level for all available commits:
 ```
 python main.py -p ../sample-projects/ceph -l function -o ./ceph-function
 ```
@@ -57,7 +57,7 @@ Currently, this project creates two .csv files as its final results which are `m
 ### Metadata File
 The `metadata.csv` file represents the features available for each individual entity (file or function depending on the used granularity level).
 In addition to the metrics provided by Understand's analysis, it includes id, unique name, and path columns. 
-You can read the description of all Understand metrics in [this link](https://scitools.com/support/metrics_list).
+You can read the description of all Understand metrics in [this link](https://support.scitools.com/t/what-metrics-does-undertand-have/66).
 Here's a sample of ceph's extracted metadata in the file granularity:
 
 |Id|Name|FilePath|AltAvgLineBlank|AltAvgLineCode|AltAvgLineComment|AltCountLineBlank|AltCountLineCode|AltCountLineComment|AvgCyclomatic|AvgCyclomaticModified|AvgCyclomaticStrict|AvgEssential|AvgLine|AvgLineBlank|AvgLineCode|AvgLineComment|CountDeclClass|CountDeclFunction|CountLine|CountLineBlank|CountLineCode|CountLineCodeDecl|CountLineCodeExe|CountLineComment|CountLineInactive|CountLinePreprocessor|CountSemicolon|CountStmt|CountStmtDecl|CountStmtEmpty|CountStmtExe|MaxCyclomatic|MaxCyclomaticModified|MaxCyclomaticStrict|MaxEssential|MaxNesting|RatioCommentToCode|SumCyclomatic|SumCyclomaticModified|SumCyclomaticStrict|SumEssential|
