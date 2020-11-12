@@ -43,8 +43,6 @@ Argument Name | Description | Required
 --language | The main programming language of the project. We currently support Java and C/C++ languages and this argument's value for these languages are "java" and "c" respectively. | Yes
 -l, --level | Specifies the granularity of feature extraction. It can be one of the two "file" or "function" values. | Yes
 -o, --ouput-dir | Specifies the directory to save resulting datasets. The directory would be created if it doesn't exist. | Yes
---branch | The git branch to analyze. The default value is "master". | No
---since | The start date of commits to analyze with the format of YYYY-MM-DD. Not providing this argument means to analyze all commits. | No
 
 `history` sub-command arguments:
 
