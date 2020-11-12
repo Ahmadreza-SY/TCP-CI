@@ -28,8 +28,13 @@ $ und version
 Unlike typical projects, Understand doesn't provide its Python library in the well-known pip package installer, and you need to manually add the package to your Python environment. The instructions of adding the package are explained in [this link](https://support.scitools.com/t/getting-started-with-the-python-api/51).
 
 ## Usage Instructions
+After setting up Understand's environment, you're ready to run our script.
+
+This project consists of two sub-commands: `history` and `release`. The `history` sub-command extracts code dependecies based on the history of the code and static analysis. The `release` sub-command depends on output of the `history` command and extract changed entities in a new CI build/cycle.
+
 ### Arguments
-After setting up Understand's environment, you're ready to run our script. The following table demonstrates available arguments to run the script:
+
+Common arguments:
 
 Argument Name | Description | Required
 --- | --- | ---
@@ -41,18 +46,36 @@ Argument Name | Description | Required
 --branch | The git branch to analyze. The default value is "master". | No
 --since | The start date of commits to analyze with the format of YYYY-MM-DD. Not providing this argument means to analyze all commits. | No
 
+`history` sub-command arguments:
+
+Argument Name | Description | Required
+--- | --- | ---
+--branch | The git branch to analyze. The default value is "master". | No
+--since | The start date of commits to analyze with the format of YYYY-MM-DD. Not providing this argument means to analyze all commits. | No
+
+`release` sub-command arguments:
+
+Argument Name | Description | Required
+--- | --- | ---
+-c, --commits-file | Path to a text file including commit hashes of a release in each line. | Yes
+-hist, --histories-dir | Path to outputs of the history command. | Yes
+
 ### Usage Examples
 This example analyzes ceph's nautilus branch in the file granularity level for only commits since 2020-04-16:
 ```
-python main.py -p ../sample-projects/ceph -l file -o ./ceph-file --branch nautilus --since 2020-04-16
+python main.py history -p ../sample-projects/ceph -l file -o ./ceph-file --branch nautilus --since 2020-04-16
 ```
 This example analyzes ceph's master branch in the function granularity level for all available commits:
 ```
-python main.py -p ../sample-projects/ceph -l function -o ./ceph-function
+python main.py history -p ../sample-projects/ceph -l function -o ./ceph-function
+```
+This example extracts changed entities from a new release of ceph project:
+```
+python main.py release -p ../sample-projects/ceph -l function -o ./ceph-function -hist ./ceph-function --language c -c release-commits.txt
 ```
 
 ## Outputs
-Currently, this project creates two .csv files as its final results which are `metadata.csv` and `dep_graph.csv`.
+The `history` sub-command outputs the two `metadata.csv` and `dep_graph.csv` files. The `release` sub-command outputs the `release_changes.csv` file.
 
 ### Metadata File
 The `metadata.csv` file represents the features available for each individual entity (file or function depending on the used granularity level).
@@ -106,3 +129,17 @@ Here's how the dependency graph file looks like:
 |1013|[272]|[0]|
 |21|[22]|[[0.005, 1.0, 0.5, 108.5]]|
 |18298|[1887, 431]|[0, [0.0061, 0.22, 0.5, 18.22]]|
+
+### Release Changes File
+The `release_changes.csv` file indicates which enities have been directly and indirectly changed in a release (set of commits).
+
+The entities which are directly changed are indicated with the weight value of 1, however, entities with the weight value of 0 or a list of four real numbers are indirectly changed, and the meaning of their weights is compeletely explained in the previous section.
+
+The following table demonstrates a sample of release data:
+
+|entity_id|weight|
+|---|---|
+|1763|1|
+|48641|[0.0011, 0.333, 0.014, 4.32]|
+|3792|1|
+|1024|0|
