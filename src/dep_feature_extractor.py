@@ -93,17 +93,22 @@ class FunctionDEPExtractor(DEPExtractor):
 		metadata.setdefault(DEPExtractor.FILE_PATH_FIELD, [])
 		metadata.setdefault(FunctionDEPExtractor.PARAMETERS_FIELD, [])
 		entities = self.understand_db.get_ents()
+		function_set = set()
 		for entity in tqdm(entities, desc="Extracting metadata"):
 			if not self.understand_db.entity_is_valid(entity):
 				continue
+			rel_path = self.understand_db.get_valid_rel_path(entity.ref('definein').file())
+			parameters = "" if not entity.parameters() else entity.parameters()
+			unique_name = f'{entity.name()}-{entity.longname()}-{rel_path}-{parameters}'
+			if unique_name in function_set:
+				continue
+			function_set.add(unique_name)
 			metadata[DEPExtractor.ID_FIELD].append(entity.id())
 			metadata[DEPExtractor.NAME_FIELD].append(entity.name())
 			metadata[FunctionDEPExtractor.FULL_NAME_FIELD].append(entity.longname())
 			metadata[FunctionDEPExtractor.UNIQUE_NAME_FIELD].append(self.understand_db.get_und_function_unique_name(entity))
-			rel_path = self.understand_db.get_valid_rel_path(entity.ref('definein').file())
 			metadata[DEPExtractor.FILE_PATH_FIELD].append(rel_path)
-			parameters = entity.parameters()
-			metadata[FunctionDEPExtractor.PARAMETERS_FIELD].append(None if not parameters else parameters)
+			metadata[FunctionDEPExtractor.PARAMETERS_FIELD].append(parameters)
 			metric_names = entity.metrics()
 			metrics = entity.metric(metric_names)
 			for name, value in metrics.items():

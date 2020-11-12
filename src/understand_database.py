@@ -34,12 +34,12 @@ class UnderstandDatabase:
 	def entity_is_valid(self, entity):
 		entity_file_path = None
 		if self.level == 'file':
-			entity_file_path = entity.relname()
+			entity_file_path = self.get_valid_rel_path(entity)
 		elif self.level == 'function':
 			define_ref = entity.ref('definein')
 			if define_ref is None:
 				return False
-			entity_file_path = define_ref.file().relname()
+			entity_file_path = self.get_valid_rel_path(define_ref.file())
 		if entity_file_path is not None and entity_file_path[0] == "/":
 			return False
 		return True
