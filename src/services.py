@@ -7,7 +7,7 @@ import subprocess
 import shlex
 import os
 import sys
-
+import json
 
 class DataCollectionService:
 
@@ -76,8 +76,6 @@ class DataCollectionService:
 		metadata = extractor.extract_metadata()
 		metadata_df = pd.DataFrame(metadata)
 		metadata_cols = metadata_df.columns.values.tolist()
-		if 'UniqueName' in metadata_cols:
-			metadata_cols.remove('UniqueName')
 		metadata_df.to_csv(f"{output_dir}/metadata.csv", index=False, columns=metadata_cols)
 
 		structural_graph = extractor.extract_structural_dependency_graph(metadata_df)
@@ -110,7 +108,7 @@ class DataCollectionService:
 		miner = miner_type(repository, metadata_df, understand_db)
 
 		changed_sets = miner.compute_changed_sets()
-		changed_entities = set.union(*changed_sets)
+		changed_entities = set.union(*changed_sets) if len(changed_sets) > 0 else set()
 		dep_graph = pd.read_csv(f'{args.histories_dir}/dep_graph.csv', sep=';',
 														converters={'dependencies': json.loads, 'weights': json.loads})
 		changed_dep_graph = dep_graph[dep_graph.entity_id.isin(changed_entities)]
