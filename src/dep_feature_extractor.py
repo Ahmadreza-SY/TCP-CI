@@ -11,6 +11,7 @@ class DEPExtractor:
 	ID_FIELD = "Id"
 	NAME_FIELD = "Name"
 	FILE_PATH_FIELD = "FilePath"
+	ENTITY_TYPE_FIELD = "EntityType"
 
 	def __init__(self, understand_db, lang):
 		self.understand_db = understand_db
@@ -60,6 +61,7 @@ class FileDEPExtractor(DEPExtractor):
 		metadata.setdefault(DEPExtractor.ID_FIELD, [])
 		metadata.setdefault(DEPExtractor.NAME_FIELD, [])
 		metadata.setdefault(DEPExtractor.FILE_PATH_FIELD, [])
+		metadata.setdefault(DEPExtractor.ENTITY_TYPE_FIELD, [])
 		entities = self.understand_db.get_ents()
 		for entity in tqdm(entities, desc="Extracting metadata"):
 			if not self.understand_db.entity_is_valid(entity):
@@ -67,6 +69,8 @@ class FileDEPExtractor(DEPExtractor):
 			metadata[DEPExtractor.ID_FIELD].append(entity.id())
 			metadata[DEPExtractor.NAME_FIELD].append(entity.name())
 			rel_path = self.understand_db.get_valid_rel_path(entity)
+			entity_type = self.understand_db.get_entity_type(entity, rel_path)
+			metadata[DEPExtractor.ENTITY_TYPE_FIELD].append(entity_type.name)
 			metadata[DEPExtractor.FILE_PATH_FIELD].append(rel_path)
 			metric_names = entity.metrics()
 			metrics = entity.metric(metric_names)
@@ -91,6 +95,7 @@ class FunctionDEPExtractor(DEPExtractor):
 		metadata.setdefault(FunctionDEPExtractor.FULL_NAME_FIELD, [])
 		metadata.setdefault(FunctionDEPExtractor.UNIQUE_NAME_FIELD, [])
 		metadata.setdefault(DEPExtractor.FILE_PATH_FIELD, [])
+		metadata.setdefault(DEPExtractor.ENTITY_TYPE_FIELD, [])
 		metadata.setdefault(FunctionDEPExtractor.PARAMETERS_FIELD, [])
 		entities = self.understand_db.get_ents()
 		function_set = set()
@@ -98,6 +103,7 @@ class FunctionDEPExtractor(DEPExtractor):
 			if not self.understand_db.entity_is_valid(entity):
 				continue
 			rel_path = self.understand_db.get_valid_rel_path(entity.ref('definein').file())
+			entity_type = self.understand_db.get_entity_type(entity, rel_path)
 			parameters = "" if not entity.parameters() else entity.parameters()
 			unique_name = f'{entity.name()}-{entity.longname()}-{rel_path}-{parameters}'
 			if unique_name in function_set:
@@ -107,6 +113,7 @@ class FunctionDEPExtractor(DEPExtractor):
 			metadata[DEPExtractor.NAME_FIELD].append(entity.name())
 			metadata[FunctionDEPExtractor.FULL_NAME_FIELD].append(entity.longname())
 			metadata[FunctionDEPExtractor.UNIQUE_NAME_FIELD].append(self.understand_db.get_und_function_unique_name(entity))
+			metadata[DEPExtractor.ENTITY_TYPE_FIELD].append(entity_type.name)
 			metadata[DEPExtractor.FILE_PATH_FIELD].append(rel_path)
 			metadata[FunctionDEPExtractor.PARAMETERS_FIELD].append(parameters)
 			metric_names = entity.metrics()

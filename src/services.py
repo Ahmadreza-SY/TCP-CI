@@ -9,6 +9,7 @@ import os
 import sys
 import json
 
+
 class DataCollectionService:
 
 	@staticmethod
@@ -71,7 +72,7 @@ class DataCollectionService:
 			extractor_type = FunctionDEPExtractor
 
 		understand_db_type = DataCollectionService.get_understand_db_type(args.language)
-		understand_db = understand_db_type(db, args.level, args.project_path)
+		understand_db = understand_db_type(db, args.level, args.project_path, args.test_path)
 		extractor = extractor_type(understand_db, args.language)
 		metadata = extractor.extract_metadata()
 		metadata_df = pd.DataFrame(metadata)
@@ -98,7 +99,7 @@ class DataCollectionService:
 		metadata_df = pd.read_csv(f'{args.histories_dir}/metadata.csv')
 
 		understand_db_type = DataCollectionService.get_understand_db_type(args.language)
-		understand_db = understand_db_type(None, args.level, args.project_path)
+		understand_db = understand_db_type(None, args.level, args.project_path, args.test_path)
 
 		miner_type = AssociationMiner
 		if args.level == "file":

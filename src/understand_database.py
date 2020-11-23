@@ -1,12 +1,20 @@
 import os
 import re
+import glob
+from enum import Enum
+
+
+class EntityType(Enum):
+	TEST = 1
+	SRC = 2
 
 
 class UnderstandDatabase:
-	def __init__(self, db, level, project_path):
+	def __init__(self, db, level, project_path, test_path):
 		self.db = db
 		self.level = level
 		self.project_path = project_path
+		self.test_path = test_path
 
 	def get_valid_rel_path(self, entity):
 		full_project_path = os.path.abspath(self.project_path)
@@ -15,6 +23,15 @@ class UnderstandDatabase:
 			full_path = full_path.replace("RELATIVE:/", '')
 			full_path = '/'.join(full_path.split('/')[1:])
 		return full_path.replace(full_project_path + '/', '')
+
+	def get_entity_type(self, entity, rel_path):
+		file_name = rel_path.split('/')[-1]
+		full_test_path = os.path.abspath(self.test_path)
+		pattern = f'{full_test_path}/**/{file_name}'
+		for match in glob.glob(pattern, recursive=True):
+			if os.path.isfile(match) and rel_path in match:
+				return EntityType.TEST
+		return EntityType.SRC
 
 	def get_ents_by_id(self, ids):
 		return list(map(lambda id: self.db.ent_from_id(id), ids))
@@ -46,8 +63,8 @@ class UnderstandDatabase:
 
 
 class CUnderstandDatabase(UnderstandDatabase):
-	def __init__(self, db, level, project_path):
-		UnderstandDatabase.__init__(self, db, level, project_path)
+	def __init__(self, db, level, project_path, test_path):
+		UnderstandDatabase.__init__(self, db, level, project_path, test_path)
 		self.lang = "c"
 
 	def get_dependencies(self, entity):
@@ -77,8 +94,8 @@ class CUnderstandDatabase(UnderstandDatabase):
 
 
 class JavaUnderstandDatabase(UnderstandDatabase):
-	def __init__(self, db, level, project_path):
-		UnderstandDatabase.__init__(self, db, level, project_path)
+	def __init__(self, db, level, project_path, test_path):
+		UnderstandDatabase.__init__(self, db, level, project_path, test_path)
 		self.lang = "java"
 
 	def get_ents(self):

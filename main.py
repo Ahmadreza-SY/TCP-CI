@@ -2,12 +2,15 @@ from src.services import *
 import argparse
 import os
 
+
 def history(args):
 	args.db_path = DataCollectionService.create_understand_database(args)
 	DataCollectionService.compute_and_save_historical_data(args)
 
+
 def release(args):
 	DataCollectionService.compute_and_save_release_data(args)
+
 
 def valid_date(s):
 	try:
@@ -19,6 +22,7 @@ def valid_date(s):
 
 def add_common_arguments(parser):
 	parser.add_argument('-p', '--project-path', help="Project's source code git repository path.", required=True)
+	parser.add_argument('-t', '--test-path', help="Specifies root directory of the test source code.", required=True)
 	parser.add_argument('-l', '--level', help="Specifies the granularity of feature extraction.",
 											choices=['function', 'file'], required=True)
 	parser.add_argument('-o', '--output-dir', help="Specifies the directory to save resulting datasets.", default=".")
