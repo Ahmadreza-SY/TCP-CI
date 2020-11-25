@@ -77,7 +77,12 @@ class CUnderstandDatabase(UnderstandDatabase):
 		return und_function.longname()
 
 	def get_pydriller_function_unique_name(self, pydriller_function):
-		return pydriller_function.name
+		function_name = pydriller_function.name
+		if function_name == 'TEST':
+			function_name = pydriller_function.long_name
+			test_names = function_name[function_name.find("(")+1:function_name.find(")")].replace(' ', '').split(',')
+			function_name = f'{test_names[0]}_{test_names[1]}_Test::TestBody'
+		return function_name
 
 	def entity_is_valid(self, entity):
 		if not UnderstandDatabase.entity_is_valid(self, entity):

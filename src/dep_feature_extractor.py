@@ -2,7 +2,7 @@ from pydriller import RepositoryMining
 from pydriller.domain.commit import ModificationType
 from datetime import datetime
 from src.association_miner import *
-from src.understand_database import UnderstandDatabase
+from src.understand_database import UnderstandDatabase, EntityType
 import pandas as pd
 from tqdm import tqdm
 
@@ -23,21 +23,30 @@ class DEPExtractor:
 	def extract_metadata(self):
 		pass
 
-	def extract_structural_dependency_graph(self, metadata):
+	def create_static_dependency_graph(self, source_ids, dest_ids, desc):
 		structural_graph = {}
-		entities = self.understand_db.get_ents_by_id(metadata.Id.values)
-		ent_id_set = set(metadata.Id.values)
-		for entity in tqdm(entities, desc="Extracting structural graph"):
+		entities = self.understand_db.get_ents_by_id(source_ids)
+		dest_id_set = set(dest_ids)
+		for entity in tqdm(entities, desc=desc):
 			for dep in self.understand_db.get_dependencies(entity):
-				if dep.id() in ent_id_set:
+				if dep.id() in dest_id_set:
 					structural_graph.setdefault(entity.id(), [])
 					if dep.id() not in structural_graph[entity.id()] and dep.id() != entity.id():
 						structural_graph[entity.id()].append(dep.id())
 		return structural_graph
 
-	def extract_logical_dependency_graph(self, structural_graph, association_map):
+	def create_static_dep_graph(self, metadata):
+		src_ids = metadata[metadata[DEPExtractor.ENTITY_TYPE_FIELD] == EntityType.SRC.name].Id.values
+		return self.create_static_dependency_graph(src_ids, src_ids, "Creating static DEP graph")
+
+	def create_static_tar_graph(self, metadata):
+		src_ids = metadata[metadata[DEPExtractor.ENTITY_TYPE_FIELD] == EntityType.SRC.name].Id.values
+		test_ids = metadata[metadata[DEPExtractor.ENTITY_TYPE_FIELD] == EntityType.TEST.name].Id.values
+		return self.create_static_dependency_graph(test_ids, src_ids, "Creating static TAR graph")
+
+	def extract_historical_dependency_weights(self, structural_graph, association_map, desc):
 		logical_graph = {}
-		for edge_start, dependencies in tqdm(structural_graph.items(), desc="Extracting edge weights"):
+		for edge_start, dependencies in tqdm(structural_graph.items(), desc=desc):
 			dep_weights = []
 			for edge_end in dependencies:
 				pair = frozenset({edge_start, edge_end})
@@ -81,7 +90,6 @@ class FileDEPExtractor(DEPExtractor):
 
 
 class FunctionDEPExtractor(DEPExtractor):
-	FULL_NAME_FIELD = "FullName"
 	UNIQUE_NAME_FIELD = "UniqueName"
 	PARAMETERS_FIELD = "Parameters"
 
@@ -92,7 +100,6 @@ class FunctionDEPExtractor(DEPExtractor):
 		metadata = {}
 		metadata.setdefault(DEPExtractor.ID_FIELD, [])
 		metadata.setdefault(DEPExtractor.NAME_FIELD, [])
-		metadata.setdefault(FunctionDEPExtractor.FULL_NAME_FIELD, [])
 		metadata.setdefault(FunctionDEPExtractor.UNIQUE_NAME_FIELD, [])
 		metadata.setdefault(DEPExtractor.FILE_PATH_FIELD, [])
 		metadata.setdefault(DEPExtractor.ENTITY_TYPE_FIELD, [])
@@ -108,10 +115,11 @@ class FunctionDEPExtractor(DEPExtractor):
 			unique_name = f'{entity.name()}-{entity.longname()}-{rel_path}-{parameters}'
 			if unique_name in function_set:
 				continue
+			if self.lang == "c" and entity_type == EntityType.TEST and entity.name() != "TestBody":
+				continue
 			function_set.add(unique_name)
 			metadata[DEPExtractor.ID_FIELD].append(entity.id())
 			metadata[DEPExtractor.NAME_FIELD].append(entity.name())
-			metadata[FunctionDEPExtractor.FULL_NAME_FIELD].append(entity.longname())
 			metadata[FunctionDEPExtractor.UNIQUE_NAME_FIELD].append(self.understand_db.get_und_function_unique_name(entity))
 			metadata[DEPExtractor.ENTITY_TYPE_FIELD].append(entity_type.name)
 			metadata[DEPExtractor.FILE_PATH_FIELD].append(rel_path)

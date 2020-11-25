@@ -59,6 +59,12 @@ class DataCollectionService:
 		return und_db_path
 
 	@staticmethod
+	def save_dependency_graph(graph, weights, file_path, dependency_col_name):
+		graph_df = pd.DataFrame({'entity_id': list(graph.keys()), dependency_col_name: list(graph.values())})
+		graph_df['weights'] = [weights[ent_id] for ent_id in graph.keys()]
+		graph_df.to_csv(file_path, sep=';', index=False)
+
+	@staticmethod
 	def compute_and_save_historical_data(args):
 		print("Loading understand database ...")
 		db = understand.open(args.db_path)
@@ -78,17 +84,30 @@ class DataCollectionService:
 		metadata_df = pd.DataFrame(metadata)
 		metadata_cols = metadata_df.columns.values.tolist()
 		metadata_df.to_csv(f"{output_dir}/metadata.csv", index=False, columns=metadata_cols)
+		test_count = len(metadata_df[metadata_df[DEPExtractor.ENTITY_TYPE_FIELD] == EntityType.TEST.name])
+		print(f'Found a total of {len(metadata_df)} entities including {test_count} among test code and {len(metadata_df) - test_count} among the main source code.')
 
-		structural_graph = extractor.extract_structural_dependency_graph(metadata_df)
+		dep_graph = extractor.create_static_dep_graph(metadata_df)
+		tar_graph = extractor.create_static_tar_graph(metadata_df)
 		miner_type = extractor.get_association_miner()
 		repository = RepositoryMining(args.project_path, since=args.since, only_no_merge=True, only_in_branch=args.branch)
 		miner = miner_type(repository, metadata_df, understand_db)
 		association_map = miner.compute_association_map()
-		logical_graph = extractor.extract_logical_dependency_graph(structural_graph, association_map)
+		dep_weights = extractor.extract_historical_dependency_weights(dep_graph, association_map, "Extracting DEP weights")
+		tar_weights = extractor.extract_historical_dependency_weights(tar_graph, association_map, "Extracting TAR weights")
 
-		dep_df = pd.DataFrame({'entity_id': list(structural_graph.keys()), 'dependencies': list(structural_graph.values())})
-		dep_df['weights'] = [logical_graph[ent_id] for ent_id in structural_graph.keys()]
-		dep_df.to_csv(f"{output_dir}/dep_graph.csv", sep=';', index=False)
+		DataCollectionService.save_dependency_graph(dep_graph, dep_weights, f"{output_dir}/dep.csv", 'dependencies')
+
+		tar_reversed_graph = {}
+		tar_reversed_weights = {}
+		for test_id, src_ids in tar_graph.items():
+			for i, src_id in enumerate(src_ids):
+				tar_reversed_graph.setdefault(src_id, [])
+				tar_reversed_weights.setdefault(src_id, [])
+				tar_reversed_graph[src_id].append(test_id)
+				tar_reversed_weights[src_id].append(tar_weights[test_id][i])
+		DataCollectionService.save_dependency_graph(tar_reversed_graph, tar_reversed_weights,
+																								f"{output_dir}/tar.csv", 'targeted_by_tests')
 		print(f'All finished, results are saved in {output_dir}')
 
 	@staticmethod
@@ -110,19 +129,36 @@ class DataCollectionService:
 
 		changed_sets = miner.compute_changed_sets()
 		changed_entities = set.union(*changed_sets) if len(changed_sets) > 0 else set()
-		dep_graph = pd.read_csv(f'{args.histories_dir}/dep_graph.csv', sep=';',
+		dep_graph = pd.read_csv(f'{args.histories_dir}/dep.csv', sep=';',
 														converters={'dependencies': json.loads, 'weights': json.loads})
+		tar_graph = pd.read_csv(f'{args.histories_dir}/tar.csv', sep=';',
+														converters={'targeted_by_tests': json.loads, 'weights': json.loads})
+		tar_graph_dict = dict(zip(tar_graph.entity_id.values, zip(tar_graph.targeted_by_tests.values, tar_graph.weights.values)))
 		changed_dep_graph = dep_graph[dep_graph.entity_id.isin(changed_entities)]
 		changed_ids = []
 		change_weights = []
+		targeted_by_tests = []
+		targeted_by_tests_weights = []
+
+		def update_targeted_by_tests(entity_id):
+			if entity_id in tar_graph_dict:
+				targeted_by_tests.append(tar_graph_dict[entity_id][0])
+				targeted_by_tests_weights.append(tar_graph_dict[entity_id][1])
+			else:
+				targeted_by_tests.append([])
+				targeted_by_tests_weights.append([])
 		for r_index, row in changed_dep_graph.iterrows():
-			changed_ids.append(row['entity_id'])
+			entity_id = row['entity_id']
+			changed_ids.append(entity_id)
 			change_weights.append(1)
+			update_targeted_by_tests(entity_id)
 			for i, dep in enumerate(row['dependencies']):
 				changed_ids.append(dep)
 				change_weights.append(row['weights'][i])
+				update_targeted_by_tests(dep)
 
 		output_dir = args.output_dir
-		release_changes = pd.DataFrame({'entity_id': changed_ids, 'weight': change_weights})
+		release_changes = pd.DataFrame({'entity_id': changed_ids, 'weight': change_weights,
+																		'targeted_by_tests': targeted_by_tests, 'targeted_by_tests_weights': targeted_by_tests_weights})
 		release_changes.to_csv(f"{args.output_dir}/release_changes.csv", sep=';', index=False)
 		print(f'All finished, results are saved in {output_dir}')
