@@ -5,7 +5,7 @@ from src.association_miner import *
 from src.understand_database import UnderstandDatabase, EntityType
 import pandas as pd
 from tqdm import tqdm
-
+import re
 
 class DEPExtractor:
 	ID_FIELD = "Id"
@@ -62,6 +62,7 @@ class DEPExtractor:
 
 
 class FileDEPExtractor(DEPExtractor):
+	PACKAGE_FIELD = "Package"
 	def get_association_miner(self):
 		return FileAssociationMiner
 
@@ -69,6 +70,8 @@ class FileDEPExtractor(DEPExtractor):
 		metadata = {}
 		metadata.setdefault(DEPExtractor.ID_FIELD, [])
 		metadata.setdefault(DEPExtractor.NAME_FIELD, [])
+		if self.lang == "java":
+			metadata.setdefault(FileDEPExtractor.PACKAGE_FIELD, [])
 		metadata.setdefault(DEPExtractor.FILE_PATH_FIELD, [])
 		metadata.setdefault(DEPExtractor.ENTITY_TYPE_FIELD, [])
 		entities = self.understand_db.get_ents()
@@ -77,6 +80,12 @@ class FileDEPExtractor(DEPExtractor):
 				continue
 			metadata[DEPExtractor.ID_FIELD].append(entity.id())
 			metadata[DEPExtractor.NAME_FIELD].append(entity.name())
+			if self.lang == "java":
+				package = None
+				matches = re.compile('package (.+);').findall(entity.contents())
+				if len(matches) == 1:
+					package = matches[0] + '.' + entity.name()[:-5]
+				metadata[FileDEPExtractor.PACKAGE_FIELD].append(package)
 			rel_path = self.understand_db.get_valid_rel_path(entity)
 			entity_type = self.understand_db.get_entity_type(entity, rel_path)
 			metadata[DEPExtractor.ENTITY_TYPE_FIELD].append(entity_type.name)
