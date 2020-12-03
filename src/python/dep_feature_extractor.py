@@ -1,8 +1,8 @@
 from pydriller import RepositoryMining
 from pydriller.domain.commit import ModificationType
 from datetime import datetime
-from src.association_miner import *
-from src.understand_database import UnderstandDatabase, EntityType
+from src.python.association_miner import *
+from src.python.understand_database import UnderstandDatabase, EntityType
 import pandas as pd
 from tqdm import tqdm
 import re

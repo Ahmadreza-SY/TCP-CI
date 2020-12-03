@@ -1,5 +1,5 @@
-from src.dep_feature_extractor import *
-from src.understand_database import *
+from src.python.dep_feature_extractor import *
+from src.python.understand_database import *
 import understand
 import pandas as pd
 import time
