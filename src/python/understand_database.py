@@ -26,7 +26,7 @@ class UnderstandDatabase:
 
 	def get_entity_type(self, entity, rel_path):
 		file_name = rel_path.split('/')[-1]
-		full_test_path = os.path.abspath(self.test_path)
+		full_test_path = os.path.abspath(f'{self.project_path}/{self.test_path}')
 		pattern = f'{full_test_path}/**/{file_name}'
 		for match in glob.glob(pattern, recursive=True):
 			if os.path.isfile(match) and rel_path in match:

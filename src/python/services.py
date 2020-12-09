@@ -1,9 +1,11 @@
 from src.python.dep_feature_extractor import *
+from src.python.exe_feature_extractor import *
 from src.python.understand_database import *
 from src.python.understand_runner import *
 import understand
 import pandas as pd
 import os
+from os.path import isfile
 import sys
 import json
 
@@ -24,6 +26,10 @@ class DataCollectionService:
 		return UnderstandRunner.create_understand_database(args)
 
 	@staticmethod
+	def fetch_and_save_execution_history(args):
+		ExeFeatureExtractor.fetch_and_save_execution_history(args)
+
+	@staticmethod
 	def save_dependency_graph(graph, weights, file_path, dependency_col_name):
 		graph_df = pd.DataFrame({'entity_id': list(graph.keys()), dependency_col_name: list(graph.values())})
 		graph_df['weights'] = [weights[ent_id] for ent_id in graph.keys()]
@@ -31,10 +37,13 @@ class DataCollectionService:
 
 	@staticmethod
 	def compute_and_save_historical_data(args):
+		output_dir = args.output_dir
+		if isfile(f"{output_dir}/metadata.csv") and isfile(f"{output_dir}/dep.csv") and isfile(f"{output_dir}/tar.csv"):
+			print(f'Dependency datasets already exist, skipping dependency analysis.')
+			return
+
 		print("Loading understand database ...")
 		db = understand.open(args.db_path)
-
-		output_dir = args.output_dir
 
 		extractor_type = DEPExtractor
 		if args.level == "file":
@@ -73,7 +82,6 @@ class DataCollectionService:
 				tar_reversed_weights[src_id].append(tar_weights[test_id][i])
 		DataCollectionService.save_dependency_graph(tar_reversed_graph, tar_reversed_weights,
 																								f"{output_dir}/tar.csv", 'targeted_by_tests')
-		print(f'All finished, results are saved in {output_dir}')
 
 	@staticmethod
 	def compute_and_save_release_data(args):

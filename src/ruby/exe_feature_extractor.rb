@@ -4,12 +4,10 @@ require 'parallel'
 require 'rover-df'
 require 'tqdm'
 
-BASE_DIR = "data"
 TEST_LOG_REGEX = /Running (?<test_class>([A-Za-z]{1}[A-Za-z\d_]*\.)+[A-Za-z][A-Za-z\d_]*)(.*?)Tests run: (?<total_tests>\d*), Failures: (?<failed_tests>\d*), Errors: (?<error_tests>\d*), Skipped: (?<skipped_tests>\d*), Time elapsed: (?<tests_duration>[+-]?([0-9]*[.])?[0-9]+)/m
 ANSI_COLOR_CODES_REGEX = /\x1B\[([0-9]{1,3}((;[0-9]{1,2})?){1,2})?[mGK]/
 PROGRESS_LOGS_REGEX = /Progress \(\d*\):.*[\n\r]*/
 SCRIPT_REGEX = /The command "(?<script>.*)" exited with \d*./
-CSV_SEPARATOR = ","
 TestRun = Struct.new(:total_tests, :failed_tests, :error_tests, :skipped_tests, :tests_duration, :test_class)
 
 def extract_all_tests(job)
@@ -45,16 +43,17 @@ def extract_all_tests(job)
     }.compact, received_bytes
 end
 
-def fetch_logs_and_create_dataset(repository_name, repo_dir, separator, concurrency=1)
-    puts "starting to get #{repository_name} repository"
-    result_path = "#{repo_dir}/test_execution_history.csv"
+def fetch_logs_and_create_dataset(repository_slug, output_dir, concurrency=1)
+    puts "starting to get #{repository_slug} repository CI build logs"
+    result_path = "#{output_dir}/test_execution_history.csv"
     if File.file?(result_path)
-        puts "skipping download phase, #{result_path} already exists."
+        puts "skipping test execution history data extraction, #{result_path} already exists."
         return result_path
-    end
-    repository = Travis::Repository.find(repository_name)
+		end
+		separator = ","
+    repository = Travis::Repository.find(repository_slug)
     tests_file = File.open(result_path, "w")
-    dataset_columns = ["name", "duration", "executionDateTime", "verdict", "cycle"]
+    dataset_columns = ["name", "cycle", "verdict", "duration", "executionDateTime"]
     tests_file.write("#{dataset_columns.join(separator)}\n")
     received_megabytes = 0.0
     progress_message = "Initailizing ..."
@@ -65,12 +64,12 @@ def fetch_logs_and_create_dataset(repository_name, repo_dir, separator, concurre
                 if !default_job.nil?
                     test_runs, received_bytes = extract_all_tests(default_job)
                     received_megabytes += received_bytes.to_f / 2**20
-                    progress_message.sub!(/\A.*\Z/, "Received #{received_megabytes.round(2)} MBs")
+                    progress_message.sub!(/\A.*\Z/, "Received #{received_megabytes.round(2)} MBs of logs")
                     unless test_runs.empty?
                         tests_file.write(test_runs.map {|run|
                             verdict = (run.failed_tests == 0 && run.error_tests == 0) ? 0 : 1
-                            values = [run.test_class, (run.tests_duration * 1000).to_i, 
-                                default_job.started_at.strftime("%Y-%m-%d %H:%M"), verdict, build.number]
+                            values = [run.test_class, build.number, verdict, (run.tests_duration * 1000).to_i, 
+                                default_job.started_at.strftime("%Y-%m-%d %H:%M")]
                             values.join(separator)
                         	}.join("\n") + "\n"
                         )
@@ -85,25 +84,23 @@ def fetch_logs_and_create_dataset(repository_name, repo_dir, separator, concurre
         end
     }
     tests_file.close
-    puts "finshed getting #{repository_name} repository. Total received size: #{received_megabytes.round(2)} MBs\n"
+    puts "finshed extracting #{repository_slug} test execution history data. Total logs received: #{received_megabytes.round(2)} MBs\n"
     return result_path
 end
 
-def download_logs_and_save_test_cases(repository_name, separator=CSV_SEPARATOR)
-    repo_dir = "#{BASE_DIR}/#{repository_name}"
-    FileUtils.makedirs(repo_dir)
-    dataset_path = "#{repo_dir}/test_case_dataset.csv"
+def download_logs_and_save_test_cases(repository_slug, output_dir)
+    FileUtils.makedirs(output_dir)
+    dataset_path = "#{output_dir}/test_execution_history.csv"
     if File.file?(dataset_path)
-        puts "skipping #{repository_name} repository, dataset #{dataset_path} already exists."
+        puts "skipping #{repository_slug} repository, execution history #{dataset_path} already exists."
         return
     end
-    fetch_logs_and_create_dataset(repository_name, repo_dir, separator, 8)
+    fetch_logs_and_create_dataset(repository_slug, output_dir, 8)
 end
 
-repositories_file = File.open("repositories.txt")
-repositories = repositories_file.readlines.map(&:chomp)
-repositories_file.close
-FileUtils.makedirs(BASE_DIR)
-repositories.each do |repo|
-    download_logs_and_save_test_cases(repo)
+if ARGV.length != 2
+	puts "Exactly two arguments (project slug and output dir) is required!"
+	exit
 end
+
+download_logs_and_save_test_cases(ARGV[0], ARGV[1])
