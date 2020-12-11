@@ -28,14 +28,22 @@ class ExeFeatureExtractor:
 		exe_df = pd.read_csv(f'{args.output_dir}/test_execution_history.csv')
 		metadata_df = pd.read_csv(f'{args.output_dir}/metadata.csv', usecols=['Id', 'Package'])
 		package_to_id = dict(zip(metadata_df.Package.values, metadata_df.Id.values))
-		exe_df['entity_id'] = exe_df['name'].apply(lambda name: package_to_id.get(name, None))
-		exe_df.drop(['name'], axis=1, inplace=True)
+		exe_df['entity_id'] = exe_df['test_name'].apply(lambda name: package_to_id.get(name, None))
+		exe_df.drop(['test_name'], axis=1, inplace=True)
 		exe_df.dropna(subset=['entity_id'], inplace=True)
 		exe_df['entity_id'] = exe_df['entity_id'].astype('int32')
 		exe_cols = exe_df.columns.tolist()
 		exe_cols = exe_cols[-1:] + exe_cols[:-1]
 		exe_df = exe_df[exe_cols]
-		exe_df.sort_values(by=['cycle'], ascending=False, inplace=True)
+		exe_df.sort_values(by=['build', 'job'], ascending=False, inplace=True)
 		exe_df.to_csv(f'{args.output_dir}/exe.csv', index=False)
 		os.remove(f'{args.output_dir}/test_execution_history.csv')
+
+		builds_df = pd.read_csv(f'{args.output_dir}/builds.csv', sep=';')
+		builds_df.sort_values(by=['id'], ascending=False, inplace=True)
+		builds_df.to_csv(f'{args.output_dir}/builds.csv', index=False, sep=';')
+
+		jobs_df = pd.read_csv(f'{args.output_dir}/jobs.csv', sep=';')
+		jobs_df.sort_values(by=['build_id', 'id'], ascending=False, inplace=True)
+		jobs_df.to_csv(f'{args.output_dir}/jobs.csv', index=False, sep=';')
 		return
