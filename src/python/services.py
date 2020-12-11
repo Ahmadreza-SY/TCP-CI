@@ -2,6 +2,7 @@ from src.python.dep_feature_extractor import *
 from src.python.exe_feature_extractor import *
 from src.python.understand_database import *
 from src.python.understand_runner import *
+from src.python.commit_miner import *
 import understand
 import pandas as pd
 import os
@@ -36,12 +37,46 @@ class DataCollectionService:
 		graph_df.to_csv(file_path, sep=';', index=False)
 
 	@staticmethod
-	def compute_and_save_historical_data(args):
+	def compute_and_save_dep_data(extractor, metadata_df, understand_db, args):
 		output_dir = args.output_dir
 		if isfile(f"{output_dir}/metadata.csv") and isfile(f"{output_dir}/dep.csv") and isfile(f"{output_dir}/tar.csv"):
 			print(f'Dependency datasets already exist, skipping dependency analysis.')
 			return
 
+		dep_graph = extractor.create_static_dep_graph(metadata_df)
+		tar_graph = extractor.create_static_tar_graph(metadata_df)
+		miner_type = extractor.get_association_miner()
+		repository = RepositoryMining(args.project_path, since=args.since, only_in_branch=args.branch)
+		miner = miner_type(repository, metadata_df, understand_db)
+		association_map = miner.compute_association_map()
+		dep_weights = extractor.extract_historical_dependency_weights(dep_graph, association_map, "Extracting DEP weights")
+		tar_weights = extractor.extract_historical_dependency_weights(tar_graph, association_map, "Extracting TAR weights")
+		DataCollectionService.save_dependency_graph(dep_graph, dep_weights, f"{args.output_dir}/dep.csv", 'dependencies')
+
+		tar_reversed_graph = {}
+		tar_reversed_weights = {}
+		for test_id, src_ids in tar_graph.items():
+			for i, src_id in enumerate(src_ids):
+				tar_reversed_graph.setdefault(src_id, [])
+				tar_reversed_weights.setdefault(src_id, [])
+				tar_reversed_graph[src_id].append(test_id)
+				tar_reversed_weights[src_id].append(tar_weights[test_id][i])
+		DataCollectionService.save_dependency_graph(tar_reversed_graph, tar_reversed_weights,
+																								f"{args.output_dir}/tar.csv", 'targeted_by_tests')
+
+	@staticmethod
+	def compute_and_save_commit_data(args):
+		output_dir = args.output_dir
+		if isfile(f"{output_dir}/commits.csv") and isfile(f"{output_dir}/contributors.csv"):
+			print(f'Commmit datasets already exist, skipping commit mining.')
+			return
+		commit_miner = CommitMiner(args.project_path)
+		commit_features, contributors = commit_miner.mine_commits()
+		pd.DataFrame(commit_features).to_csv(f'{args.output_dir}/commits.csv', index=False, sep=';')
+		pd.DataFrame(list(contributors.values())).to_csv(f'{args.output_dir}/contributors.csv', index=False)
+
+	@staticmethod
+	def compute_and_save_historical_data(args):
 		print("Loading understand database ...")
 		db = understand.open(args.db_path)
 
@@ -57,31 +92,12 @@ class DataCollectionService:
 		metadata = extractor.extract_metadata()
 		metadata_df = pd.DataFrame(metadata)
 		metadata_cols = metadata_df.columns.values.tolist()
-		metadata_df.to_csv(f"{output_dir}/metadata.csv", index=False, columns=metadata_cols)
+		metadata_df.to_csv(f"{args.output_dir}/metadata.csv", index=False, columns=metadata_cols)
 		test_count = len(metadata_df[metadata_df[DEPExtractor.ENTITY_TYPE_FIELD] == EntityType.TEST.name])
 		print(f'Found a total of {len(metadata_df)} entities including {test_count} among test code and {len(metadata_df) - test_count} among the main source code.')
 
-		dep_graph = extractor.create_static_dep_graph(metadata_df)
-		tar_graph = extractor.create_static_tar_graph(metadata_df)
-		miner_type = extractor.get_association_miner()
-		repository = RepositoryMining(args.project_path, since=args.since, only_no_merge=True, only_in_branch=args.branch)
-		miner = miner_type(repository, metadata_df, understand_db)
-		association_map = miner.compute_association_map()
-		dep_weights = extractor.extract_historical_dependency_weights(dep_graph, association_map, "Extracting DEP weights")
-		tar_weights = extractor.extract_historical_dependency_weights(tar_graph, association_map, "Extracting TAR weights")
-
-		DataCollectionService.save_dependency_graph(dep_graph, dep_weights, f"{output_dir}/dep.csv", 'dependencies')
-
-		tar_reversed_graph = {}
-		tar_reversed_weights = {}
-		for test_id, src_ids in tar_graph.items():
-			for i, src_id in enumerate(src_ids):
-				tar_reversed_graph.setdefault(src_id, [])
-				tar_reversed_weights.setdefault(src_id, [])
-				tar_reversed_graph[src_id].append(test_id)
-				tar_reversed_weights[src_id].append(tar_weights[test_id][i])
-		DataCollectionService.save_dependency_graph(tar_reversed_graph, tar_reversed_weights,
-																								f"{output_dir}/tar.csv", 'targeted_by_tests')
+		DataCollectionService.compute_and_save_dep_data(extractor, metadata_df, understand_db, args)
+		DataCollectionService.compute_and_save_commit_data(args)
 
 	@staticmethod
 	def compute_and_save_release_data(args):

@@ -21,7 +21,7 @@ class AssociationMiner:
 		commits = list(self.repository.traverse_commits())
 		changed_sets = []
 		global_changed_set = set()
-		for commit in tqdm(commits, desc="Traversing commits"):
+		for commit in tqdm(commits, desc="Looking for associations among commits ..."):
 			changed_set = self.compute_changed_set(commit)
 			if len(changed_set) > 0:
 				changed_sets.append(changed_set)
