@@ -3,6 +3,7 @@ from src.python.exe_feature_extractor import *
 from src.python.understand_database import *
 from src.python.understand_runner import *
 from src.python.commit_miner import *
+from src.python.release_feature_extractor import *
 import understand
 import pandas as pd
 import os
@@ -101,9 +102,8 @@ class DataCollectionService:
 
 	@staticmethod
 	def compute_and_save_release_data(args):
-		commits_file = open(args.commits_file, 'r')
-		commits = list(map(str.strip, commits_file.readlines()))
-		repository = RepositoryMining(args.project_path, only_commits=commits)
+		output_dir = args.output_dir
+		repository = RepositoryMining(args.project_path, from_commit=args.from_commit, to_commit=args.to_commit)
 		metadata_df = pd.read_csv(f'{args.histories_dir}/metadata.csv')
 
 		understand_db_type = DataCollectionService.get_understand_db_type(args.language)
@@ -116,38 +116,19 @@ class DataCollectionService:
 			miner_type = FunctionAssociationMiner
 		miner = miner_type(repository, metadata_df, understand_db)
 
+		print('Extracting release impacts ...')
 		changed_sets = miner.compute_changed_sets()
 		changed_entities = set.union(*changed_sets) if len(changed_sets) > 0 else set()
 		dep_graph = pd.read_csv(f'{args.histories_dir}/dep.csv', sep=';',
 														converters={'dependencies': json.loads, 'weights': json.loads})
 		tar_graph = pd.read_csv(f'{args.histories_dir}/tar.csv', sep=';',
 														converters={'targeted_by_tests': json.loads, 'weights': json.loads})
-		tar_graph_dict = dict(zip(tar_graph.entity_id.values, zip(tar_graph.targeted_by_tests.values, tar_graph.weights.values)))
-		changed_dep_graph = dep_graph[dep_graph.entity_id.isin(changed_entities)]
-		changed_ids = []
-		change_weights = []
-		targeted_by_tests = []
-		targeted_by_tests_weights = []
+		release_impacts = ReleaseFeatureExtractor.extract_release_impacts(changed_entities, dep_graph, tar_graph)
+		release_impacts.to_csv(f"{output_dir}/release_impacts.csv", sep=';', index=False)
 
-		def update_targeted_by_tests(entity_id):
-			if entity_id in tar_graph_dict:
-				targeted_by_tests.append(tar_graph_dict[entity_id][0])
-				targeted_by_tests_weights.append(tar_graph_dict[entity_id][1])
-			else:
-				targeted_by_tests.append([])
-				targeted_by_tests_weights.append([])
-		for r_index, row in changed_dep_graph.iterrows():
-			entity_id = row['entity_id']
-			changed_ids.append(entity_id)
-			change_weights.append(1)
-			update_targeted_by_tests(entity_id)
-			for i, dep in enumerate(row['dependencies']):
-				changed_ids.append(dep)
-				change_weights.append(row['weights'][i])
-				update_targeted_by_tests(dep)
+		print('Extracting release changes ...')
+		release_changes = ReleaseFeatureExtractor.extract_release_changes(
+				metadata_df, args.project_path, args.from_commit, args.to_commit)
+		pd.DataFrame(release_changes).to_csv(f"{output_dir}/release_changes.csv", index=False)
 
-		output_dir = args.output_dir
-		release_changes = pd.DataFrame({'entity_id': changed_ids, 'weight': change_weights,
-																		'targeted_by_tests': targeted_by_tests, 'targeted_by_tests_weights': targeted_by_tests_weights})
-		release_changes.to_csv(f"{args.output_dir}/release_changes.csv", sep=';', index=False)
 		print(f'All finished, results are saved in {output_dir}')

@@ -68,8 +68,8 @@ def main():
 
 	add_common_arguments(release_parser)
 	release_parser.set_defaults(func=release)
-	release_parser.add_argument('-c', '--commits-file',
-															help="Path to a text file including commit hashes of a release in each line.", required=True)
+	release_parser.add_argument('-from', '--from-commit', help="Hash of the start commit of this release.", required=True)
+	release_parser.add_argument('-to', '--to-commit', help="Hash of the last commit of this release.", required=True)
 	release_parser.add_argument('-hist', '--histories-dir', help="Path to outputs of the history command.", required=True)
 
 	args = parser.parse_args()
