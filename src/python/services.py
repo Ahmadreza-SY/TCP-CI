@@ -73,8 +73,8 @@ class DataCollectionService:
 			return
 		commit_miner = CommitMiner(args.project_path)
 		commit_features, contributors = commit_miner.mine_commits()
-		pd.DataFrame(commit_features).to_csv(f'{args.output_dir}/commits.csv', index=False, sep=';')
-		pd.DataFrame(list(contributors.values())).to_csv(f'{args.output_dir}/contributors.csv', index=False)
+		commit_features.to_csv(f'{args.output_dir}/commits.csv', index=False, sep=';')
+		contributors.to_csv(f'{args.output_dir}/contributors.csv', index=False)
 
 	@staticmethod
 	def compute_and_save_historical_data(args):

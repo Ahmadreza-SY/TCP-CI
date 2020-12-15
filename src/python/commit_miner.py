@@ -1,5 +1,6 @@
 from pydriller import RepositoryMining
 from tqdm import tqdm
+import pandas as pd
 
 
 class CommitMiner:
@@ -54,9 +55,36 @@ class CommitMiner:
 		self.commit_features['max_complexity'].append(0.0 if len(mods_complexity) == 0 else max(mods_complexity))
 		self.commit_features['parents'].append(commit.parents)
 
+	def update_contributors_experience(self, experience, commit, contributor, date):
+		if contributor not in experience:
+			experience[contributor] = {'id': contributor, 'additions': 0,
+																 'deletions': 0, 'commit_count': 0, 'last_commit_date': date}
+		experience[contributor]['additions'] += commit.additions
+		experience[contributor]['deletions'] += commit.deletions
+		experience[contributor]['commit_count'] += 1
+		experience[contributor]['last_commit_date'] = max(date, experience[contributor]['last_commit_date'])
+
+	def extract_contributor_features(self, commit_features, contributors):
+		contributors_exp = {}
+		for index, commit in commit_features.iterrows():
+			author = commit.author
+			committer = commit.committer
+			if author == committer:
+				self.update_contributors_experience(contributors_exp, commit, commit.committer,
+																						max(commit.committer_date, commit.author_date))
+			else:
+				self.update_contributors_experience(contributors_exp, commit, commit.committer, commit.committer_date)
+				self.update_contributors_experience(contributors_exp, commit, commit.author, commit.author_date)
+
+		contributors_exp = pd.DataFrame(contributors_exp.values())
+		return pd.merge(contributors, contributors_exp, on='id')
+
 	def mine_commits(self):
 		commits = list(self.repository.traverse_commits())
 		commit_features = []
 		for commit in tqdm(commits, desc="Extracting commits features ..."):
 			self.extract_commit_features(commit)
-		return self.commit_features, self.contributors
+		commit_features = pd.DataFrame(self.commit_features)
+		contributors = pd.DataFrame(list(self.contributors.values()))
+		contributors = self.extract_contributor_features(commit_features, contributors)
+		return commit_features, contributors
