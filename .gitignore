@@ -2,4 +2,5 @@
 *.csv
 *.udb
 *.txt
+*.sh
 __pycache__
