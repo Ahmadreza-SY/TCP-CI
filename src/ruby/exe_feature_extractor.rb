@@ -129,7 +129,7 @@ def download_logs_and_save_test_cases(repository_slug, output_dir)
         puts "Skipping #{repository_slug} repository, execution history #{dataset_path} already exists."
         return
     end
-    fetch_logs_and_create_dataset(repository_slug, output_dir, 8)
+    fetch_logs_and_create_dataset(repository_slug, output_dir, 4)
 end
 
 if ARGV.length != 2
