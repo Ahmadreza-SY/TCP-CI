@@ -11,6 +11,13 @@ PROGRESS_LOGS_REGEX = /Progress \(\d*\):.*[\n\r]*/
 SCRIPT_REGEX = /The command "(?<script>.*)" exited with \d*./
 TestRun = Struct.new(:total_tests, :failed_tests, :error_tests, :skipped_tests, :tests_duration, :test_class)
 
+module TestResult
+	SUCCESS = 0
+	EXCEPTION = 1	
+	ASSERTION = 2
+	UNKNOWN_FAILURE = 3
+end
+
 def extract_all_tests(job)
     log = job.log.body
     if log.nil?
@@ -71,9 +78,12 @@ def save_test_execution(test_runs, job, build, exe_file, sep)
 	end
 	unless test_runs.empty?
 		exe_file.write(test_runs.map {|run|
-				test_result = (run.failed_tests == 0 && run.error_tests == 0) ? 0 : 1
-				values = [run.test_class, build.number, job.number, test_result, (run.tests_duration * 1000).to_i]
-				values.join(sep)
+			test_result = TestResult::SUCCESS
+			if run.failed_tests > 0 || run.error_tests > 0
+				test_result = (run.error_tests > run.failed_tests) ? TestResult::EXCEPTION : TestResult::ASSERTION
+			end
+			values = [run.test_class, build.number, job.number, test_result, (run.tests_duration * 1000).to_i]
+			values.join(sep)
 			}.join("\n") + "\n"
 		)
 	end
