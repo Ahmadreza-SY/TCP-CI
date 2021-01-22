@@ -76,6 +76,7 @@ def main():
 	if not os.path.exists(args.output_dir):
 		os.makedirs(args.output_dir)
 	fetch_source_code_if_needed(args)
+	args.unique_separator = '\t'
 	args.func(args)
 
 

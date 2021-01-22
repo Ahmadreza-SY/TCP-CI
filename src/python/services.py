@@ -32,10 +32,10 @@ class DataCollectionService:
 		ExeFeatureExtractor.fetch_and_save_execution_history(args)
 
 	@staticmethod
-	def save_dependency_graph(graph, weights, file_path, dependency_col_name):
+	def save_dependency_graph(graph, weights, file_path, dependency_col_name, args):
 		graph_df = pd.DataFrame({'entity_id': list(graph.keys()), dependency_col_name: list(graph.values())})
 		graph_df['weights'] = [weights[ent_id] for ent_id in graph.keys()]
-		graph_df.to_csv(file_path, sep=';', index=False)
+		graph_df.to_csv(file_path, sep=args.unique_separator, index=False)
 
 	@staticmethod
 	def compute_and_save_dep_data(extractor, metadata_df, understand_db, args):
@@ -52,7 +52,7 @@ class DataCollectionService:
 		association_map = miner.compute_association_map()
 		dep_weights = extractor.extract_historical_dependency_weights(dep_graph, association_map, "Extracting DEP weights")
 		tar_weights = extractor.extract_historical_dependency_weights(tar_graph, association_map, "Extracting TAR weights")
-		DataCollectionService.save_dependency_graph(dep_graph, dep_weights, f"{args.output_dir}/dep.csv", 'dependencies')
+		DataCollectionService.save_dependency_graph(dep_graph, dep_weights, f"{args.output_dir}/dep.csv", 'dependencies', args)
 
 		tar_reversed_graph = {}
 		tar_reversed_weights = {}
@@ -63,7 +63,7 @@ class DataCollectionService:
 				tar_reversed_graph[src_id].append(test_id)
 				tar_reversed_weights[src_id].append(tar_weights[test_id][i])
 		DataCollectionService.save_dependency_graph(tar_reversed_graph, tar_reversed_weights,
-																								f"{args.output_dir}/tar.csv", 'targeted_by_tests')
+																								f"{args.output_dir}/tar.csv", 'targeted_by_tests', args)
 
 	@staticmethod
 	def compute_and_save_commit_data(args):
@@ -73,7 +73,7 @@ class DataCollectionService:
 			return
 		commit_miner = CommitMiner(args.project_path)
 		commit_features, contributors = commit_miner.mine_commits()
-		commit_features.to_csv(f'{args.output_dir}/commits.csv', index=False, sep=';')
+		commit_features.to_csv(f'{args.output_dir}/commits.csv', index=False, sep=args.unique_separator)
 		contributors.to_csv(f'{args.output_dir}/contributors.csv', index=False)
 
 	@staticmethod
@@ -119,12 +119,12 @@ class DataCollectionService:
 		print('Extracting release impacts ...')
 		changed_sets = miner.compute_changed_sets()
 		changed_entities = set.union(*changed_sets) if len(changed_sets) > 0 else set()
-		dep_graph = pd.read_csv(f'{args.histories_dir}/dep.csv', sep=';',
+		dep_graph = pd.read_csv(f'{args.histories_dir}/dep.csv', sep=args.unique_separator,
 														converters={'dependencies': json.loads, 'weights': json.loads})
-		tar_graph = pd.read_csv(f'{args.histories_dir}/tar.csv', sep=';',
+		tar_graph = pd.read_csv(f'{args.histories_dir}/tar.csv', sep=args.unique_separator,
 														converters={'targeted_by_tests': json.loads, 'weights': json.loads})
 		release_impacts = ReleaseFeatureExtractor.extract_release_impacts(changed_entities, dep_graph, tar_graph)
-		release_impacts.to_csv(f"{output_dir}/release_impacts.csv", sep=';', index=False)
+		release_impacts.to_csv(f"{output_dir}/release_impacts.csv", sep=args.unique_separator, index=False)
 
 		print('Extracting release changes ...')
 		release_changes = ReleaseFeatureExtractor.extract_release_changes(
