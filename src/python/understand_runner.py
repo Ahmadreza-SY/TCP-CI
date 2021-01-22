@@ -25,6 +25,9 @@ class UnderstandRunner:
 				elif "File:" not in output and "Warning:" not in output and pbar is not None:
 					if "RELATIVE:/" in output or full_project_path in output:
 						pbar.update(1)
+		if pbar is None:
+			print("No output captured from understand!")
+			sys.exit()
 		pbar.close()
 		rc = process.poll()
 		return rc
