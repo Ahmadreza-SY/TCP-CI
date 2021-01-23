@@ -18,7 +18,7 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, c
 	exe_path = "#{output_dir}/test_execution_history.csv"
 	builds_path = "#{output_dir}/builds.csv"
 	jobs_path = "#{output_dir}/jobs.csv"
-	if File.file?(exe_path) && File.file?(builds_path) && File.file?(jobs_path)
+	if File.size(exe_path) > 0 && File.size(builds_path) > 0 && File.size(jobs_path) > 0
 		puts "Skipping test execution history data extraction, dataset already exists."
 		return
 	end
@@ -45,7 +45,7 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, c
 			end
 		rescue StandardError => e
 				sleep_seconds = 15
-				puts "Exception occurred: #{e.message}, retrying in #{sleep_seconds} seconds ..."
+				progress_message.sub!(/\A.*\Z/, "Exception occurred: #{e.message}, retrying in #{sleep_seconds} seconds ...")
 				sleep(sleep_seconds)
 				retry
 		end
@@ -58,17 +58,12 @@ end
 
 def download_logs_and_save_test_cases(repository_slug, log_type, output_dir)
 	FileUtils.makedirs(output_dir)
-	dataset_path = "#{output_dir}/test_execution_history.csv"
-	if File.file?(dataset_path)
-		puts "Skipping #{repository_slug} repository, execution history #{dataset_path} already exists."
-		return
-	end
 	test_extractor = if log_type == LogType::MAVEN
 		MavenTestExtractor.new
 	elsif log_type == LogType::GTEST
 		GTestExtractor.new
 	end
-	fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, 6)
+	fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, 8)
 end
 
 if ARGV.length != 3
