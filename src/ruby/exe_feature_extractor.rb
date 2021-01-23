@@ -58,6 +58,11 @@ end
 
 def download_logs_and_save_test_cases(repository_slug, log_type, output_dir)
 	FileUtils.makedirs(output_dir)
+	dataset_path = "#{output_dir}/exe.csv"
+	if File.size(dataset_path) > 0
+		puts "Skipping #{repository_slug} repository, execution history #{dataset_path} already exists."
+		return
+	end
 	test_extractor = if log_type == LogType::MAVEN
 		MavenTestExtractor.new
 	elsif log_type == LogType::GTEST
