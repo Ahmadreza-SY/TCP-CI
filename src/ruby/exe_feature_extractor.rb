@@ -18,7 +18,7 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, c
 	exe_path = "#{output_dir}/test_execution_history.csv"
 	builds_path = "#{output_dir}/builds.csv"
 	jobs_path = "#{output_dir}/jobs.csv"
-	if !File.size?(exe_path) && !File.size?(builds_path) && !File.size?(jobs_path)
+	if File.size?(exe_path) && File.size?(builds_path) && File.size?(jobs_path)
 		puts "Skipping test execution history data extraction, dataset already exists."
 		return
 	end
@@ -59,7 +59,7 @@ end
 def download_logs_and_save_test_cases(repository_slug, log_type, output_dir)
 	FileUtils.makedirs(output_dir)
 	dataset_path = "#{output_dir}/exe.csv"
-	if !File.size?(dataset_path)
+	if File.size?(dataset_path)
 		puts "Skipping #{repository_slug} repository, execution history #{dataset_path} already exists."
 		return
 	end
