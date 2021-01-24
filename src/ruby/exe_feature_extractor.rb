@@ -22,15 +22,18 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, c
 		puts "Skipping test execution history data extraction, dataset already exists."
 		return
 	end
-	repository = Travis::Repository.find(repository_slug)
 	exe_file = File.open(exe_path, "w")
 	builds_file = File.open(builds_path, "w")
 	jobs_file = File.open(jobs_path, "w")
 	
 	received_megabytes = 0.0
 	progress_message = "Initailizing ..."
-	Parallel.each(repository.each_build, in_threads: concurrency, progress: progress_message) { |build|
+	repository = Travis::Repository.find(repository_slug)
+	last_build_number = repository.last_build.number
+	build_numbers = (1..last_build_number).to_a
+	Parallel.each(build_numbers, in_threads: concurrency, progress: progress_message) { |build_number|
 		begin
+			build = repository.build(build_number)
 			unless build.nil?
 				save_build(build, builds_file, UNIQUE_SEPARATOR)
 				build.jobs.each { |job|
