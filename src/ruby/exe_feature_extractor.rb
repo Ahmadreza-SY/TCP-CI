@@ -28,9 +28,18 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, c
 	
 	received_megabytes = 0.0
 	progress_message = "Initailizing ..."
-	repository = Travis::Repository.find(repository_slug)
-	last_build_number = repository.last_build.number
-	build_numbers = (1..last_build_number).to_a
+	repository = nil
+	build_numbers = nil
+	begin
+		repository = Travis::Repository.find(repository_slug)
+		last_build_number = repository.last_build.number
+		build_numbers = (1..last_build_number).to_a
+	rescue StandardError => e
+			sleep_seconds = 15
+			puts "Exception occurred: #{e.message}, retrying in #{sleep_seconds} seconds ..."
+			sleep(sleep_seconds)
+			retry
+	end
 	Parallel.each(build_numbers, in_threads: concurrency, progress: progress_message) { |build_number|
 		begin
 			build = repository.build(build_number)
