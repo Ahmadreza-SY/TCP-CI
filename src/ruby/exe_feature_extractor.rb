@@ -32,7 +32,7 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, c
 	build_numbers = nil
 	begin
 		repository = Travis::Repository.find(repository_slug)
-		last_build_number = repository.last_build.number
+		last_build_number = repository.last_build.number.to_i
 		build_numbers = (1..last_build_number).to_a
 	rescue StandardError => e
 			sleep_seconds = 15
