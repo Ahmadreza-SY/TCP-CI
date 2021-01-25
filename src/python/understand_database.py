@@ -2,7 +2,7 @@ import os
 import re
 import glob
 from enum import Enum
-
+import sys
 
 class EntityType(Enum):
 	TEST = 1
@@ -25,6 +25,9 @@ class UnderstandDatabase:
 		return full_path.replace(full_project_path + '/', '')
 
 	def get_entity_type(self, entity, rel_path):
+		if self.test_path is None:
+			print("Test path cannot be None for this configuration. Aborting ...")
+			sys.exit()
 		file_name = rel_path.split('/')[-1]
 		full_test_path = os.path.abspath(f'{self.project_path}/{self.test_path}')
 		pattern = f'{full_test_path}/**/{file_name}'
@@ -102,6 +105,14 @@ class JavaUnderstandDatabase(UnderstandDatabase):
 	def __init__(self, db, level, project_path, test_path):
 		UnderstandDatabase.__init__(self, db, level, project_path, test_path)
 		self.lang = "java"
+
+	def get_entity_type(self, entity, rel_path):
+		if self.test_path is not None:
+			return super().get_entity_type(entity, rel_path)
+		if "src/test" in rel_path:
+			return EntityType.TEST
+		else:
+			return EntityType.SRC
 
 	def get_ents(self):
 		entity_kind = self.level

@@ -45,7 +45,7 @@ def valid_date(s):
 def add_common_arguments(parser):
 	parser.add_argument('-p', '--project-path', help="Project's source code git repository path.", default=None)
 	parser.add_argument('-s', '--project-slug', help="The project's GitHub slug, e.g., apache/commons.", default=None)
-	parser.add_argument('-t', '--test-path', help="Specifies the relative root directory of the test source code.", required=True)
+	parser.add_argument('-t', '--test-path', help="Specifies the relative root directory of the test source code.", default=None)
 	parser.add_argument('-l', '--level', help="Specifies the granularity of feature extraction.",
 											choices=['function', 'file'], required=True)
 	parser.add_argument('-o', '--output-dir', help="Specifies the directory to save resulting datasets.", default=".")
