@@ -30,6 +30,7 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, c
 	progress_message = "Initailizing ..."
 	repository = nil
 	build_numbers = nil
+	retries = 0
 	begin
 		repository = Travis::Repository.find(repository_slug)
 		last_build_number = repository.last_build.number.to_i
@@ -38,9 +39,14 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, c
 			sleep_seconds = 15
 			puts "Exception occurred: #{e.message}, retrying in #{sleep_seconds} seconds ..."
 			sleep(sleep_seconds)
-			retry
+			if (retries += 1) < 10
+				retry 
+			else
+				raise "Cannot get repository from Travis-CI after 10 retries: #{e.message}"
+			end
 	end
 	Parallel.each(build_numbers, in_threads: concurrency, progress: progress_message) { |build_number|
+		retries = 0
 		begin
 			build = repository.build(build_number)
 			unless build.nil?
@@ -56,10 +62,10 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, c
 				}
 			end
 		rescue StandardError => e
-				sleep_seconds = 15
-				progress_message.sub!(/\A.*\Z/, "Exception occurred: #{e.message}, retrying in #{sleep_seconds} seconds ...")
-				sleep(sleep_seconds)
-				retry
+			sleep_seconds = 15
+			progress_message.sub!(/\A.*\Z/, "Exception occurred: #{e.message}, retrying in #{sleep_seconds} seconds ...")
+			sleep(sleep_seconds)
+			retry if (retries += 1) < 5
 		end
 	}
 	exe_file.close
