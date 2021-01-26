@@ -3,6 +3,7 @@ import argparse
 import os
 import sys
 import subprocess
+from git import Repo
 
 
 def history(args):
@@ -14,6 +15,11 @@ def history(args):
 
 def release(args):
 	DataCollectionService.compute_and_save_release_data(args)
+
+
+def get_default_branch(project_path):
+	repo = Repo(project_path)
+	return repo.active_branch
 
 
 def fetch_source_code_if_needed(args):
@@ -32,6 +38,8 @@ def fetch_source_code_if_needed(args):
 		if return_code != 0:
 			print('Failure in fetching source code for GitHub!')
 			sys.exit()
+	if args.branch is None:
+		args.branch = get_default_branch(args.project_path)
 
 
 def valid_date(s):
@@ -61,7 +69,7 @@ def main():
 
 	add_common_arguments(history_parser)
 	history_parser.set_defaults(func=history)
-	history_parser.add_argument('--branch', help="Git branch to analyze.", default="master")
+	history_parser.add_argument('--branch', help="Git branch to analyze.", default=None)
 	history_parser.add_argument('--since', help="Start date for commits to analyze - format YYYY-MM-DD. Not providing this arguments means to analyze all commits.",
 															type=valid_date,
 															default=None)

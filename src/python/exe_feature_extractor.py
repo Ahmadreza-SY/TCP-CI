@@ -78,6 +78,11 @@ class ExeFeatureExtractor:
 		if args.project_slug is None:
 			print(f'No project slug is provided, skipping test execution history retrival.')
 			return
+		
+		exe_path = f'{args.output_dir}/exe.csv'
+		if os.path.exists(exe_path) and os.path.getsize(exe_path) > 0:
+			print(f"Skipping {args.project_slug} repository, execution history {exe_path} already exists.")
+			return
 
 		log_type = None
 		exe_mapper = None
