@@ -22,9 +22,9 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, c
 		puts "Skipping test execution history data extraction, dataset already exists."
 		return
 	end
-	exe_file = File.open(exe_path, "w")
-	builds_file = File.open(builds_path, "w")
-	jobs_file = File.open(jobs_path, "w")
+	exe_file = File.new(exe_path, "w")
+	builds_file = File.new(builds_path, "w")
+	jobs_file = File.new(jobs_path, "w")
 	
 	received_megabytes = 0.0
 	progress_message = "Initailizing ..."
