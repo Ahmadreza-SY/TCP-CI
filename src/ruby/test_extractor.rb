@@ -14,10 +14,10 @@ class TestExtractor
 	TestRun = Struct.new(:test_name, :test_duration, :test_result)
 
 	def fetch_and_clean_logs(job)
-		log = job.log.body
-		if log.nil?
+		if job.log.nil? || job.log.body.nil?
 			return nil, 0
 		end
+		log = job.log.body
 		cleaned_log = log.gsub(ANSI_COLOR_CODES_REGEX, '').gsub(PROGRESS_LOGS_REGEX, '')
 		received_bytes = log.bytesize
 		return cleaned_log, received_bytes
