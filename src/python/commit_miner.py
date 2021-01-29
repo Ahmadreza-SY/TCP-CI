@@ -44,9 +44,24 @@ class CommitMiner:
 		self.commit_features['author_date'].append(commit.author_date.strftime("%Y-%m-%d %H:%M"))
 		self.commit_features['in_main_branch'].append(commit.in_main_branch)
 		self.commit_features['merge'].append(commit.merge)
-		self.commit_features['dmm_unit_complexity'].append(commit.dmm_unit_complexity)
-		self.commit_features['dmm_unit_interfacing'].append(commit.dmm_unit_interfacing)
-		self.commit_features['dmm_unit_size'].append(commit.dmm_unit_size)
+		dmm_unit_complexity = None
+		try:
+			dmm_unit_complexity = commit.dmm_unit_complexity
+		except:
+			pass
+		self.commit_features['dmm_unit_complexity'].append(dmm_unit_complexity)
+		dmm_unit_interfacing = None
+		try:
+			dmm_unit_interfacing = commit.dmm_unit_interfacing
+		except:
+			pass
+		self.commit_features['dmm_unit_interfacing'].append(dmm_unit_interfacing)
+		dmm_unit_size = None
+		try:
+			dmm_unit_size = commit.dmm_unit_size
+		except:
+			pass
+		self.commit_features['dmm_unit_size'].append(dmm_unit_size)
 		self.commit_features['additions'].append(sum(list(map(lambda m: m.added, commit.modifications))))
 		self.commit_features['deletions'].append(sum(list(map(lambda m: m.removed, commit.modifications))))
 		mods_complexity = list(filter(lambda c: c is not None, map(lambda m: m.complexity, commit.modifications)))
