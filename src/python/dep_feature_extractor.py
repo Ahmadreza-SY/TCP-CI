@@ -52,9 +52,16 @@ class DEPExtractor:
 				pair = frozenset({edge_start, edge_end})
 				if pair in association_map:
 					rule = association_map[pair]
-					forward_stats = next(stats for stats in rule.ordered_statistics if stats.items_base == frozenset({edge_end}))
-					backward_stats = next(stats for stats in rule.ordered_statistics if stats.items_base == frozenset({edge_start}))
-					dep_weights.append([rule.support, forward_stats.confidence, backward_stats.confidence, forward_stats.lift])
+					forward_confidence = 0.0
+					backward_confidence = 0.0
+					lift = 0.0
+					for stats in rule.ordered_statistics:
+						lift = stats.lift
+						if stats.items_base == frozenset({edge_end}):
+							forward_confidence = stats.confidence
+						elif stats.items_base == frozenset({edge_start}):
+							backward_confidence = stats.confidence
+					dep_weights.append([rule.support, forward_confidence, backward_confidence, lift])
 				else:
 					dep_weights.append(0)
 			logical_graph[edge_start] = dep_weights
