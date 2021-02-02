@@ -64,7 +64,15 @@ class CommitMiner:
 		self.commit_features['dmm_unit_size'].append(dmm_unit_size)
 		self.commit_features['additions'].append(sum(list(map(lambda m: m.added, commit.modifications))))
 		self.commit_features['deletions'].append(sum(list(map(lambda m: m.removed, commit.modifications))))
-		mods_complexity = list(filter(lambda c: c is not None, map(lambda m: m.complexity, commit.modifications)))
+		mods_complexity = []
+		for m in commit.modifications:
+			mod_complexity = None
+			try:
+				mod_complexity = m.complexity
+			except:
+				pass
+			if mod_complexity is not None:
+				mods_complexity.append(mod_complexity)
 		avg_complexity = 0.0 if len(mods_complexity) == 0 else sum(mods_complexity) / len(mods_complexity)
 		self.commit_features['avg_complexity'].append(avg_complexity)
 		self.commit_features['max_complexity'].append(0.0 if len(mods_complexity) == 0 else max(mods_complexity))
