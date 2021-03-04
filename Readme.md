@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This project aims to extract and compute source-code-related features from a software repository. It analyzes the source code based on static and version control history aspects and creates a dependency graph containing the relationships between files/functions and their association weights. The ultimate goal of extracting these features is for sloving the  test case selection and prioritization problems.
+This project aims to extract and compute source-code-related features from a software repository. It analyzes the source code based on static and version control history aspects and creates a dependency graph containing the relationships between files/functions and their association weights. The ultimate goal of extracting these features is for solving the test case selection and prioritization problems.
 
 ## Environment Setup
 ### Python Environment
@@ -11,7 +11,7 @@ The tool is tested on Python 3.7+. The tool's Python dependencies can be install
 pip install -r requirements.txt
 ```
 ### Ruby Environment
-The tool is tested on Ruby 2.6.6. The tool's Ruby dependencies can be installed by running the bundler command in the root of the project:
+The tool is tested on Ruby 2.6.6. The tool's Ruby dependencies can be installed by running the bundler command at the root of the project:
 ```bash
 bundle install
 ```
@@ -21,7 +21,7 @@ Understand is a code analysis enterprise software with a wide variety of [suppor
 In this section, we explain how to install and set up Understand for our script to obtain a file with `.und` format which is the output of Understand's analysis. Note that this project needs Understand's database for extracting features and won't work without it.
 
 #### Installing Understand's CLI
-You can download the latest stable version of Understand from [this link](https://licensing.scitools.com/download). In order to run this project, you need to add the `und` command to your PATH environment variable so the `und` command is recognized in the shell. `und` is located in the `bin` directory of Understand's software.
+You can download the latest stable version of Understand from [this link](https://licensing.scitools.com/download). To run this project, you need to add the `und` command to your PATH environment variable so the `und` command is recognized in the shell. `und` is located in the `bin` directory of Understand's software.
 
 ```bash
 export PATH="$PATH:/path/to/understand/scitools/bin/linux64"
@@ -35,12 +35,12 @@ $ und version
 ```
 
 #### Adding Understand Python Package/Library
-Unlike typical projects, Understand doesn't provide its Python library in the well-known pip package installer, and you need to manually add the package to your Python environment. The instructions of adding the package are explained in [this link](https://support.scitools.com/t/getting-started-with-the-python-api/51).
+Unlike typical projects, Understand doesn't provide its Python library in the well-known pip package installer, and you need to manually add the package to your Python environment. The instructions for adding the package are explained in [this link](https://support.scitools.com/t/getting-started-with-the-python-api/51).
 
 ## Usage Instructions
 After setting up the environment, you're ready to run our script.
 
-This project consists of two sub-commands: `history` and `release`. The `history` sub-command extracts code dependecies based on the history of the code and static analysis. The `release` sub-command depends on output of the `history` command and extract changed entities in a new CI build/cycle.
+This project consists of two sub-commands: `history` and `release`. The `history` sub-command extracts code dependencies based on the history of the code and static analysis. The `release` sub-command depends on the output of the `history` command and extracts changed entities in a new CI build/cycle.
 
 ### Arguments
 
@@ -54,7 +54,7 @@ Argument Name | Description | Required
 --language | The main programming language of the project. We currently support Java and C/C++ languages and this argument's value for these languages are "java" and "c" respectively. | Yes
 -l, --level | Specifies the granularity of feature extraction. It can be one of the two "file" or "function" values. | Yes
 -t, --test-path | Specifies the relative root directory of the test source code. | No
--o, --ouput-dir | Specifies the directory to save resulting datasets. The directory would be created if it doesn't exist. | Yes
+-o, --output-dir | Specifies the directory to save resulting datasets. The directory would be created if it doesn't exist. | Yes
 
 #### Notes
 - At least one of the `--project-path` or `--project-slug` arguments should be provided since the tool requires the source code for analysis.
@@ -65,7 +65,7 @@ Argument Name | Description | Required
 Argument Name | Description | Required
 --- | --- | ---
 --branch | The git branch to analyze. The default value is "master". | No
---since | The start date of commits to analyze with the format of YYYY-MM-DD. Not providing this argument means to analyze all commits. | No
+--since | The start date of commits to analyze with the format of YYYY-MM-DD. Not providing this argument means analyzing all commits. | No
 
 `release` sub-command arguments:
 
@@ -104,7 +104,7 @@ The `release` sub-command outputs the `release_changes.csv` file.
 We used meaningful names for the output files and columns, therefore we only discuss the following files.
 
 ### Metadata File
-The `metadata.csv` file represents the features available for each individual entity (file or function depending on the used granularity level).
+The `metadata.csv` file represents the features available for each entity (file or function depending on the used granularity level).
 In addition to the metrics provided by Understand's analysis, it includes id, unique name, path, and EntityType columns. 
 You can read the description of all Understand metrics in [this link](https://support.scitools.com/t/what-metrics-does-undertand-have/66).
 Here's a sample of ceph's extracted metadata in the file granularity:
@@ -123,15 +123,15 @@ This file is created of three columns which are `entity_id`, `dependencies`, `we
 
 Each row demonstrates the dependencies of an entity with the id of `entity_id` to a list of other entities (the `dependencies` column).
 These static dependencies are extracted from Understand's database.
-A file has a dependency to a second file if it includes/imports the second file.
-A function has a dependency to a second function if it calls the second function.
+A file has a dependency on a second file if it includes/imports the second file.
+A function has a dependency on a second function if it calls the second function.
 
 It also contains the association weights for each dependency which can be found in the `weights` column.
 The association weights are extracted using the git history and Apriori algorithm.
 For each dependency, the association weight is either a single zero or four real numbers. 
 
-A single zero means although Understand detected a static relation, but there is no historical dependency between these two entities.
-In other words, among all analyzed commits, there is no commit in which these both enities have changed.
+A single zero means although Understand detected a static relation, there is no historical dependency between these two entities.
+In other words, among all analyzed commits, there is no commit in which both entities have changed.
 
 On the other hand, the four real numbers represent `support`, `forward_confidence`, `backward_confidence`, and `lift`.
 These metrics are popular among the association rule mining algorithms.
@@ -147,25 +147,25 @@ Here's how the dependency graph file looks like:
 |21|[22]|[[0.005, 1.0, 0.5, 108.5]]|
 |18298|[1887, 431]|[0, [0.0061, 0.22, 0.5, 18.22]]|
 
-Additionally, the `tar.csv` file represents the dependencies between the test code and source code. The idea behind this file is the same as `dep.csv` with similar idea of association weights and dependencies. However, it contains the following three columns which are slightly different from `dep.csv` columns.
+Additionally, the `tar.csv` file represents the dependencies between the test code and source code. The idea behind this file is the same as `dep.csv` with the similar idea of association weights and dependencies. However, it contains the following three columns which are slightly different from `dep.csv` columns.
 
-- `entity_id`: The id of a source code entity which is executed (targeted) by test cases.
+- `entity_id`: The id of a source code entity that is executed (targeted) by test cases.
 - `targeted_by_tests`: A list of test case ids which execute (target) the `entity_id`.
 - `weights`: The weights of the target relation between each test case in `targeted_by_tests` and the `entity_id`.
 
 ### Execution History File
-The `exe.csv` file represents the execution history of all available test cases in the project. We assign each CI build/cycle a build_id, and for each build_id we have multiple jobs in which the test cases are executed. The columns of this file are breifly explained in the following list.
+The `exe.csv` file represents the execution history of all available test cases in the project. We assign each CI build/cycle a build_id, and for each build_id we have multiple jobs in which the test cases are executed. The columns of this file are briefly explained in the following list.
 
 - `entity_id`: Id of the test case which was executed.
-- `build`: Id of the build in which the test case was executed. The builds metadata is available in the `builds.csv` file.
+- `build`: Id of the build in which the test case was executed. The build metadata is available in the `builds.csv` file.
 - `job`: Id of the job in which the test case was executed. The jobs metadata is available in the `jobs.csv` file.
-- `test_result`: The result of the test case execution. The value of 0 means passed, 1 means failed due to execption, 2 meand failed due to assertion, and 3 means failed due to an unknown reason.
+- `test_result`: The result of the test case execution. The value of 0 means passed, 1 means failed due to exception, 2 means failed due to assertion, and 3 means failed due to an unknown reason.
 - `duration`: The duration of the test case execution in milliseconds.
 
 ### Release Changes File
 The `release_changes.csv` file indicates which enities have been directly and indirectly changed in a release (set of commits).
 
-The entities which are directly changed are indicated with the weight value of 1, however, entities with the weight value of 0 or a list of four real numbers are indirectly changed, and the meaning of their weights is compeletely explained in the previous section.
+The entities which are directly changed are indicated with the weight value of 1, however, entities with the weight value of 0 or a list of four real numbers are indirectly changed, and the meaning of their weights is completely explained in the previous section.
 
 The following table demonstrates a sample of release data:
 
