@@ -38,7 +38,7 @@ $ und version
 Unlike typical projects, Understand doesn't provide its Python library in the well-known pip package installer, and you need to manually add the package to your Python environment. The instructions of adding the package are explained in [this link](https://support.scitools.com/t/getting-started-with-the-python-api/51).
 
 ## Usage Instructions
-After setting up Understand's environment, you're ready to run our script.
+After setting up the environment, you're ready to run our script.
 
 This project consists of two sub-commands: `history` and `release`. The `history` sub-command extracts code dependecies based on the history of the code and static analysis. The `release` sub-command depends on output of the `history` command and extract changed entities in a new CI build/cycle.
 
@@ -91,6 +91,7 @@ python main.py release -p ./sample-projects/ceph -l function -o ./ceph-function 
 
 ## Outputs
 The `history` sub-command creates the following files as its outputs: 
+
 - `metadata.csv`: Contains all entities (files/functions) of the source and test code with all their complexity features.
 - `dep.csv`: Contains the dependency graph for only the source entities of the system under test.
 - `tar.csv`: Contains the dependency graph for test case and the system under test dependencies.
@@ -147,12 +148,14 @@ Here's how the dependency graph file looks like:
 |18298|[1887, 431]|[0, [0.0061, 0.22, 0.5, 18.22]]|
 
 Additionally, the `tar.csv` file represents the dependencies between the test code and source code. The idea behind this file is the same as `dep.csv` with similar idea of association weights and dependencies. However, it contains the following three columns which are slightly different from `dep.csv` columns.
+
 - `entity_id`: The id of a source code entity which is executed (targeted) by test cases.
 - `targeted_by_tests`: A list of test case ids which execute (target) the `entity_id`.
 - `weights`: The weights of the target relation between each test case in `targeted_by_tests` and the `entity_id`.
 
 ### Execution History File
 The `exe.csv` file represents the execution history of all available test cases in the project. We assign each CI build/cycle a build_id, and for each build_id we have multiple jobs in which the test cases are executed. The columns of this file are breifly explained in the following list.
+
 - `entity_id`: Id of the test case which was executed.
 - `build`: Id of the build in which the test case was executed. The builds metadata is available in the `builds.csv` file.
 - `job`: Id of the job in which the test case was executed. The jobs metadata is available in the `jobs.csv` file.
