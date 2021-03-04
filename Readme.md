@@ -90,33 +90,34 @@ python main.py release -p ./sample-projects/ceph -l function -o ./ceph-function 
 ```
 
 ## Outputs
-The `history` sub-command outputs the two `metadata.csv` and `dep_graph.csv` files. The `release` sub-command outputs the `release_changes.csv` file.
+The `history` sub-command creates the following files as its outputs: 
+- `metadata.csv`: Contains all entities (files/functions) of the source and test code with all their complexity features.
+- `dep.csv`: Contains the dependency graph for only the source entities of the system under test.
+- `tar.csv`: Contains the dependency graph for test case and the system under test dependencies.
+- `exe.csv`: Contains the execution history of the test cases.
+- `commits.csv`: Contains metadata and metrics of all analyzed commits.
+- `contributors.csv`: Contains the process metrics related to contributors' experience.
+
+The `release` sub-command outputs the `release_changes.csv` file.
+
+We used meaningful names for the output files and columns, therefore we only discuss the following files.
 
 ### Metadata File
 The `metadata.csv` file represents the features available for each individual entity (file or function depending on the used granularity level).
-In addition to the metrics provided by Understand's analysis, it includes id, unique name, and path columns. 
+In addition to the metrics provided by Understand's analysis, it includes id, unique name, path, and EntityType columns. 
 You can read the description of all Understand metrics in [this link](https://support.scitools.com/t/what-metrics-does-undertand-have/66).
 Here's a sample of ceph's extracted metadata in the file granularity:
 
-|Id|Name|FilePath|AltAvgLineBlank|AltAvgLineCode|AltAvgLineComment|AltCountLineBlank|AltCountLineCode|AltCountLineComment|AvgCyclomatic|AvgCyclomaticModified|AvgCyclomaticStrict|AvgEssential|AvgLine|AvgLineBlank|AvgLineCode|AvgLineComment|CountDeclClass|CountDeclFunction|CountLine|CountLineBlank|CountLineCode|CountLineCodeDecl|CountLineCodeExe|CountLineComment|CountLineInactive|CountLinePreprocessor|CountSemicolon|CountStmt|CountStmtDecl|CountStmtEmpty|CountStmtExe|MaxCyclomatic|MaxCyclomaticModified|MaxCyclomaticStrict|MaxEssential|MaxNesting|RatioCommentToCode|SumCyclomatic|SumCyclomaticModified|SumCyclomaticStrict|SumEssential|
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-|1|ClusterWatcher.cc|src/tools/cephfs_mirror/ClusterWatcher.cc|2|14|0|28|123|7|3|3|3|0|16|2|14|0|0|8|156|28|112|40|10|7|0|11|50|111|87|0|24|8|8|8|1|3|0.06|27|27|27|8|
-|20|debug.h|src/common/debug.h|0|0|0|10|10|15|0|0|0|0|0|0|0|0|0|0|35|10|0|0|0|15|0|10|0|0|0|0|0|0|0|0|0|0|0.00|0|0|0|0|
-|724|ClientSnapRealm.cc|src/client/ClientSnapRealm.cc|2|21|0|4|23|2|4|4|4|1|23|2|21|0|0|1|29|4|21|4|18|2|0|2|21|28|4|0|24|4|4|4|1|1|0.10|4|4|4|1|
-|725|ClientSnapRealm.h|src/client/ClientSnapRealm.h|0|18|0|14|44|4|5|5|5|1|18|0|18|0|1|4|60|14|38|0|0|4|0|6|21|32|27|0|5|2|2|2|1|1|0.11|5|5|5|4|
-|769|actions.hpp|src/rbd_replay/actions.hpp|0|105|0|83|212|49|34|34|34|1|105|0|105|0|15|34|344|83|203|0|0|49|0|9|77|205|181|0|24|1|1|1|1|0|0.24|34|34|34|34|
+|Id|Name|FilePath|EntityType|AltAvgLineBlank|AltAvgLineCode|AltAvgLineComment|AltCountLineBlank|AltCountLineCode|AltCountLineComment|AvgCyclomatic|AvgCyclomaticModified|AvgCyclomaticStrict|AvgEssential|AvgLine|AvgLineBlank|AvgLineCode|AvgLineComment|CountDeclClass|CountDeclFunction|CountLine|CountLineBlank|CountLineCode|CountLineCodeDecl|CountLineCodeExe|CountLineComment|CountLineInactive|CountLinePreprocessor|CountSemicolon|CountStmt|CountStmtDecl|CountStmtEmpty|CountStmtExe|MaxCyclomatic|MaxCyclomaticModified|MaxCyclomaticStrict|MaxEssential|MaxNesting|RatioCommentToCode|SumCyclomatic|SumCyclomaticModified|SumCyclomaticStrict|SumEssential|
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+|1|ClusterWatcher.cc|src/tools/cephfs_mirror/ClusterWatcher.cc|SRC|2|14|0|28|123|7|3|3|3|0|16|2|14|0|0|8|156|28|112|40|10|7|0|11|50|111|87|0|24|8|8|8|1|3|0.06|27|27|27|8|
+|20|debug.h|src/common/debug.h|SRC|0|0|0|10|10|15|0|0|0|0|0|0|0|0|0|0|35|10|0|0|0|15|0|10|0|0|0|0|0|0|0|0|0|0|0.00|0|0|0|0|
+|724|ClientSnapRealm.cc|src/client/ClientSnapRealm.cc|SRC|2|21|0|4|23|2|4|4|4|1|23|2|21|0|0|1|29|4|21|4|18|2|0|2|21|28|4|0|24|4|4|4|1|1|0.10|4|4|4|1|
+|725|ClientSnapRealm.h|src/client/ClientSnapRealm.h|SRC|0|18|0|14|44|4|5|5|5|1|18|0|18|0|1|4|60|14|38|0|0|4|0|6|21|32|27|0|5|2|2|2|1|1|0.11|5|5|5|4|
+|769|actions.hpp|src/rbd_replay/actions.hpp|SRC|0|105|0|83|212|49|34|34|34|1|105|0|105|0|15|34|344|83|203|0|0|49|0|9|77|205|181|0|24|1|1|1|1|0|0.24|34|34|34|34|
 
-This is a another sample of ceph's extracted metadata for function granularity:
-
-|Id|Name|FullName|FilePath|Parameters|AltCountLineBlank|AltCountLineCode|AltCountLineComment|CountInput|CountLine|CountLineBlank|CountLineCode|CountLineCodeDecl|CountLineCodeExe|CountLineComment|CountLineInactive|CountLinePreprocessor|CountOutput|CountPath|CountPathLog|CountSemicolon|CountStmt|CountStmtDecl|CountStmtEmpty|CountStmtExe|Cyclomatic|CyclomaticModified|CyclomaticStrict|Essential|Knots|MaxEssentialKnots|MaxNesting|MinEssentialKnots|RatioCommentToCode|
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-|15|get_ostream|ceph::logging::MutableEntry::get_ostream|src/log/Entry.h||0|3|0|7668|3|0|3|1|1|0|0|0|2|1|0|1|1|0|0|1|1|1|1|1|0|0|0|0|0.00|
-|71|handle_fsmap|cephfs::mirror::ClusterWatcher::handle_fsmap|src/tools/cephfs_mirror/ClusterWatcher.cc|const int &|11|69|3|1|83|11|69|25|0|3|0|0|3|8|1|34|55|49|0|6|7|7|7|1|0|0|2|0|0.04|
-|163|append|ceph::buffer::v15_2_0::list::append|src/common/buffer.cc|const ceph::buffer::v15_2_0::ptr &|0|4|0|110|4|0|4|1|1|0|0|0|1|1|0|1|1|0|0|1|1|1|1|1|0|0|0|0|0.00|
-|177|clone_range|SloppyCRCMap::clone_range|src/common/SloppyCRCMap.cc|"uint64_t,uint64_t,uint64_t,const SloppyCRCMap &,std::ostream *"|0|43|1|10|44|0|43|8|33|1|0|0|10|63|2|21|31|5|0|26|11|11|11|1|2|0|4|0|0.02|
-
-### Dependency Graph File
-The `dep_graph.csv` file represents the static and historical dependencies between the entities found in `metadata.csv`.
+### Dependency Graph Files
+The `dep.csv` file represents the static and historical dependencies between the entities found in `metadata.csv`.
 This file is created of three columns which are `entity_id`, `dependencies`, `weights`.
 
 Each row demonstrates the dependencies of an entity with the id of `entity_id` to a list of other entities (the `dependencies` column).
@@ -144,6 +145,19 @@ Here's how the dependency graph file looks like:
 |1013|[272]|[0]|
 |21|[22]|[[0.005, 1.0, 0.5, 108.5]]|
 |18298|[1887, 431]|[0, [0.0061, 0.22, 0.5, 18.22]]|
+
+Additionally, the `tar.csv` file represents the dependencies between the test code and source code. The idea behind this file is the same as `dep.csv` with similar idea of association weights and dependencies. However, it contains the following three columns which are slightly different from `dep.csv` columns.
+- `entity_id`: The id of a source code entity which is executed (targeted) by test cases.
+- `targeted_by_tests`: A list of test case ids which execute (target) the `entity_id`.
+- `weights`: The weights of the target relation between each test case in `targeted_by_tests` and the `entity_id`.
+
+### Execution History File
+The `exe.csv` file represents the execution history of all available test cases in the project. We assign each CI build/cycle a build_id, and for each build_id we have multiple jobs in which the test cases are executed. The columns of this file are breifly explained in the following list.
+- `entity_id`: Id of the test case which was executed.
+- `build`: Id of the build in which the test case was executed. The builds metadata is available in the `builds.csv` file.
+- `job`: Id of the job in which the test case was executed. The jobs metadata is available in the `jobs.csv` file.
+- `test_result`: The result of the test case execution. The value of 0 means passed, 1 means failed due to execption, 2 meand failed due to assertion, and 3 means failed due to an unknown reason.
+- `duration`: The duration of the test case execution in milliseconds.
 
 ### Release Changes File
 The `release_changes.csv` file indicates which enities have been directly and indirectly changed in a release (set of commits).
