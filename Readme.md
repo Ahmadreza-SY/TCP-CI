@@ -4,13 +4,23 @@
 
 This project aims to extract and compute source-code-related features from a software repository. It analyzes the source code based on static and version control history aspects and creates a dependency graph containing the relationships between files/functions and their association weights. The ultimate goal of extracting these features is for sloving the  test case selection and prioritization problems.
 
-## Instructions for Obtaining Understand Database
+## Environment Setup
+### Python Environment
+The tool is tested on Python 3.7+. The tool's Python dependencies can be installed via the following command:
+```bash
+pip install -r requirements.txt
+```
+### Ruby Environment
+The tool is tested on Ruby 2.6.6. The tool's Ruby dependencies can be installed by running the bundler command in the root of the project:
+```bash
+bundle install
+```
 ### Understand
 Understand is a code analysis enterprise software with a wide variety of [supported languages](https://support.scitools.com/t/supported-languages/153) which provides static dependencies available in a source code between files, functions, classes, etc. For more details on this software, visit [this link](https://scitools.com/features). In this project, we utilize Understand to create a static call graph as a base for other features. 
 
 In this section, we explain how to install and set up Understand for our script to obtain a file with `.und` format which is the output of Understand's analysis. Note that this project needs Understand's database for extracting features and won't work without it.
 
-### Installing Understand's CLI
+#### Installing Understand's CLI
 You can download the latest stable version of Understand from [this link](https://licensing.scitools.com/download). In order to run this project, you need to add the `und` command to your PATH environment variable so the `und` command is recognized in the shell. `und` is located in the `bin` directory of Understand's software.
 
 ```bash
@@ -24,7 +34,7 @@ $ und version
 (Build 1029)
 ```
 
-### Adding Understand Python Package/Library
+#### Adding Understand Python Package/Library
 Unlike typical projects, Understand doesn't provide its Python library in the well-known pip package installer, and you need to manually add the package to your Python environment. The instructions of adding the package are explained in [this link](https://support.scitools.com/t/getting-started-with-the-python-api/51).
 
 ## Usage Instructions
@@ -39,10 +49,16 @@ Common arguments:
 Argument Name | Description | Required
 --- | --- | ---
 -h, --help | Shows the help message and exits. | No
--p, --project-path | Path to project's source code which is a git repository. | Yes
+-p, --project-path | Path to project's source code which is a git repository. | No
+-s, --project-slug | The project's GitHub slug, e.g., apache/commons. | No
 --language | The main programming language of the project. We currently support Java and C/C++ languages and this argument's value for these languages are "java" and "c" respectively. | Yes
 -l, --level | Specifies the granularity of feature extraction. It can be one of the two "file" or "function" values. | Yes
+-t, --test-path | Specifies the relative root directory of the test source code. | No
 -o, --ouput-dir | Specifies the directory to save resulting datasets. The directory would be created if it doesn't exist. | Yes
+
+#### Notes
+- At least one of the `--project-path` or `--project-slug` arguments should be provided since the tool requires the source code for analysis.
+- The `--test-path` is only optional for Java projects since test source is found under `src/test` directories in Java projects.
 
 `history` sub-command arguments:
 
@@ -55,21 +71,22 @@ Argument Name | Description | Required
 
 Argument Name | Description | Required
 --- | --- | ---
--c, --commits-file | Path to a text file including commit hashes of a release in each line. | Yes
+-from, --from-commit | Hash of the start commit of this release. | Yes
+-to, --to-commit | Hash of the last commit of this release. | Yes
 -hist, --histories-dir | Path to outputs of the history command. | Yes
 
 ### Usage Examples
 This example analyzes ceph's nautilus branch in the file granularity level for only commits since 2020-04-16:
 ```
-python main.py history -p ../sample-projects/ceph -l file -o ./ceph-file --branch nautilus --since 2020-04-16
+python main.py history -s ceph/ceph -l file -o ./ceph-file --branch nautilus --since 2020-04-16
 ```
 This example analyzes ceph's master branch in the function granularity level for all available commits:
 ```
-python main.py history -p ../sample-projects/ceph -l function -o ./ceph-function
+python main.py history -p ./sample-projects/ceph -l function -o ./ceph-function
 ```
 This example extracts changed entities from a new release of ceph project:
 ```
-python main.py release -p ../sample-projects/ceph -l function -o ./ceph-function -hist ./ceph-function --language c -c release-commits.txt
+python main.py release -p ./sample-projects/ceph -l function -o ./ceph-function -hist ./ceph-function --language c -from 19f492014bcab54e4bafae4c52576de390bdbe47 -to 7efcc72483543cdbeae268b42ff33491a258626c
 ```
 
 ## Outputs
