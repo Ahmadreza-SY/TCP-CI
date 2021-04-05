@@ -13,11 +13,11 @@ end
 
 UNIQUE_SEPARATOR = "\t"
 
-def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, concurrency=1)
+def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_path, concurrency=1)
 	puts "Starting to get #{repository_slug} repository CI build logs"
-	exe_path = "#{output_dir}/test_execution_history.csv"
-	builds_path = "#{output_dir}/builds.csv"
-	jobs_path = "#{output_dir}/jobs.csv"
+	exe_path = "#{output_path}/test_execution_history.csv"
+	builds_path = "#{output_path}/builds.csv"
+	jobs_path = "#{output_path}/jobs.csv"
 	if File.size?(exe_path) && File.size?(builds_path) && File.size?(jobs_path)
 		puts "Skipping test execution history data extraction, dataset already exists."
 		return
@@ -74,9 +74,9 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, c
 	puts "Finshed extracting #{repository_slug} test execution history data. Total logs received: #{received_megabytes.round(2)} MBs\n"
 end
 
-def download_logs_and_save_test_cases(repository_slug, log_type, output_dir)
-	FileUtils.makedirs(output_dir)
-	dataset_path = "#{output_dir}/exe.csv"
+def download_logs_and_save_test_cases(repository_slug, log_type, output_path)
+	FileUtils.makedirs(output_path)
+	dataset_path = "#{output_path}/exe.csv"
 	if File.size?(dataset_path)
 		puts "Skipping #{repository_slug} repository, execution history #{dataset_path} already exists."
 		return
@@ -86,7 +86,7 @@ def download_logs_and_save_test_cases(repository_slug, log_type, output_dir)
 	elsif log_type == LogType::GTEST
 		GTestExtractor.new
 	end
-	fetch_logs_and_create_dataset(repository_slug, test_extractor, output_dir, 8)
+	fetch_logs_and_create_dataset(repository_slug, test_extractor, output_path, 8)
 end
 
 if ARGV.length != 3

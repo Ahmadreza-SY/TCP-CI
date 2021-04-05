@@ -3,5 +3,5 @@ from typing import List
 
 
 class ExecutionRecordExtractorInterface:
-    def fetch_execution_records() -> List[ExecutionRecord]:
+    def fetch_execution_records(self) -> List[ExecutionRecord]:
         pass
