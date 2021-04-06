@@ -16,8 +16,8 @@ UNIQUE_SEPARATOR = "\t"
 def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_path, concurrency=1)
 	puts "Starting to get #{repository_slug} repository CI build logs"
 	exe_path = "#{output_path}/test_execution_history.csv"
-	builds_path = "#{output_path}/builds.csv"
-	jobs_path = "#{output_path}/jobs.csv"
+	builds_path = "#{output_path}/full_builds.csv"
+	jobs_path = "#{output_path}/full_jobs.csv"
 	if File.size?(exe_path) && File.size?(builds_path) && File.size?(jobs_path)
 		puts "Skipping test execution history data extraction, dataset already exists."
 		return

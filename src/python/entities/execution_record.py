@@ -1,5 +1,5 @@
 from enum import Enum
-from entities.entity import Entity
+from ..entities.entity import Entity
 
 
 class TestVerdict(Enum):
@@ -10,9 +10,37 @@ class TestVerdict(Enum):
 
 
 class ExecutionRecord:
-    def __init__(self, test: Entity, build_id: int, job_id: int, verdict: TestVerdict, duration: int):
+    TEST = "test"
+    BUILD = "build"
+    JOB = "job"
+    VERDICT = "verdict"
+    DURATION = "duration"
+
+    def __init__(
+        self, test: int, build: int, job: int, verdict: TestVerdict, duration: int
+    ):
         self.test = test
-        self.build_id = build_id
-        self.job_id = job_id
+        self.build = build
+        self.job = job
         self.verdict = verdict
         self.duration = duration
+
+    def to_dict(self):
+        d = {
+            ExecutionRecord.TEST: self.test,
+            ExecutionRecord.BUILD: self.build,
+            ExecutionRecord.JOB: self.job,
+            ExecutionRecord.VERDICT: self.verdict.value,
+            ExecutionRecord.DURATION: self.duration,
+        }
+        return d
+
+
+class Build:
+    def __init__(self, id: int, commit_hash: str):
+        self.id = id
+        self.commit_hash = commit_hash
+
+    def to_dict(self):
+        d = {"id": self.id, "commit_hash": self.commit_hash}
+        return d

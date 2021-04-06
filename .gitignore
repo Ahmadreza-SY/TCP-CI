@@ -4,3 +4,4 @@
 *.txt
 *.sh
 __pycache__
+.vscode

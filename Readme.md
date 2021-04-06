@@ -156,9 +156,9 @@ Additionally, the `tar.csv` file represents the dependencies between the test co
 ### Execution History File
 The `exe.csv` file represents the execution history of all available test cases in the project. We assign each CI build/cycle a build_id, and for each build_id we have multiple jobs in which the test cases are executed. The columns of this file are briefly explained in the following list.
 
-- `entity_id`: Id of the test case which was executed.
-- `build`: Id of the build in which the test case was executed. The build metadata is available in the `builds.csv` file.
-- `job`: Id of the job in which the test case was executed. The jobs metadata is available in the `jobs.csv` file.
+- `test`: Id of the test case which was executed.
+- `build`: Id of the build in which the test case was executed. The build metadata is available in the `full_builds.csv` file.
+- `job`: Id of the job in which the test case was executed. The jobs metadata is available in the `full_jobs.csv` file.
 - `test_result`: The result of the test case execution. The value of 0 means passed, 1 means failed due to exception, 2 means failed due to assertion, and 3 means failed due to an unknown reason.
 - `duration`: The duration of the test case execution in milliseconds.
 

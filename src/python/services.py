@@ -1,12 +1,13 @@
-from .exe_feature_extractor import *
 from .commit_miner import *
 from .release_feature_extractor import *
 from .association_miner import FileAssociationMiner, FunctionAssociationMiner
 import pandas as pd
 from os.path import isfile
+import os
 import json
 from .entities.entity import Entity, EntityType
 from .code_analyzer.code_analyzer import AnalysisLevel
+from .entities.execution_record import ExecutionRecord
 
 
 class DataCollectionService:
@@ -86,8 +87,121 @@ class DataCollectionService:
         DataCollectionService.compute_and_save_commit_data(args)
 
     @staticmethod
-    def fetch_and_save_execution_history(args):
-        ExeFeatureExtractor.fetch_and_save_execution_history(args)
+    def compute_test_case_features(exe_df):
+        def calc_failure_rate(tc_results, row):
+            tc_runs = tc_results[(row[ExecutionRecord.TEST])]
+            tc_passes = 0 if 0 not in tc_runs.index else tc_runs[0]
+            return 1 - tc_passes / tc_runs.sum()
+
+        test_cases = pd.DataFrame()
+        tc_age = exe_df.groupby(ExecutionRecord.TEST, as_index=False).count()
+        test_cases[ExecutionRecord.TEST] = tc_age[ExecutionRecord.TEST]
+        test_cases["age"] = tc_age[ExecutionRecord.VERDICT]
+        tc_avg_duration = (
+            exe_df[[ExecutionRecord.TEST, ExecutionRecord.DURATION]]
+            .groupby(ExecutionRecord.TEST, as_index=False)
+            .mean()
+        )
+        test_cases = pd.merge(test_cases, tc_avg_duration, on=[ExecutionRecord.TEST])
+        tc_results = (
+            exe_df[[ExecutionRecord.TEST, ExecutionRecord.VERDICT]]
+            .groupby([ExecutionRecord.TEST, ExecutionRecord.VERDICT], as_index=False)
+            .size()
+        )
+        test_cases["failure_rate"] = test_cases.apply(
+            lambda r: calc_failure_rate(tc_results, r), axis=1
+        )
+        test_cases.rename(
+            columns={ExecutionRecord.DURATION: "avg_duration"}, inplace=True
+        )
+        return test_cases
+
+    @staticmethod
+    def compute_contributors_failure_rate(
+        exe_df, builds_df, commits_df, contributors_df
+    ):
+        def update_contirbutor_failure_rate(fr_map, contributor, result):
+            if contributor not in fr_map:
+                fr_map[contributor] = [0, 0]
+            if result > 0:
+                fr_map[contributor][1] += 1
+            else:
+                fr_map[contributor][0] += 1
+
+        builds_df.rename(columns={"id": ExecutionRecord.BUILD}, inplace=True)
+        builds_tc_results = exe_df.groupby(ExecutionRecord.BUILD, as_index=False).sum()
+        builds_tc_results = pd.merge(
+            builds_tc_results, builds_df, on=[ExecutionRecord.BUILD]
+        )
+        commit_to_build_result = dict(
+            zip(
+                builds_tc_results.commit_hash,
+                builds_tc_results[ExecutionRecord.VERDICT],
+            )
+        )
+        contributor_failure_rate = {}
+        for index, commit in commits_df.iterrows():
+            if commit.hash not in commit_to_build_result:
+                continue
+            if commit.committer == commit.author:
+                update_contirbutor_failure_rate(
+                    contributor_failure_rate,
+                    commit.committer,
+                    commit_to_build_result[commit.hash],
+                )
+            else:
+                update_contirbutor_failure_rate(
+                    contributor_failure_rate,
+                    commit.committer,
+                    commit_to_build_result[commit.hash],
+                )
+                update_contirbutor_failure_rate(
+                    contributor_failure_rate,
+                    commit.author,
+                    commit_to_build_result[commit.hash],
+                )
+        contributor_failure_rate = pd.DataFrame(
+            {
+                "id": list(contributor_failure_rate.keys()),
+                "failure_rate": list(
+                    map(lambda r: r[1] / sum(r), contributor_failure_rate.values())
+                ),
+            }
+        )
+        contributors_df = pd.merge(
+            contributors_df, contributor_failure_rate, on=["id"], how="outer"
+        )
+        contributors_df.fillna(0, inplace=True)
+        return contributors_df
+
+    @staticmethod
+    def fetch_and_save_execution_history(args, execution_record_extractor):
+        exe_path = f"{args.output_path}/exe.csv"
+        if os.path.exists(exe_path) and os.path.getsize(exe_path) > 0:
+            print(
+                f"Skipping {args.project_slug} repository, execution history {exe_path} already exists."
+            )
+            return
+
+        exe_records, builds = execution_record_extractor.fetch_execution_records()
+        exe_df = pd.DataFrame.from_records([e.to_dict() for e in exe_records])
+        exe_df.to_csv(f"{args.output_path}/exe.csv", index=False)
+
+        DataCollectionService.compute_test_case_features(exe_df).to_csv(
+            f"{args.output_path}/test_cases.csv", index=False
+        )
+
+        builds_df = pd.DataFrame.from_records([b.to_dict() for b in builds])
+        commits_df = pd.read_csv(
+            f"{args.output_path}/commits.csv",
+            usecols=["hash", "committer", "author"],
+            sep=args.unique_separator,
+        )
+        contributors_df = pd.read_csv(f"{args.output_path}/contributors.csv")
+        contributors_df = DataCollectionService.compute_contributors_failure_rate(
+            exe_df, builds_df, commits_df, contributors_df
+        )
+        contributors_df.to_csv(f"{args.output_path}/contributors.csv", index=False)
 
     @staticmethod
     def compute_and_save_release_data(args):

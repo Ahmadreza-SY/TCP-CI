@@ -6,6 +6,7 @@ import subprocess
 from git import Repo
 from src.python.code_analyzer.code_analyzer import AnalysisLevel
 from src.python.code_analyzer.understand.understand_analyzer import *
+from src.python.execution_record_extractor.travis_ci_extractor import *
 from src.python.entities.entity import Language
 
 
@@ -20,10 +21,27 @@ def create_code_analyzer(args):
     )
 
 
+def create_execution_record_extractor(args):
+    extractor_class = None
+    if args.language == Language.JAVA:
+        extractor_class = TravisCIJavaExtractor
+    elif args.language == Language.C:
+        extractor_class = TravisCICExtractor
+    return extractor_class(
+        args.language,
+        args.level,
+        args.project_slug,
+        args.project_path,
+        args.output_path,
+        args.unique_separator,
+    )
+
+
 def history(args):
     code_analyzer = create_code_analyzer(args)
     DataCollectionService.compute_and_save_historical_data(args, code_analyzer)
-    DataCollectionService.fetch_and_save_execution_history(args)
+    extractor = create_execution_record_extractor(args)
+    DataCollectionService.fetch_and_save_execution_history(args, extractor)
     print(f"All finished, results are saved in {args.output_path}")
 
 
