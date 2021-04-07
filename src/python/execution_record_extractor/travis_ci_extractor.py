@@ -34,21 +34,21 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
     def get_log_type(self):
         pass
 
-    def create_test_name_to_id_mapping(exe_df):
+    def create_test_name_to_id_mapping(self, exe_df):
         pass
 
-    def fetch_execution_records(self) -> List[ExecutionRecord]:
+    def fetch_execution_records(self) -> Tuple[List[ExecutionRecord], List[Build]]:
         if (self.language, self.level) not in TravisCIExtractor.SUPPORTED_LANG_LEVELS:
             print(
                 f"Test execution history extraction is not yet supported for {self.language} in {self.level} granularity level."
             )
-            return
+            return [], []
 
         if self.project_slug is None:
             print(
                 f"No project slug is provided, skipping test execution history retrival."
             )
-            return
+            return [], []
 
         if not os.path.exists(f"{self.output_path}/test_execution_history.csv"):
             log_type = self.get_log_type().value
@@ -56,7 +56,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
             return_code = subprocess.call(shlex.split(command))
             if return_code != 0:
                 print(f"failed ruby test execution history command: {command}")
-                return
+                return [], []
         else:
             print("Execution history exists, skipping fetch.")
 

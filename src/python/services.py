@@ -185,23 +185,26 @@ class DataCollectionService:
 
         exe_records, builds = execution_record_extractor.fetch_execution_records()
         exe_df = pd.DataFrame.from_records([e.to_dict() for e in exe_records])
-        exe_df.to_csv(f"{args.output_path}/exe.csv", index=False)
+        if len(exe_df) > 0:
+            exe_df.to_csv(f"{args.output_path}/exe.csv", index=False)
 
-        DataCollectionService.compute_test_case_features(exe_df).to_csv(
-            f"{args.output_path}/test_cases.csv", index=False
-        )
+            DataCollectionService.compute_test_case_features(exe_df).to_csv(
+                f"{args.output_path}/test_cases.csv", index=False
+            )
 
-        builds_df = pd.DataFrame.from_records([b.to_dict() for b in builds])
-        commits_df = pd.read_csv(
-            f"{args.output_path}/commits.csv",
-            usecols=["hash", "committer", "author"],
-            sep=args.unique_separator,
-        )
-        contributors_df = pd.read_csv(f"{args.output_path}/contributors.csv")
-        contributors_df = DataCollectionService.compute_contributors_failure_rate(
-            exe_df, builds_df, commits_df, contributors_df
-        )
-        contributors_df.to_csv(f"{args.output_path}/contributors.csv", index=False)
+            builds_df = pd.DataFrame.from_records([b.to_dict() for b in builds])
+            commits_df = pd.read_csv(
+                f"{args.output_path}/commits.csv",
+                usecols=["hash", "committer", "author"],
+                sep=args.unique_separator,
+            )
+            contributors_df = pd.read_csv(f"{args.output_path}/contributors.csv")
+            contributors_df = DataCollectionService.compute_contributors_failure_rate(
+                exe_df, builds_df, commits_df, contributors_df
+            )
+            contributors_df.to_csv(f"{args.output_path}/contributors.csv", index=False)
+        else:
+            print("No execution history collected!")
 
     @staticmethod
     def compute_and_save_release_data(args):

@@ -5,7 +5,7 @@ from ..understand.understand_database import (
     UnderstandCDatabase,
     UnderstandJavaDatabase,
 )
-from ...entities.entity import Language, File, Function
+from ...entities.entity import Language, File, Function, EntityType
 from ...entities.dep_graph import DepGraph
 
 
@@ -71,7 +71,7 @@ class UnderstandFileAnalyzer(UnderstandAnalyzer):
 
 
 class UnderstandFunctionAnalyzer(UnderstandAnalyzer):
-    def get_entities() -> List[Entity]:
+    def get_entities(self) -> List[Entity]:
         entities = []
         und_entities = self.und_db.get_ents()
         function_set = set()

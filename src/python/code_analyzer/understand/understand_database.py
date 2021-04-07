@@ -124,14 +124,13 @@ class UnderstandCDatabase(UnderstandDatabase):
         self.language = Language.C
 
     def get_ents(self):
-        language_argument = UnderstandDatabase.language_map[self.language]
         level_argument = None
         if self.level == AnalysisLevel.FILE:
             level_argument = "file"
         elif self.level == AnalysisLevel.FUNCTION:
             level_argument = "function"
         return self.get_und_db().ents(
-            f"{language_argument} {level_argument} ~unresolved ~unknown"
+            f"{self.language.value} {level_argument} ~unresolved ~unknown"
         )
 
     def get_dependencies(self, entity):
@@ -173,14 +172,13 @@ class UnderstandJavaDatabase(UnderstandDatabase):
             return EntityType.SRC
 
     def get_ents(self):
-        language_argument = UnderstandDatabase.language_map[self.language]
         level_argument = None
         if self.level == AnalysisLevel.FILE:
             level_argument = "file"
         elif self.level == AnalysisLevel.FUNCTION:
             level_argument = "method"
         return self.get_und_db().ents(
-            f"{language_argument} {level_argument} ~unresolved ~unknown"
+            f"{self.language.value} {level_argument} ~unresolved ~unknown"
         )
 
     def get_dependencies(self, entity):
