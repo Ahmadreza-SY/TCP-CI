@@ -17,13 +17,13 @@ class ExecutionRecord:
     DURATION = "duration"
 
     def __init__(
-        self, test: int, build: int, job: int, verdict: TestVerdict, duration: int
+        self, test: int, build: int, job: str, verdict: TestVerdict, duration: int
     ):
-        self.test = test
-        self.build = build
+        self.test = int(test)
+        self.build = int(build)
         self.job = job
         self.verdict = verdict
-        self.duration = duration
+        self.duration = int(duration)
 
     def to_dict(self):
         d = {
