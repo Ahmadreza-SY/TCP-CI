@@ -50,7 +50,8 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
             )
             return [], []
 
-        if not os.path.exists(f"{self.output_path}/test_execution_history.csv"):
+        test_exe_history_path = self.output_path / "test_execution_history.csv"
+        if not test_exe_history_path.exists():
             log_type = self.get_log_type().value
             command = f"ruby ./src/ruby/exe_feature_extractor.rb {self.project_slug} {log_type} {self.output_path}"
             return_code = subprocess.call(shlex.split(command))
@@ -60,7 +61,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
         else:
             print("Execution history exists, skipping fetch.")
 
-        exe_df = pd.read_csv(f"{self.output_path}/test_execution_history.csv")
+        exe_df = pd.read_csv(test_exe_history_path)
         test_name_to_id = self.create_test_name_to_id_mapping(exe_df)
         exe_df[ExecutionRecord.TEST] = exe_df["test_name"].apply(
             lambda name: test_name_to_id.get(name, None)
@@ -90,7 +91,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
             exe_records.append(exe_record)
 
         builds_df = pd.read_csv(
-            f"{self.output_path}/full_builds.csv", sep=self.unique_separator
+            self.output_path / "full_builds.csv", sep=self.unique_separator
         )
         builds_df.sort_values(by=["id"], ascending=False, inplace=True)
         builds = []

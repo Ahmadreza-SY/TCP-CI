@@ -9,6 +9,7 @@ from tqdm import tqdm
 import understand
 from ...entities.entity import Language, EntityType
 from ..code_analyzer import AnalysisLevel
+from pathlib import Path
 
 
 class UnderstandDatabase:
@@ -24,9 +25,9 @@ class UnderstandDatabase:
         self.output_path = output_path
 
     def get_und_db(self):
-        project_name = self.project_path.split("/")[-1]
-        und_db_path = f"{self.output_path}/{project_name}.udb"
-        if not os.path.isfile(und_db_path):
+        project_name = self.project_path.parts[-1]
+        und_db_path = self.output_path / f"{project_name}.udb"
+        if not und_db_path.exists():
             start = time.time()
             language_argument = UnderstandDatabase.language_map[self.language]
             print("Running understand analysis")
@@ -37,12 +38,12 @@ class UnderstandDatabase:
             )
         if self.db is None:
             print("Loading understand database ...")
-            self.db = understand.open(und_db_path)
+            self.db = understand.open(str(und_db_path))
         return self.db
 
     def run_und_command(self, command):
         pbar = None
-        full_project_path = os.path.abspath(self.project_path)
+        full_project_path = self.project_path.absolute()
         process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE)
         while True:
             output = process.stdout.readline().decode("utf-8").strip()
@@ -61,7 +62,7 @@ class UnderstandDatabase:
                     and "Warning:" not in output
                     and pbar is not None
                 ):
-                    if "RELATIVE:/" in output or full_project_path in output:
+                    if "RELATIVE:/" in output or str(full_project_path) in output:
                         pbar.update(1)
         if pbar is None:
             print("No output captured from understand!")
@@ -79,27 +80,29 @@ class UnderstandDatabase:
             if define_ref is None:
                 return False
             entity_file_path = self.get_valid_rel_path(define_ref.file())
-        if entity_file_path is not None and entity_file_path[0] == "/":
+        if entity_file_path is not None and entity_file_path.is_absolute():
             return False
         return True
 
     def get_valid_rel_path(self, entity):
-        full_project_path = os.path.abspath(self.project_path)
-        full_path = entity.longname()
-        if full_project_path not in full_path and "RELATIVE:/" in full_path:
-            full_path = full_path.replace("RELATIVE:/", "")
-            full_path = "/".join(full_path.split("/")[1:])
-        return full_path.replace(full_project_path + "/", "")
+        full_project_path = self.project_path.absolute()
+        full_path = Path(entity.longname())
+        rel_prefix = f"RELATIVE:{os.sep}"
+        if str(full_project_path) not in str(full_path) and rel_prefix in str(
+            full_path
+        ):
+            full_path = Path(str(full_path).replace(rel_prefix, ""))
+            full_path = Path(*full_path.parts[1:])
+        return Path(str(full_path).replace(str(full_project_path) + os.sep, ""))
 
     def get_entity_type(self, entity, rel_path):
         if self.test_path is None:
             print("Test path cannot be None for this configuration. Aborting ...")
             sys.exit()
-        file_name = rel_path.split("/")[-1]
-        full_test_path = os.path.abspath(f"{self.project_path}/{self.test_path}")
-        pattern = f"{full_test_path}/**/{file_name}"
-        for match in glob.glob(pattern, recursive=True):
-            if os.path.isfile(match) and rel_path in match:
+        file_name = rel_path.name
+        full_test_path = (self.project_path / self.test_path).absolute()
+        for match in full_test_path.rglob(file_name):
+            if match.exists() and str(rel_path) in str(match):
                 return EntityType.TEST
         return EntityType.SRC
 
@@ -145,13 +148,14 @@ class UnderstandCDatabase(UnderstandDatabase):
     def entity_is_valid(self, entity):
         if not UnderstandDatabase.entity_is_valid(self, entity):
             return False
-        if self.level == AnalysisLevel.FILE and "/_deps/" in entity.relname():
+        deps_subpath = f"{os.sep}_deps{os.sep}"
+        if self.level == AnalysisLevel.FILE and deps_subpath in entity.relname():
             return False
         elif self.level == AnalysisLevel.FUNCTION:
             if entity.name() == "[unnamed]":
                 return False
             define_in_ref = entity.ref("definein")
-            if define_in_ref is None or "/_deps/" in define_in_ref.file().relname():
+            if define_in_ref is None or deps_subpath in define_in_ref.file().relname():
                 return False
         return True
 
@@ -166,7 +170,7 @@ class UnderstandJavaDatabase(UnderstandDatabase):
     def get_entity_type(self, entity, rel_path):
         if self.test_path is not None:
             return super().get_entity_type(entity, rel_path)
-        if "src/test" in rel_path:
+        if f"src{os.sep}test" in str(rel_path):
             return EntityType.TEST
         else:
             return EntityType.SRC

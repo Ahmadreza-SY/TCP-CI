@@ -8,6 +8,7 @@ from src.python.code_analyzer.code_analyzer import AnalysisLevel
 from src.python.code_analyzer.understand.understand_analyzer import *
 from src.python.execution_record_extractor.travis_ci_extractor import *
 from src.python.entities.entity import Language
+from pathlib import Path
 
 
 def create_code_analyzer(args):
@@ -64,8 +65,8 @@ def fetch_source_code_if_needed(args):
         sys.exit()
     if path is None:
         name = slug.split("/")[-1]
-        args.project_path = f"{args.output_path}/{name}"
-        if os.path.isdir(args.project_path):
+        args.project_path = args.output_path / name
+        if args.project_path.exists():
             return
         clone_command = f"git clone https://github.com/{slug}.git {args.project_path}"
         return_code = subprocess.call(clone_command, shell=True)
@@ -89,6 +90,7 @@ def add_common_arguments(parser):
         "-p",
         "--project-path",
         help="Project's source code git repository path.",
+        type=Path,
         default=None,
     )
     parser.add_argument(
@@ -101,6 +103,7 @@ def add_common_arguments(parser):
         "-t",
         "--test-path",
         help="Specifies the relative root directory of the test source code.",
+        type=Path,
         default=None,
     )
     parser.add_argument(
@@ -115,6 +118,7 @@ def add_common_arguments(parser):
         "-o",
         "--output-path",
         help="Specifies the directory to save resulting datasets.",
+        type=Path,
         default=".",
     )
     parser.add_argument(
@@ -165,12 +169,12 @@ def main():
         "-hist",
         "--histories-dir",
         help="Path to outputs of the history command.",
+        type=Path,
         required=True,
     )
 
     args = parser.parse_args()
-    if not os.path.exists(args.output_path):
-        os.makedirs(args.output_path)
+    args.output_path.mkdir(parents=True, exist_ok=True)
     fetch_source_code_if_needed(args)
     args.unique_separator = "\t"
     args.func(args)

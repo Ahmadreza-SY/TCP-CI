@@ -15,9 +15,9 @@ class DataCollectionService:
     def compute_and_save_dep_data(code_analyzer, metadata_df, args):
         output_path = args.output_path
         if (
-            isfile(f"{output_path}/metadata.csv")
-            and isfile(f"{output_path}/dep.csv")
-            and isfile(f"{output_path}/tar.csv")
+            (output_path / "metadata.csv").exists()
+            and (output_path / "dep.csv").exists()
+            and (output_path / "tar.csv").exists()
         ):
             print(f"Dependency datasets already exist, skipping dependency analysis.")
             return
@@ -38,33 +38,33 @@ class DataCollectionService:
             miner_type = FunctionAssociationMiner
 
         repository = RepositoryMining(
-            args.project_path, since=args.since, only_in_branch=args.branch
+            str(args.project_path), since=args.since, only_in_branch=args.branch
         )
         miner = miner_type(repository, metadata_df, args.language)
         dep_graph = miner.compute_dependency_weights(dep_graph)
         tar_graph = miner.compute_dependency_weights(tar_graph)
         dep_graph.save_graph(
-            f"{args.output_path}/dep.csv", "dependencies", args.unique_separator
+            args.output_path / "dep.csv", "dependencies", args.unique_separator
         )
         tar_graph.reverse_graph()
         tar_graph.save_graph(
-            f"{args.output_path}/tar.csv", "targeted_by_tests", args.unique_separator
+            args.output_path / "tar.csv", "targeted_by_tests", args.unique_separator
         )
 
     @staticmethod
     def compute_and_save_commit_data(args):
         output_path = args.output_path
-        if isfile(f"{output_path}/commits.csv") and isfile(
-            f"{output_path}/contributors.csv"
-        ):
+        if (output_path / "commits.csv").exists() and (
+            output_path / "contributors.csv"
+        ).exists():
             print(f"Commmit datasets already exist, skipping commit mining.")
             return
         commit_miner = CommitMiner(args.project_path)
         commit_features, contributors = commit_miner.mine_commits()
         commit_features.to_csv(
-            f"{args.output_path}/commits.csv", index=False, sep=args.unique_separator
+            args.output_path / "commits.csv", index=False, sep=args.unique_separator
         )
-        contributors.to_csv(f"{args.output_path}/contributors.csv", index=False)
+        contributors.to_csv(args.output_path / "contributors.csv", index=False)
 
     @staticmethod
     def compute_and_save_historical_data(args, code_analyzer):
@@ -72,7 +72,7 @@ class DataCollectionService:
         metadata_df = pd.DataFrame.from_records([e.to_dict() for e in entities])
         metadata_cols = metadata_df.columns.values.tolist()
         metadata_df.to_csv(
-            f"{args.output_path}/metadata.csv", index=False, columns=metadata_cols
+            args.output_path / "metadata.csv", index=False, columns=metadata_cols
         )
         test_count = len(
             metadata_df[metadata_df[Entity.ENTITY_TYPE] == EntityType.TEST.name]
@@ -176,8 +176,8 @@ class DataCollectionService:
 
     @staticmethod
     def fetch_and_save_execution_history(args, execution_record_extractor):
-        exe_path = f"{args.output_path}/exe.csv"
-        if os.path.exists(exe_path) and os.path.getsize(exe_path) > 0:
+        exe_path = args.output_path / "exe.csv"
+        if exe_path.exists() and exe_path.stat().st_size > 0:
             print(
                 f"Skipping {args.project_slug} repository, execution history {exe_path} already exists."
             )
@@ -186,30 +186,30 @@ class DataCollectionService:
         exe_records, builds = execution_record_extractor.fetch_execution_records()
         exe_df = pd.DataFrame.from_records([e.to_dict() for e in exe_records])
         if len(exe_df) > 0:
-            exe_df.to_csv(f"{args.output_path}/exe.csv", index=False)
+            exe_df.to_csv(exe_path, index=False)
 
             DataCollectionService.compute_test_case_features(exe_df).to_csv(
-                f"{args.output_path}/test_cases.csv", index=False
+                args.output_path / "test_cases.csv", index=False
             )
 
             builds_df = pd.DataFrame.from_records([b.to_dict() for b in builds])
             commits_df = pd.read_csv(
-                f"{args.output_path}/commits.csv",
+                args.output_path / "commits.csv",
                 usecols=["hash", "committer", "author"],
                 sep=args.unique_separator,
             )
-            contributors_df = pd.read_csv(f"{args.output_path}/contributors.csv")
+            contributors_df = pd.read_csv(args.output_path / "contributors.csv")
             contributors_df = DataCollectionService.compute_contributors_failure_rate(
                 exe_df, builds_df, commits_df, contributors_df
             )
-            contributors_df.to_csv(f"{args.output_path}/contributors.csv", index=False)
+            contributors_df.to_csv(args.output_path / "contributors.csv", index=False)
         else:
             print("No execution history collected!")
 
     @staticmethod
     def compute_and_save_release_data(args):
         output_path = args.output_path
-        metadata_df = pd.read_csv(f"{args.histories_dir}/metadata.csv")
+        metadata_df = pd.read_csv(args.histories_dir / "metadata.csv")
 
         miner_type = None
         if args.level == AnalysisLevel.FILE:
@@ -217,7 +217,9 @@ class DataCollectionService:
         elif args.level == AnalysisLevel.FUNCTION:
             miner_type = FunctionAssociationMiner
         repository = RepositoryMining(
-            args.project_path, from_commit=args.from_commit, to_commit=args.to_commit
+            str(args.project_path),
+            from_commit=args.from_commit,
+            to_commit=args.to_commit,
         )
         miner = miner_type(repository, metadata_df, args.language)
 
@@ -225,12 +227,12 @@ class DataCollectionService:
         changed_sets = miner.compute_changed_sets()
         changed_entities = set.union(*changed_sets) if len(changed_sets) > 0 else set()
         dep_graph = pd.read_csv(
-            f"{args.histories_dir}/dep.csv",
+            args.histories_dir / "dep.csv",
             sep=args.unique_separator,
             converters={"dependencies": json.loads, "weights": json.loads},
         )
         tar_graph = pd.read_csv(
-            f"{args.histories_dir}/tar.csv",
+            args.histories_dir / "tar.csv",
             sep=args.unique_separator,
             converters={"targeted_by_tests": json.loads, "weights": json.loads},
         )
@@ -238,7 +240,7 @@ class DataCollectionService:
             changed_entities, dep_graph, tar_graph
         )
         release_impacts.to_csv(
-            f"{output_path}/release_impacts.csv", sep=args.unique_separator, index=False
+            output_path / "release_impacts.csv", sep=args.unique_separator, index=False
         )
 
         print("Extracting release changes ...")
@@ -246,7 +248,7 @@ class DataCollectionService:
             metadata_df, args.project_path, args.from_commit, args.to_commit
         )
         pd.DataFrame(release_changes).to_csv(
-            f"{output_path}/release_changes.csv", index=False
+            output_path / "release_changes.csv", index=False
         )
 
         print(f"All finished, results are saved in {output_path}")

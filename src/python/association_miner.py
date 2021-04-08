@@ -1,13 +1,14 @@
 from pydriller.domain.commit import ModificationType
 from tqdm import tqdm
 from apyori import apriori
-from .entities.entity import Language
+from .entities.entity import Language, Entity
 
 
 class AssociationMiner:
     def __init__(self, repository, metadata, language):
         self.repository = repository
-        self.metadata = metadata
+        self.metadata = metadata.copy()
+        self.metadata[Entity.FILE_PATH] = self.metadata[Entity.FILE_PATH].astype(str)
         self.min_support = 0.0001
         self.min_confidence = 0.002
         self.language = language
