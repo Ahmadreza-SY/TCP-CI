@@ -16,13 +16,14 @@ class UnderstandDatabase:
     language_map = {Language.JAVA: "java", Language.C: "c++"}
 
     def __init__(
-        self, project_path: str, test_path: str, output_path: str, level: AnalysisLevel
+        self, project_path: Path, test_path: Path, output_path: Path, level: AnalysisLevel
     ):
         self.db = None
         self.project_path = project_path
         self.test_path = test_path
         self.level = level
         self.output_path = output_path
+        self.language = None
 
     def get_und_db(self):
         project_name = self.project_path.parts[-1]
@@ -31,7 +32,7 @@ class UnderstandDatabase:
             start = time.time()
             language_argument = UnderstandDatabase.language_map[self.language]
             print("Running understand analysis")
-            und_command = f"und -verbose -db {und_db_path} create -languages {language_argument} add {self.project_path} analyze"
+            und_command = f"und -verbose -db {und_db_path.as_posix()} create -languages {language_argument} add {self.project_path.as_posix()} analyze"
             self.run_und_command(und_command)
             print(
                 f'Created understand db at {und_db_path}, took {"{0:.2f}".format(time.time() - start)} seconds.'
@@ -62,7 +63,7 @@ class UnderstandDatabase:
                     and "Warning:" not in output
                     and pbar is not None
                 ):
-                    if "RELATIVE:/" in output or str(full_project_path) in output:
+                    if f"RELATIVE:{os.sep}" in output or str(full_project_path) in output:
                         pbar.update(1)
         if pbar is None:
             print("No output captured from understand!")

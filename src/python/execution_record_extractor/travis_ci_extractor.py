@@ -8,6 +8,7 @@ import subprocess
 import shlex
 import os
 import re
+from pathlib import Path
 
 
 class LogType(Enum):
@@ -22,7 +23,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
     ]
 
     def __init__(
-        self, language, level, project_slug, project_path, output_path, unique_separator
+        self, language, level, project_slug, project_path, output_path: Path, unique_separator
     ):
         self.language = language
         self.level = level
@@ -53,7 +54,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
         test_exe_history_path = self.output_path / "test_execution_history.csv"
         if not test_exe_history_path.exists():
             log_type = self.get_log_type().value
-            command = f"ruby ./src/ruby/exe_feature_extractor.rb {self.project_slug} {log_type} {self.output_path}"
+            command = f"ruby ./src/ruby/exe_feature_extractor.rb {self.project_slug} {log_type} {self.output_path.as_posix()}"
             return_code = subprocess.call(shlex.split(command))
             if return_code != 0:
                 print(f"failed ruby test execution history command: {command}")
