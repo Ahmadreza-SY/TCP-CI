@@ -45,7 +45,7 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_path, 
 				raise "Cannot get repository from Travis-CI after 10 retries: #{e.message}"
 			end
 	end
-	Parallel.each(build_numbers, in_threads: concurrency, progress: progress_message) { |build_number|
+	Parallel.each(build_numbers, in_threads: concurrency, progress: "Fetching logs") { |build_number|
 		retries = 0
 		begin
 			build = repository.build(build_number)
