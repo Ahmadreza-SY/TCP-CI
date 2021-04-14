@@ -16,7 +16,11 @@ class UnderstandDatabase:
     language_map = {Language.JAVA: "java", Language.C: "c++"}
 
     def __init__(
-        self, project_path: Path, test_path: Path, output_path: Path, level: AnalysisLevel
+        self,
+        project_path: Path,
+        test_path: Path,
+        output_path: Path,
+        level: AnalysisLevel,
     ):
         self.db = None
         self.project_path = project_path
@@ -27,7 +31,12 @@ class UnderstandDatabase:
 
     def get_und_db(self):
         project_name = self.project_path.parts[-1]
-        und_db_path = self.output_path / f"{project_name}.udb"
+        db_name = (
+            f"{project_name}.udb"
+            if understand.version() < 1039
+            else f"{project_name}.und"
+        )
+        und_db_path = self.output_path / db_name
         if not und_db_path.exists():
             start = time.time()
             language_argument = UnderstandDatabase.language_map[self.language]
@@ -63,7 +72,10 @@ class UnderstandDatabase:
                     and "Warning:" not in output
                     and pbar is not None
                 ):
-                    if f"RELATIVE:{os.sep}" in output or str(full_project_path) in output:
+                    if (
+                        f"RELATIVE:{os.sep}" in output
+                        or str(full_project_path) in output
+                    ):
                         pbar.update(1)
         if pbar is None:
             print("No output captured from understand!")
