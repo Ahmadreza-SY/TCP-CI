@@ -1,34 +1,21 @@
 from src.python.services import *
+from src.python.module_factory import ModuleFactory
 import argparse
 import os
 import sys
 import subprocess
-from git import Repo
 from src.python.code_analyzer.code_analyzer import AnalysisLevel
-from src.python.code_analyzer.understand.understand_analyzer import *
-from src.python.execution_record_extractor.travis_ci_extractor import *
 from src.python.entities.entity import Language
 from pathlib import Path
 
 
-def create_code_analyzer(args):
-    analyzer_class = None
-    if args.level == AnalysisLevel.FILE:
-        analyzer_class = UnderstandFileAnalyzer
-    elif args.level == AnalysisLevel.FUNCTION:
-        analyzer_class = UnderstandFunctionAnalyzer
-    return analyzer_class(
+def history(args):
+    code_analyzer = ModuleFactory.get_code_analyzer(args.level)
+    with code_analyzer(
         args.project_path, args.test_path, args.output_path, args.language, args.level
-    )
-
-
-def create_execution_record_extractor(args):
-    extractor_class = None
-    if args.language == Language.JAVA:
-        extractor_class = TravisCIJavaExtractor
-    elif args.language == Language.C:
-        extractor_class = TravisCICExtractor
-    return extractor_class(
+    ) as analyzer:
+        DataCollectionService.compute_and_save_historical_data(args, analyzer)
+    extractor = ModuleFactory.get_execution_record_extractor(args.language)(
         args.language,
         args.level,
         args.project_slug,
@@ -36,12 +23,6 @@ def create_execution_record_extractor(args):
         args.output_path,
         args.unique_separator,
     )
-
-
-def history(args):
-    code_analyzer = create_code_analyzer(args)
-    DataCollectionService.compute_and_save_historical_data(args, code_analyzer)
-    extractor = create_execution_record_extractor(args)
     DataCollectionService.fetch_and_save_execution_history(args, extractor)
     print(f"All finished, results are saved in {args.output_path}")
 
@@ -50,9 +31,16 @@ def release(args):
     DataCollectionService.compute_and_save_release_data(args)
 
 
-def get_default_branch(project_path):
-    repo = Repo(project_path)
-    return repo.active_branch
+def dataset(args):
+    extractor = ModuleFactory.get_execution_record_extractor(args.language)(
+        args.language,
+        args.level,
+        args.project_slug,
+        args.project_path,
+        args.output_path,
+        args.unique_separator,
+    )
+    DataCollectionService.create_dataset(args, extractor)
 
 
 def fetch_source_code_if_needed(args):
@@ -73,8 +61,6 @@ def fetch_source_code_if_needed(args):
         if return_code != 0:
             print("Failure in fetching source code for GitHub!")
             sys.exit()
-    if args.branch is None:
-        args.branch = get_default_branch(args.project_path)
 
 
 def valid_date(s):
@@ -140,10 +126,13 @@ def main():
         "release",
         help="The release command extracts changed entities and their dependencies based on the pre-computed history.",
     )
+    dataset_parser = subparsers.add_parser(
+        "dataset",
+        help="Create training dataset including all test case features for each CI cycle.",
+    )
 
     add_common_arguments(history_parser)
     history_parser.set_defaults(func=history)
-    history_parser.add_argument("--branch", help="Git branch to analyze.", default=None)
     history_parser.add_argument(
         "--since",
         help="Start date for commits to analyze - format YYYY-MM-DD. Not providing this arguments means to analyze all commits.",
@@ -172,6 +161,9 @@ def main():
         type=Path,
         required=True,
     )
+
+    add_common_arguments(dataset_parser)
+    dataset_parser.set_defaults(func=dataset)
 
     args = parser.parse_args()
     args.output_path.mkdir(parents=True, exist_ok=True)

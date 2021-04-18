@@ -8,9 +8,80 @@ import json
 from .entities.entity import Entity, EntityType
 from .code_analyzer.code_analyzer import AnalysisLevel
 from .entities.execution_record import ExecutionRecord
+from .dataset_factory import DatasetFactory
+from .module_factory import ModuleFactory
+from git import Git
+import sys
+import re
+from pydriller.git_repository import GitRepository
 
 
 class DataCollectionService:
+    @staticmethod
+    def checkout_default_branch(project_path):
+        print("Checking out default branch...")
+        g = Git(project_path)
+        remote = g.execute("git remote show".split())
+        if remote == "":
+            print("Git repository has no remote! Please set a remote.")
+            sys.exit()
+        result = g.execute(f"git remote show {remote}".split())
+        default_branch = re.search("HEAD branch: (.+)", result).groups()[0]
+        git_repository = GitRepository(project_path)
+        git_repository.repo.git.checkout(default_branch)
+
+    @staticmethod
+    def create_dataset(args, execution_record_extractor):
+        code_analyzer = ModuleFactory.get_code_analyzer(args.level)
+        with code_analyzer(
+            args.project_path,
+            args.test_path,
+            args.output_path,
+            args.language,
+            args.level,
+        ) as analyzer:
+            DataCollectionService.checkout_default_branch(args.project_path)
+            entities = analyzer.get_entities()
+            entities_df = pd.DataFrame.from_records([e.to_dict() for e in entities])
+            entities_cols = entities_df.columns.values.tolist()
+            entities_df.to_csv(
+                args.output_path / "metadata.csv", index=False, columns=entities_cols
+            )
+
+        records, builds = DataCollectionService.fetch_and_save_execution_history(
+            args, execution_record_extractor
+        )
+
+        dataset_factory = DatasetFactory(
+            args.project_path,
+            args.test_path,
+            args.output_path,
+            args.language,
+            args.level,
+        )
+        dataset = dataset_factory.create_dataset(builds)
+        dataset_df = pd.DataFrame.from_records(dataset)
+        cols = dataset_df.columns.tolist()
+        cols.remove(DatasetFactory.BUILD)
+        cols.remove(DatasetFactory.TEST)
+        cols.insert(0, DatasetFactory.TEST)
+        cols.insert(0, DatasetFactory.BUILD)
+        dataset_df = dataset_df[cols]
+        dataset_df.to_csv(args.output_path / "dataset.csv", index=False)
+        print(f'All finished. Saved dataset to {args.output_path / "dataset.csv"}')
+
+    @staticmethod
+    def fetch_and_save_execution_history(args, execution_record_extractor):
+        exe_path = args.output_path / "exe.csv"
+        exe_records, builds = execution_record_extractor.fetch_execution_records()
+        exe_df = pd.DataFrame.from_records([e.to_dict() for e in exe_records])
+        if len(exe_df) > 0:
+            exe_df.to_csv(exe_path, index=False)
+            return exe_records, builds
+        else:
+            print("No execution history collected!")
+            return None, None
+
     @staticmethod
     def compute_and_save_dep_data(code_analyzer, metadata_df, args):
         output_path = args.output_path
@@ -37,9 +108,7 @@ class DataCollectionService:
         elif args.level == AnalysisLevel.FUNCTION:
             miner_type = FunctionAssociationMiner
 
-        repository = RepositoryMining(
-            str(args.project_path), since=args.since, only_in_branch=args.branch
-        )
+        repository = RepositoryMining(str(args.project_path), since=args.since)
         miner = miner_type(repository, metadata_df, args.language)
         dep_graph = miner.compute_dependency_weights(dep_graph)
         tar_graph = miner.compute_dependency_weights(tar_graph)
@@ -173,38 +242,6 @@ class DataCollectionService:
         )
         contributors_df.fillna(0, inplace=True)
         return contributors_df
-
-    @staticmethod
-    def fetch_and_save_execution_history(args, execution_record_extractor):
-        exe_path = args.output_path / "exe.csv"
-        if exe_path.exists() and exe_path.stat().st_size > 0:
-            print(
-                f"Skipping {args.project_slug} repository, execution history {exe_path} already exists."
-            )
-            return
-
-        exe_records, builds = execution_record_extractor.fetch_execution_records()
-        exe_df = pd.DataFrame.from_records([e.to_dict() for e in exe_records])
-        if len(exe_df) > 0:
-            exe_df.to_csv(exe_path, index=False)
-
-            DataCollectionService.compute_test_case_features(exe_df).to_csv(
-                args.output_path / "test_cases.csv", index=False
-            )
-
-            builds_df = pd.DataFrame.from_records([b.to_dict() for b in builds])
-            commits_df = pd.read_csv(
-                args.output_path / "commits.csv",
-                usecols=["hash", "committer", "author"],
-                sep=args.unique_separator,
-            )
-            contributors_df = pd.read_csv(args.output_path / "contributors.csv")
-            contributors_df = DataCollectionService.compute_contributors_failure_rate(
-                exe_df, builds_df, commits_df, contributors_df
-            )
-            contributors_df.to_csv(args.output_path / "contributors.csv", index=False)
-        else:
-            print("No execution history collected!")
 
     @staticmethod
     def compute_and_save_release_data(args):

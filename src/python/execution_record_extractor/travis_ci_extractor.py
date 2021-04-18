@@ -23,7 +23,13 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
     ]
 
     def __init__(
-        self, language, level, project_slug, project_path, output_path: Path, unique_separator
+        self,
+        language,
+        level,
+        project_slug,
+        project_path,
+        output_path: Path,
+        unique_separator,
     ):
         self.language = language
         self.level = level
@@ -62,6 +68,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
         else:
             print("Execution history exists, skipping fetch.")
 
+        print("Creating execution records...")
         exe_df = pd.read_csv(test_exe_history_path)
         test_name_to_id = self.create_test_name_to_id_mapping(exe_df)
         exe_df[ExecutionRecord.TEST] = exe_df["test_name"].apply(
