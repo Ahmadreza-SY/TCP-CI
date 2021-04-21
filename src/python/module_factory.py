@@ -2,6 +2,7 @@ from .code_analyzer.code_analyzer import AnalysisLevel
 from .entities.entity import Language
 from .code_analyzer.understand.understand_analyzer import *
 from .execution_record_extractor.travis_ci_extractor import *
+from .repository_miner import FileRepositoryMiner, FunctionRepositoryMiner
 
 
 class ModuleFactory:
@@ -22,3 +23,12 @@ class ModuleFactory:
         elif language == Language.C:
             extractor_class = TravisCICExtractor
         return extractor_class
+
+    @staticmethod
+    def get_repository_miner(level):
+        miner_class = None
+        if level == AnalysisLevel.FILE:
+            miner_class = FileRepositoryMiner
+        elif level == AnalysisLevel.FUNCTION:
+            miner_class = FunctionRepositoryMiner
+        return miner_class

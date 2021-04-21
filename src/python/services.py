@@ -52,6 +52,20 @@ class DataCollectionService:
             args, execution_record_extractor
         )
 
+        if len(builds) == 0:
+            print("No CI cycles found. Aborting...")
+            sys.exit()
+
+        repo_miner_class = ModuleFactory.get_repository_miner(args.level)
+        repo_miner = repo_miner_class(
+            args.language,
+            args.level,
+            args.project_path,
+            args.test_path,
+            args.output_path,
+        )
+        change_history_df = repo_miner.compute_and_save_entity_change_history()
+
         dataset_factory = DatasetFactory(
             args.project_path,
             args.test_path,
@@ -59,16 +73,7 @@ class DataCollectionService:
             args.language,
             args.level,
         )
-        dataset = dataset_factory.create_dataset(builds)
-        dataset_df = pd.DataFrame.from_records(dataset)
-        cols = dataset_df.columns.tolist()
-        cols.remove(DatasetFactory.BUILD)
-        cols.remove(DatasetFactory.TEST)
-        cols.insert(0, DatasetFactory.TEST)
-        cols.insert(0, DatasetFactory.BUILD)
-        dataset_df = dataset_df[cols]
-        dataset_df.to_csv(args.output_path / "dataset.csv", index=False)
-        print(f'All finished. Saved dataset to {args.output_path / "dataset.csv"}')
+        dataset_df = dataset_factory.create_and_save_dataset(builds)
 
     @staticmethod
     def fetch_and_save_execution_history(args, execution_record_extractor):
