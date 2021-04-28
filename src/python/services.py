@@ -32,6 +32,17 @@ class DataCollectionService:
 
     @staticmethod
     def create_dataset(args, execution_record_extractor):
+        DataCollectionService.checkout_default_branch(args.project_path)
+        repo_miner_class = ModuleFactory.get_repository_miner(args.level)
+        repo_miner = repo_miner_class(
+            args.language,
+            args.level,
+            args.project_path,
+            args.test_path,
+            args.output_path,
+        )
+        change_history_df = repo_miner.compute_and_save_entity_change_history()
+
         code_analyzer = ModuleFactory.get_code_analyzer(args.level)
         with code_analyzer(
             args.project_path,
@@ -56,22 +67,13 @@ class DataCollectionService:
             print("No CI cycles found. Aborting...")
             sys.exit()
 
-        repo_miner_class = ModuleFactory.get_repository_miner(args.level)
-        repo_miner = repo_miner_class(
-            args.language,
-            args.level,
-            args.project_path,
-            args.test_path,
-            args.output_path,
-        )
-        change_history_df = repo_miner.compute_and_save_entity_change_history()
-
         dataset_factory = DatasetFactory(
             args.project_path,
             args.test_path,
             args.output_path,
             args.language,
             args.level,
+            change_history_df,
         )
         dataset_df = dataset_factory.create_and_save_dataset(builds)
 

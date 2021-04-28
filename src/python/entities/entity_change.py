@@ -1,9 +1,13 @@
+from datetime import datetime
+
+
 class EntityChange:
     ID = "EntityId"
     ADDED_LINES = "AddedLines"
     DELETED_LINES = "DeletedLines"
     CONTRIBUTOR = "Contributor"
     COMMIT = "Commit"
+    COMMIT_DATE = "CommitDate"
 
     def __init__(
         self,
@@ -12,12 +16,14 @@ class EntityChange:
         deleted_lines: int,
         contributor: int,
         commit_hash: str,
+        commit_date: datetime,
     ):
         self.id = id
         self.added_lines = added_lines
         self.deleted_lines = deleted_lines
         self.contributor = contributor
         self.commit_hash = commit_hash
+        self.commit_date = commit_date
 
     def to_dict(self):
         d = {
@@ -26,6 +32,7 @@ class EntityChange:
             EntityChange.DELETED_LINES: self.deleted_lines,
             EntityChange.CONTRIBUTOR: self.contributor,
             EntityChange.COMMIT: self.commit_hash,
+            EntityChange.COMMIT_DATE: self.commit_date,
         }
         return d
 

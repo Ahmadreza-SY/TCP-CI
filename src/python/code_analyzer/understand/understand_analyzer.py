@@ -10,6 +10,7 @@ from ...entities.dep_graph import DepGraph
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from ...id_mapper import IdMapper
 
 
 class UnderstandAnalyzer(CodeAnalyzerInterface):
@@ -32,16 +33,7 @@ class UnderstandAnalyzer(CodeAnalyzerInterface):
             self.und_db = UnderstandJavaDatabase(
                 project_path, test_path, output_path, level
             )
-        self.id_map_path = output_path / "id_map.csv"
-        if self.id_map_path.exists():
-            id_map_df = pd.read_csv(self.id_map_path)
-            self.id_map = dict(
-                zip(id_map_df.key.values.tolist(), id_map_df.value.values.tolist())
-            )
-            self.max_id = np.max(id_map_df.value.values)
-        else:
-            self.id_map = {}
-            self.max_id = 0
+        self.id_mapper = IdMapper(output_path)
 
     def __enter__(self):
         return self
@@ -55,23 +47,6 @@ class UnderstandAnalyzer(CodeAnalyzerInterface):
 
     def get_unique_identifier(self, und_entity):
         pass
-
-    def get_entity_id(self, und_entity):
-        unique_identifier = self.get_unique_identifier(und_entity)
-        id = -1
-        if unique_identifier in self.id_map:
-            id = self.id_map[unique_identifier]
-        else:
-            self.max_id += 1
-            self.id_map[unique_identifier] = self.max_id
-            id = self.max_id
-        return id
-
-    def save_id_map(self):
-        id_map_df = pd.DataFrame(
-            {"key": list(self.id_map.keys()), "value": list(self.id_map.values())}
-        )
-        id_map_df.to_csv(self.id_map_path, index=False)
 
     def compute_dependency_graph(self, src: List[int], dest: List[int]) -> DepGraph:
         dep_graph = DepGraph()
@@ -94,7 +69,7 @@ class UnderstandFileAnalyzer(UnderstandAnalyzer):
         for und_entity in und_entities:
             if not self.und_db.entity_is_valid(und_entity):
                 continue
-            id = self.get_entity_id(und_entity)
+            id = self.id_mapper.get_entity_id(self.get_unique_identifier(und_entity))
             name = und_entity.name()
             package = None
             if self.language == Language.JAVA:
@@ -109,7 +84,7 @@ class UnderstandFileAnalyzer(UnderstandAnalyzer):
                 id, entity_type, rel_path, self.language, name, metrics, package
             )
             entities.append(entity)
-        self.save_id_map()
+        self.id_mapper.save_id_map()
         return entities
 
 
@@ -141,7 +116,7 @@ class UnderstandFunctionAnalyzer(UnderstandAnalyzer):
             ):
                 continue
             function_set.add(unique_name)
-            id = self.get_entity_id(und_entity)
+            id = self.id_mapper.get_entity_id(self.get_unique_identifier(und_entity))
             name = und_entity.name()
             unique_name = self.und_db.get_und_function_unique_name(und_entity)
             metric_names = und_entity.metrics()
@@ -157,5 +132,5 @@ class UnderstandFunctionAnalyzer(UnderstandAnalyzer):
                 unique_name,
             )
             entities.append(entity)
-        self.save_id_map()
+        self.id_mapper.save_id_map()
         return entities
