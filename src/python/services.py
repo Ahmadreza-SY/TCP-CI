@@ -31,36 +31,14 @@ class DataCollectionService:
         git_repository.repo.git.checkout(default_branch)
 
     @staticmethod
-    def create_dataset(args, execution_record_extractor):
+    def create_dataset(args):
         DataCollectionService.checkout_default_branch(args.project_path)
         repo_miner_class = ModuleFactory.get_repository_miner(args.level)
-        repo_miner = repo_miner_class(
-            args.language,
-            args.level,
-            args.project_path,
-            args.test_path,
-            args.output_path,
-        )
+        repo_miner = repo_miner_class(args)
         change_history_df = repo_miner.compute_and_save_entity_change_history()
 
-        code_analyzer = ModuleFactory.get_code_analyzer(args.level)
-        with code_analyzer(
-            args.project_path,
-            args.test_path,
-            args.output_path,
-            args.language,
-            args.level,
-        ) as analyzer:
-            DataCollectionService.checkout_default_branch(args.project_path)
-            entities = analyzer.get_entities()
-            entities_df = pd.DataFrame.from_records([e.to_dict() for e in entities])
-            entities_cols = entities_df.columns.values.tolist()
-            entities_df.to_csv(
-                args.output_path / "metadata.csv", index=False, columns=entities_cols
-            )
-
         records, builds = DataCollectionService.fetch_and_save_execution_history(
-            args, execution_record_extractor
+            args, repo_miner
         )
 
         if len(builds) == 0:
@@ -68,21 +46,26 @@ class DataCollectionService:
             sys.exit()
 
         dataset_factory = DatasetFactory(
-            args.project_path,
-            args.test_path,
-            args.output_path,
-            args.language,
-            args.level,
+            args,
             change_history_df,
+            repo_miner,
         )
-        dataset_df = dataset_factory.create_and_save_dataset(builds)
+        dataset_df = dataset_factory.create_and_save_dataset(builds, records)
 
     @staticmethod
-    def fetch_and_save_execution_history(args, execution_record_extractor):
+    def fetch_and_save_execution_history(args, repo_miner):
+        execution_record_extractor = ModuleFactory.get_execution_record_extractor(
+            args.language
+        )(args, repo_miner)
         exe_path = args.output_path / "exe.csv"
         exe_records, builds = execution_record_extractor.fetch_execution_records()
         exe_df = pd.DataFrame.from_records([e.to_dict() for e in exe_records])
         if len(exe_df) > 0:
+            exe_df.sort_values(
+                by=[ExecutionRecord.BUILD, ExecutionRecord.JOB],
+                ignore_index=True,
+                inplace=True,
+            )
             exe_df.to_csv(exe_path, index=False)
             return exe_records, builds
         else:

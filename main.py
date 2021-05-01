@@ -32,15 +32,7 @@ def release(args):
 
 
 def dataset(args):
-    extractor = ModuleFactory.get_execution_record_extractor(args.language)(
-        args.language,
-        args.level,
-        args.project_slug,
-        args.project_path,
-        args.output_path,
-        args.unique_separator,
-    )
-    DataCollectionService.create_dataset(args, extractor)
+    DataCollectionService.create_dataset(args)
 
 
 def fetch_source_code_if_needed(args):
@@ -164,6 +156,13 @@ def main():
 
     add_common_arguments(dataset_parser)
     dataset_parser.set_defaults(func=dataset)
+    dataset_parser.add_argument(
+        "-n",
+        "--build-window",
+        help="Specifies the number of recent builds to consider for computing features.",
+        type=int,
+        required=True,
+    )
 
     args = parser.parse_args()
     args.output_path.mkdir(parents=True, exist_ok=True)

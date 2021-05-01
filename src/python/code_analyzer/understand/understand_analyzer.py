@@ -14,26 +14,13 @@ from ...id_mapper import IdMapper
 
 
 class UnderstandAnalyzer(CodeAnalyzerInterface):
-    def __init__(
-        self,
-        project_path: Path,
-        test_path: Path,
-        output_path: Path,
-        language: Language,
-        level: AnalysisLevel,
-    ):
-        self.project_path = project_path
-        self.language = language
-        self.level = level
-        if language == Language.C:
-            self.und_db = UnderstandCDatabase(
-                project_path, test_path, output_path, level
-            )
-        elif language == Language.JAVA:
-            self.und_db = UnderstandJavaDatabase(
-                project_path, test_path, output_path, level
-            )
-        self.id_mapper = IdMapper(output_path)
+    def __init__(self, config):
+        self.config = config
+        if config.language == Language.C:
+            self.und_db = UnderstandCDatabase(config)
+        elif config.language == Language.JAVA:
+            self.und_db = UnderstandJavaDatabase(config)
+        self.id_mapper = IdMapper(config.output_path)
 
     def __enter__(self):
         return self
@@ -72,7 +59,7 @@ class UnderstandFileAnalyzer(UnderstandAnalyzer):
             id = self.id_mapper.get_entity_id(self.get_unique_identifier(und_entity))
             name = und_entity.name()
             package = None
-            if self.language == Language.JAVA:
+            if self.config.language == Language.JAVA:
                 matches = re.compile("package (.+);").findall(und_entity.contents())
                 if len(matches) == 1:
                     package = matches[0] + "." + und_entity.name()[:-5]
@@ -81,7 +68,7 @@ class UnderstandFileAnalyzer(UnderstandAnalyzer):
             metric_names = und_entity.metrics()
             metrics = und_entity.metric(metric_names)
             entity = File(
-                id, entity_type, rel_path, self.language, name, metrics, package
+                id, entity_type, rel_path, self.config.language, name, metrics, package
             )
             entities.append(entity)
         self.id_mapper.save_id_map()
@@ -110,7 +97,7 @@ class UnderstandFunctionAnalyzer(UnderstandAnalyzer):
             if unique_name in function_set:
                 continue
             if (
-                self.language == Language.C
+                self.config.language == Language.C
                 and entity_type == EntityType.TEST
                 and und_entity.name() != "TestBody"
             ):
@@ -125,7 +112,7 @@ class UnderstandFunctionAnalyzer(UnderstandAnalyzer):
                 id,
                 entity_type,
                 rel_path,
-                self.language,
+                self.config.language,
                 name,
                 metrics,
                 parameters,

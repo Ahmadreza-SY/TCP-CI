@@ -15,22 +15,12 @@ from pathlib import Path
 class UnderstandDatabase:
     language_map = {Language.JAVA: "java", Language.C: "c++"}
 
-    def __init__(
-        self,
-        project_path: Path,
-        test_path: Path,
-        output_path: Path,
-        level: AnalysisLevel,
-    ):
-        self.project_path = project_path
-        self.test_path = test_path
-        self.level = level
-        self.output_path = output_path
-        self.language = None
+    def __init__(self, config):
+        self.config = config
         self.db = None
 
     def get_db_name(self):
-        project_name = self.project_path.parts[-1]
+        project_name = self.config.project_path.parts[-1]
         db_name = (
             f"{project_name}.udb"
             if understand.version() < 1039
@@ -39,13 +29,13 @@ class UnderstandDatabase:
         return db_name
 
     def get_und_db(self):
-        und_db_path = self.output_path / self.get_db_name()
+        und_db_path = self.config.output_path / self.get_db_name()
         rc = 0
         if not und_db_path.exists():
             start = time.time()
-            language_argument = UnderstandDatabase.language_map[self.language]
+            language_argument = UnderstandDatabase.language_map[self.config.language]
             # print("Running understand analysis")
-            und_command = f"und -verbose -db {und_db_path.as_posix()} create -languages {language_argument} add {self.project_path.as_posix()} analyze"
+            und_command = f"und -verbose -db {und_db_path.as_posix()} create -languages {language_argument} add {self.config.project_path.as_posix()} analyze"
             rc = self.run_und_command(und_command)
             # print(f'Created understand db at {und_db_path}, took {"{0:.2f}".format(time.time() - start)} seconds.')
             self.db = understand.open(str(und_db_path))
@@ -62,7 +52,7 @@ class UnderstandDatabase:
 
     def run_und_command(self, command):
         pbar = None
-        full_project_path = self.project_path.absolute()
+        full_project_path = self.config.project_path.absolute()
         process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE)
         while True:
             output = process.stdout.readline().decode("utf-8").strip()
@@ -71,7 +61,7 @@ class UnderstandDatabase:
             if output:
                 if "Files added:" in output:
                     pbar_total = int(output.split(" ")[-1])
-                    if self.language == Language.JAVA:
+                    if self.config.language == Language.JAVA:
                         pbar_total *= 2
                     # pbar = tqdm(total=pbar_total, file=sys.stdout, desc="Analyzing files ...")
                 elif (
@@ -91,9 +81,9 @@ class UnderstandDatabase:
 
     def entity_is_valid(self, entity):
         entity_file_path = None
-        if self.level == AnalysisLevel.FILE:
+        if self.config.level == AnalysisLevel.FILE:
             entity_file_path = self.get_valid_rel_path(entity)
-        elif self.level == AnalysisLevel.FUNCTION:
+        elif self.config.level == AnalysisLevel.FUNCTION:
             define_ref = entity.ref("definein")
             if define_ref is None:
                 return False
@@ -103,7 +93,7 @@ class UnderstandDatabase:
         return True
 
     def get_valid_rel_path(self, entity):
-        full_project_path = self.project_path.absolute()
+        full_project_path = self.config.project_path.absolute()
         full_path = Path(entity.longname())
         rel_prefix = f"RELATIVE:{os.sep}"
         if str(full_project_path) not in str(full_path) and rel_prefix in str(
@@ -114,11 +104,11 @@ class UnderstandDatabase:
         return Path(str(full_path).replace(str(full_project_path) + os.sep, ""))
 
     def get_entity_type(self, entity, rel_path):
-        if self.test_path is None:
+        if self.config.test_path is None:
             print("Test path cannot be None for this configuration. Aborting ...")
             sys.exit()
         file_name = rel_path.name
-        full_test_path = (self.project_path / self.test_path).absolute()
+        full_test_path = (self.config.project_path / self.config.test_path).absolute()
         for match in full_test_path.rglob(file_name):
             if match.exists() and str(rel_path) in str(match):
                 return EntityType.TEST
@@ -138,26 +128,24 @@ class UnderstandDatabase:
 
 
 class UnderstandCDatabase(UnderstandDatabase):
-    def __init__(
-        self, project_path: str, test_path: str, output_path: str, level: AnalysisLevel
-    ):
-        UnderstandDatabase.__init__(self, project_path, test_path, output_path, level)
-        self.language = Language.C
+    def __init__(self, config):
+        UnderstandDatabase.__init__(self, config)
+        self.config.language = Language.C
 
     def get_ents(self):
         level_argument = None
-        if self.level == AnalysisLevel.FILE:
+        if self.config.level == AnalysisLevel.FILE:
             level_argument = "file"
-        elif self.level == AnalysisLevel.FUNCTION:
+        elif self.config.level == AnalysisLevel.FUNCTION:
             level_argument = "function"
         return self.get_und_db().ents(
-            f"{self.language.value} {level_argument} ~unresolved ~unknown"
+            f"{self.config.language.value} {level_argument} ~unresolved ~unknown"
         )
 
     def get_dependencies(self, entity):
-        if self.level == AnalysisLevel.FILE:
+        if self.config.level == AnalysisLevel.FILE:
             return list(entity.depends().keys())
-        elif self.level == AnalysisLevel.FUNCTION:
+        elif self.config.level == AnalysisLevel.FUNCTION:
             return list(map(lambda ref: ref.ent(), entity.refs("c call")))
 
     def get_und_function_unique_name(self, und_function):
@@ -167,9 +155,9 @@ class UnderstandCDatabase(UnderstandDatabase):
         if not UnderstandDatabase.entity_is_valid(self, entity):
             return False
         deps_subpath = f"{os.sep}_deps{os.sep}"
-        if self.level == AnalysisLevel.FILE and deps_subpath in entity.relname():
+        if self.config.level == AnalysisLevel.FILE and deps_subpath in entity.relname():
             return False
-        elif self.level == AnalysisLevel.FUNCTION:
+        elif self.config.level == AnalysisLevel.FUNCTION:
             if entity.name() == "[unnamed]":
                 return False
             define_in_ref = entity.ref("definein")
@@ -179,14 +167,12 @@ class UnderstandCDatabase(UnderstandDatabase):
 
 
 class UnderstandJavaDatabase(UnderstandDatabase):
-    def __init__(
-        self, project_path: str, test_path: str, output_path: str, level: AnalysisLevel
-    ):
-        UnderstandDatabase.__init__(self, project_path, test_path, output_path, level)
-        self.language = Language.JAVA
+    def __init__(self, config):
+        UnderstandDatabase.__init__(self, config)
+        self.config.language = Language.JAVA
 
     def get_entity_type(self, entity, rel_path):
-        if self.test_path is not None:
+        if self.config.test_path is not None:
             return super().get_entity_type(entity, rel_path)
         if f"src{os.sep}test" in str(rel_path):
             return EntityType.TEST
@@ -195,18 +181,18 @@ class UnderstandJavaDatabase(UnderstandDatabase):
 
     def get_ents(self):
         level_argument = None
-        if self.level == AnalysisLevel.FILE:
+        if self.config.level == AnalysisLevel.FILE:
             level_argument = "file"
-        elif self.level == AnalysisLevel.FUNCTION:
+        elif self.config.level == AnalysisLevel.FUNCTION:
             level_argument = "method"
         return self.get_und_db().ents(
-            f"{self.language.value} {level_argument} ~unresolved ~unknown"
+            f"{self.config.language.value} {level_argument} ~unresolved ~unknown"
         )
 
     def get_dependencies(self, entity):
-        if self.level == AnalysisLevel.FILE:
+        if self.config.level == AnalysisLevel.FILE:
             return list(entity.depends().keys())
-        elif self.level == AnalysisLevel.FUNCTION:
+        elif self.config.level == AnalysisLevel.FUNCTION:
             return list(map(lambda ref: ref.ent(), entity.refs("java call")))
 
     def get_und_function_unique_name(self, und_function):
@@ -221,9 +207,9 @@ class UnderstandJavaDatabase(UnderstandDatabase):
     def entity_is_valid(self, entity):
         if not UnderstandDatabase.entity_is_valid(self, entity):
             return False
-        if self.level == AnalysisLevel.FILE and ".class" in entity.name():
+        if self.config.level == AnalysisLevel.FILE and ".class" in entity.name():
             return False
-        if self.level == AnalysisLevel.FUNCTION:
+        if self.config.level == AnalysisLevel.FUNCTION:
             if re.search("\(Anon_\d+\)", entity.name()) is not None:
                 return False
             if re.search("\(lambda_expr_\d+\)", entity.name()) is not None:

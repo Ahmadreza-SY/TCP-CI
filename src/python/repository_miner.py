@@ -10,13 +10,9 @@ from .id_mapper import IdMapper
 
 
 class RepositoryMiner:
-    def __init__(self, language, level, project_path, test_path, output_path):
-        self.language = language
-        self.project_path = project_path
-        self.test_path = test_path
-        self.level = level
-        self.output_path = output_path
-        self.contributors_path = output_path / "contributors.csv"
+    def __init__(self, config):
+        self.config = config
+        self.contributors_path = config.output_path / "contributors.csv"
         if self.contributors_path.exists():
             contributors_df = pd.read_csv(self.contributors_path)
             self.contributors = dict(
@@ -29,7 +25,8 @@ class RepositoryMiner:
         else:
             self.contributors = {}
             self.max_id = 0
-        self.id_mapper = IdMapper(output_path)
+        self.id_mapper = IdMapper(config.output_path)
+        self.git_repository = GitRepository(str(self.config.project_path))
 
     def get_contributor_id(self, commit):
         contributor = commit.author
@@ -51,10 +48,8 @@ class RepositoryMiner:
         contributors_df.to_csv(self.contributors_path, index=False)
 
     def compute_entity_change_history(self) -> List[EntityChange]:
-        from .module_factory import ModuleFactory
-
         change_history = []
-        repository = RepositoryMining(str(self.project_path))
+        repository = RepositoryMining(str(self.config.project_path))
         commits = list(repository.traverse_commits())
         for commit in tqdm(commits, desc="Mining entity change history"):
             change_history.extend(self.compute_changed_entities(commit))
@@ -68,9 +63,30 @@ class RepositoryMiner:
             [ch.to_dict() for ch in change_history]
         )
         change_history_df.to_csv(
-            self.output_path / "entity_change_history.csv", index=False
+            self.config.output_path / "entity_change_history.csv", index=False
         )
         return change_history_df
+
+    def analyze_commit(self, commit_hash):
+        from .module_factory import ModuleFactory
+
+        metadata_path = (
+            self.config.output_path / "metadata" / commit_hash / "metadata.csv"
+        )
+        if not metadata_path.exists():
+            try:
+                self.git_repository.repo.git.checkout(commit_hash)
+            except:
+                return pd.DataFrame()
+            code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
+            with code_analyzer(self.config) as analyzer:
+                entities = analyzer.get_entities()
+                entities_df = pd.DataFrame.from_records([e.to_dict() for e in entities])
+                metadata_path.parent.mkdir(parents=True, exist_ok=True)
+                entities_df.to_csv(metadata_path, index=False)
+            return entities_df
+        else:
+            return pd.read_csv(metadata_path)
 
     def compute_changed_entities(self, commit) -> List[EntityChange]:
         pass
@@ -112,9 +128,9 @@ class FileRepositoryMiner(RepositoryMiner):
 
 class FunctionRepositoryMiner(RepositoryMiner):
     def get_pydriller_function_unique_name(self, pydriller_function):
-        if self.language == Language.JAVA:
+        if self.config.language == Language.JAVA:
             return pydriller_function.long_name.replace(" ", "")
-        elif self.language == Language.C:
+        elif self.config.language == Language.C:
             function_name = pydriller_function.name
             if function_name == "TEST":
                 function_name = pydriller_function.long_name
