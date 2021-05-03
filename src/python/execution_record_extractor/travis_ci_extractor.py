@@ -74,13 +74,13 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
 
         for build in tqdm(builds, desc="Creating execution records"):
             metadata_path = (
-                self.config.output_path
-                / "metadata"
-                / build.commit_hash
+                self.repository_miner.get_analysis_path(build.commit_hash)
                 / "metadata.csv"
             )
             if not metadata_path.exists():
-                result = self.repository_miner.analyze_commit(build.commit_hash)
+                result = self.repository_miner.analyze_commit_statically(
+                    build.commit_hash
+                )
                 if result.empty:
                     continue
 

@@ -1,4 +1,5 @@
 from pydriller.git_repository import GitRepository
+from pydriller import RepositoryMining
 from .module_factory import ModuleFactory
 from .entities.entity import EntityType, Entity
 from .entities.entity_change import EntityChange
@@ -81,7 +82,7 @@ class DatasetFactory:
         self.change_history = change_history
         self.repository_miner = repository_miner
 
-    def compute_test_static_metrics(self, test_entities, build_tc_features):
+    def compute_static_metrics(self, test_entities, build_tc_features):
         for test in test_entities.to_dict("records"):
             for name, value in test.items():
                 if name in DatasetFactory.COM_static_feature_set:
@@ -121,9 +122,7 @@ class DatasetFactory:
             last_commit = self.git_repository.get_commit(last_commit.parents[0])
         return merge_commits
 
-    def compute_test_process_metrics(
-        self, commit_hash, test_entities, build_tc_features
-    ):
+    def compute_process_metrics(self, commit_hash, test_entities, build_tc_features):
         commit = self.git_repository.get_commit(commit_hash)
         commit_date = commit.author_date
         build_change_history = self.change_history[
@@ -187,9 +186,7 @@ class DatasetFactory:
             ] = all_commiters_experience
         return build_tc_features
 
-    def compute_test_rec_features(
-        self, test_entities, exe_df, build, build_tc_features
-    ):
+    def compute_rec_features(self, test_entities, exe_df, build, build_tc_features):
         exe_df.sort_values(by=[ExecutionRecord.BUILD], inplace=True, ignore_index=True)
         window = self.config.build_window
         builds = exe_df[ExecutionRecord.BUILD].unique().tolist()
@@ -267,13 +264,13 @@ class DatasetFactory:
         valid_builds = []
         for build in builds:
             metadata_path = (
-                self.config.output_path
-                / "metadata"
-                / build.commit_hash
+                self.repository_miner.get_analysis_path(build.commit_hash)
                 / "metadata.csv"
             )
             if not metadata_path.exists():
-                result = self.repository_miner.analyze_commit(build.commit_hash)
+                result = self.repository_miner.analyze_commit_statically(
+                    build.commit_hash
+                )
                 if result.empty:
                     continue
             build_exe_df = exe_df[exe_df[ExecutionRecord.BUILD] == build.id]
@@ -282,30 +279,70 @@ class DatasetFactory:
             valid_builds.append(build)
         return valid_builds
 
+    def compute_co_changes(self, commit_hash, ent_ids_set):
+        from .services import DataCollectionService
+
+        DataCollectionService.checkout_default_branch(self.config.project_path)
+        build_commit = self.git_repository.get_commit(commit_hash)
+        commit_date = build_commit.author_date
+        build_change_history = self.change_history[
+            self.change_history[EntityChange.COMMIT_DATE] <= commit_date
+        ]
+        commit_change_lists = (
+            build_change_history[[EntityChange.ID, EntityChange.COMMIT]]
+            .groupby(EntityChange.COMMIT)[EntityChange.ID]
+            .apply(list)
+            .reset_index(name="changes")
+        )
+        commit_change_lists_d = dict(
+            zip(
+                commit_change_lists[EntityChange.COMMIT].values.tolist(),
+                commit_change_lists["changes"].values.tolist(),
+            )
+        )
+        repository = RepositoryMining(str(self.config.project_path), to=commit_date)
+        co_changes = []
+        for commit in repository.traverse_commits():
+            changes = set()
+            commit_hashes = [commit.hash]
+            if commit.merge:
+                commit_hashes = map(lambda c: c.hash, self.get_merge_commits(commit))
+            for change_hash in commit_hashes:
+                changes.update(commit_change_lists_d[change_hash])
+            entity_changes = changes.intersection(ent_ids_set)
+            if len(entity_changes) > 0:
+                co_changes.append(entity_changes)
+        return co_changes
+
+    def compute_cov_features(self, commit_hash, test_ids, src_ids):
+        co_changes = self.compute_co_changes(commit_hash, set(test_ids) | set(src_ids))
+        dep_graph, tar_graph = self.repository_miner.analyze_commit_dependency(
+            commit_hash, test_ids, src_ids, co_changes
+        )
+
     def create_dataset(self, builds, exe_records):
         exe_df = pd.DataFrame.from_records([e.to_dict() for e in exe_records])
         dataset = []
         valid_builds = self.select_valid_builds(builds, exe_df)
         for build in tqdm(valid_builds[1:], desc="Creating dataset"):
+            commit_hash = build.commit_hash
             metadata_path = (
-                self.config.output_path
-                / "metadata"
-                / build.commit_hash
-                / "metadata.csv"
+                self.repository_miner.get_analysis_path(commit_hash) / "metadata.csv"
             )
             entities_df = pd.read_csv(metadata_path)
             build_exe_df = exe_df[exe_df[ExecutionRecord.BUILD] == build.id]
             if build_exe_df.empty:
                 continue
             test_ids = build_exe_df[ExecutionRecord.TEST].values.tolist()
+            src_ids = list(set(entities_df[Entity.ID].values.tolist()) - set(test_ids))
             tests_df = entities_df[entities_df[Entity.ID].isin(test_ids)]
 
             build_tc_features = {}
-            self.compute_test_static_metrics(tests_df, build_tc_features)
-            self.compute_test_process_metrics(
-                build.commit_hash, tests_df, build_tc_features
-            )
-            self.compute_test_rec_features(tests_df, exe_df, build, build_tc_features)
+            self.compute_static_metrics(tests_df, build_tc_features)
+            self.compute_process_metrics(commit_hash, tests_df, build_tc_features)
+            self.compute_rec_features(tests_df, exe_df, build, build_tc_features)
+
+            self.compute_cov_features(commit_hash, test_ids, src_ids)
 
             for test_id, features in build_tc_features.items():
                 features[DatasetFactory.BUILD] = build.id

@@ -1,5 +1,6 @@
 from .entities.entity_change import EntityChange, Contributor
 from .entities.entity import Language, Entity, Function
+from .entities.dep_graph import DepGraph
 from typing import List
 from pydriller.domain.commit import ModificationType
 from pydriller import RepositoryMining, GitRepository
@@ -7,6 +8,7 @@ import pandas as pd
 from tqdm import tqdm
 import numpy as np
 from .id_mapper import IdMapper
+from apyori import apriori
 
 
 class RepositoryMiner:
@@ -48,6 +50,9 @@ class RepositoryMiner:
         contributors_df.to_csv(self.contributors_path, index=False)
 
     def compute_entity_change_history(self) -> List[EntityChange]:
+        from .services import DataCollectionService
+
+        DataCollectionService.checkout_default_branch(self.config.project_path)
         change_history = []
         repository = RepositoryMining(str(self.config.project_path))
         commits = list(repository.traverse_commits())
@@ -67,19 +72,21 @@ class RepositoryMiner:
         )
         return change_history_df
 
-    def analyze_commit(self, commit_hash):
+    def get_analysis_path(self, commit_hash):
+        return self.config.output_path / "analysis" / commit_hash
+
+    def analyze_commit_statically(self, commit_hash):
         from .module_factory import ModuleFactory
 
-        metadata_path = (
-            self.config.output_path / "metadata" / commit_hash / "metadata.csv"
-        )
+        analysis_path = self.get_analysis_path(commit_hash)
+        metadata_path = analysis_path / "metadata.csv"
         if not metadata_path.exists():
             try:
                 self.git_repository.repo.git.checkout(commit_hash)
             except:
                 return pd.DataFrame()
             code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
-            with code_analyzer(self.config) as analyzer:
+            with code_analyzer(self.config, analysis_path) as analyzer:
                 entities = analyzer.get_entities()
                 entities_df = pd.DataFrame.from_records([e.to_dict() for e in entities])
                 metadata_path.parent.mkdir(parents=True, exist_ok=True)
@@ -87,6 +94,68 @@ class RepositoryMiner:
             return entities_df
         else:
             return pd.read_csv(metadata_path)
+
+    def compute_dependency_weights(self, graph, co_changes):
+        association_rules = apriori(
+            co_changes,
+            min_support=0.0001,
+            min_confidence=0.002,
+            max_length=2,
+        )
+        association_map = {rule.items: rule for rule in association_rules}
+
+        for edge_start, dependencies in graph.graph.items():
+            dep_weights = []
+            for edge_end in dependencies:
+                pair = frozenset({edge_start, edge_end})
+                if pair in association_map:
+                    rule = association_map[pair]
+                    forward_confidence = 0.0
+                    backward_confidence = 0.0
+                    lift = 0.0
+                    for stats in rule.ordered_statistics:
+                        lift = stats.lift
+                        if stats.items_base == frozenset({edge_end}):
+                            forward_confidence = stats.confidence
+                        elif stats.items_base == frozenset({edge_start}):
+                            backward_confidence = stats.confidence
+                    dep_weights.append(
+                        [rule.support, forward_confidence, backward_confidence, lift]
+                    )
+                else:
+                    dep_weights.append(0)
+            graph.add_weights(edge_start, dep_weights)
+        return graph
+
+    def analyze_commit_dependency(self, commit_hash, test_ids, src_ids, co_changes):
+        from .module_factory import ModuleFactory
+
+        analysis_path = self.get_analysis_path(commit_hash)
+        dep_path = analysis_path / "dep.csv"
+        tar_path = analysis_path / "tar.csv"
+        if (not dep_path.exists()) or (not tar_path.exists()):
+            try:
+                self.git_repository.repo.git.checkout(commit_hash)
+            except:
+                return pd.DataFrame(), pd.DataFrame()
+            code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
+            with code_analyzer(self.config, analysis_path) as analyzer:
+                dep_graph = analyzer.compute_dependency_graph(src_ids, src_ids)
+                tar_graph = analyzer.compute_dependency_graph(test_ids, src_ids)
+                dep_graph = self.compute_dependency_weights(dep_graph, co_changes)
+                tar_graph = self.compute_dependency_weights(tar_graph, co_changes)
+                dep_graph.save_graph(dep_path, self.config.unique_separator)
+                tar_graph.save_graph(
+                    tar_path,
+                    self.config.unique_separator,
+                )
+            return dep_graph, tar_graph
+        else:
+            dep_graph = DepGraph()
+            tar_graph = DepGraph()
+            dep_graph.load_graph(dep_path, self.config.unique_separator)
+            tar_graph.load_graph(tar_path, self.config.unique_separator)
+            return dep_graph, tar_graph
 
     def compute_changed_entities(self, commit) -> List[EntityChange]:
         pass

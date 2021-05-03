@@ -1,5 +1,4 @@
 import re
-from tqdm import tqdm
 from ..code_analyzer import *
 from ..understand.understand_database import (
     UnderstandCDatabase,
@@ -14,13 +13,14 @@ from ...id_mapper import IdMapper
 
 
 class UnderstandAnalyzer(CodeAnalyzerInterface):
-    def __init__(self, config):
+    def __init__(self, config, db_path=None):
         self.config = config
         if config.language == Language.C:
-            self.und_db = UnderstandCDatabase(config)
+            self.und_db = UnderstandCDatabase(config, db_path)
         elif config.language == Language.JAVA:
-            self.und_db = UnderstandJavaDatabase(config)
+            self.und_db = UnderstandJavaDatabase(config, db_path)
         self.id_mapper = IdMapper(config.output_path)
+        self.und_id_map = {}
 
     def __enter__(self):
         return self
@@ -35,14 +35,23 @@ class UnderstandAnalyzer(CodeAnalyzerInterface):
     def get_unique_identifier(self, und_entity):
         pass
 
+    def get_und_ids(self, ent_ids):
+        if not self.und_id_map:
+            self.get_entities()
+        return [self.und_id_map[ent_id] for ent_id in ent_ids]
+
     def compute_dependency_graph(self, src: List[int], dest: List[int]) -> DepGraph:
         dep_graph = DepGraph()
-        und_entities = self.und_db.get_ents_by_id(src)
+        und_entities = self.und_db.get_ents_by_id(self.get_und_ids(src))
         dest_id_set = set(dest)
-        for und_entity in tqdm(und_entities, desc="Computing dependecy graph"):
+        for und_entity in und_entities:
             for dep in self.und_db.get_dependencies(und_entity):
-                if dep.id() in dest_id_set:
-                    dep_graph.add_edge(und_entity.id(), dep.id())
+                dep_id = self.id_mapper.get_entity_id(self.get_unique_identifier(dep))
+                und_entity_id = self.id_mapper.get_entity_id(
+                    self.get_unique_identifier(und_entity)
+                )
+                if dep_id in dest_id_set:
+                    dep_graph.add_edge(und_entity_id, dep_id)
         return dep_graph
 
 
@@ -57,6 +66,7 @@ class UnderstandFileAnalyzer(UnderstandAnalyzer):
             if not self.und_db.entity_is_valid(und_entity):
                 continue
             id = self.id_mapper.get_entity_id(self.get_unique_identifier(und_entity))
+            self.und_id_map[id] = und_entity.id()
             name = und_entity.name()
             package = None
             if self.config.language == Language.JAVA:
@@ -104,6 +114,7 @@ class UnderstandFunctionAnalyzer(UnderstandAnalyzer):
                 continue
             function_set.add(unique_name)
             id = self.id_mapper.get_entity_id(self.get_unique_identifier(und_entity))
+            self.und_id_map[id] = und_entity.id()
             name = und_entity.name()
             unique_name = self.und_db.get_und_function_unique_name(und_entity)
             metric_names = und_entity.metrics()

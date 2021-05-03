@@ -19,7 +19,7 @@ from pydriller.git_repository import GitRepository
 class DataCollectionService:
     @staticmethod
     def checkout_default_branch(project_path):
-        print("Checking out default branch...")
+        # print("Checking out default branch...")
         g = Git(project_path)
         remote = g.execute("git remote show".split())
         if remote == "":
@@ -32,7 +32,6 @@ class DataCollectionService:
 
     @staticmethod
     def create_dataset(args):
-        DataCollectionService.checkout_default_branch(args.project_path)
         repo_miner_class = ModuleFactory.get_repository_miner(args.level)
         repo_miner = repo_miner_class(args)
         change_history_df = repo_miner.compute_and_save_entity_change_history()

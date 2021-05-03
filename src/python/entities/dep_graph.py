@@ -1,4 +1,5 @@
 import pandas as pd
+import json
 
 
 class Edge:
@@ -21,24 +22,31 @@ class DepGraph:
         if _from in self.graph and len(self.graph[_from]) == len(weights):
             self.weights[_from] = weights
 
-    def reverse_graph(self):
-        reversed_graph = {}
-        reversed_weights = {}
-        for src, dest_ids in self.graph.items():
-            for i, dest in enumerate(dest_ids):
-                reversed_graph.setdefault(dest, [])
-                reversed_weights.setdefault(dest, [])
-                reversed_graph[dest].append(src)
-                reversed_weights[dest].append(self.weights[src][i])
-        self.graph = reversed_graph
-        self.weights = reversed_weights
-
-    def save_graph(self, file_path, dependency_col_name, sep=","):
+    def save_graph(self, file_path, sep=","):
         graph_df = pd.DataFrame(
             {
                 "entity_id": list(self.graph.keys()),
-                dependency_col_name: list(self.graph.values()),
+                "dependencies": list(self.graph.values()),
             }
         )
         graph_df["weights"] = [self.weights[ent_id] for ent_id in self.graph.keys()]
         graph_df.to_csv(file_path, sep=sep, index=False)
+
+    def load_graph(self, file_path, sep=","):
+        graph_df = pd.read_csv(
+            file_path,
+            sep=sep,
+            converters={"dependencies": json.loads, "weights": json.loads},
+        )
+        self.graph = dict(
+            zip(
+                graph_df["entity_id"].values.tolist(),
+                graph_df["dependencies"].values.tolist(),
+            )
+        )
+        self.weights = dict(
+            zip(
+                graph_df["entity_id"].values.tolist(),
+                graph_df["weights"].values.tolist(),
+            )
+        )

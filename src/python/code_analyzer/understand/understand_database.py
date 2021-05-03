@@ -15,9 +15,13 @@ from pathlib import Path
 class UnderstandDatabase:
     language_map = {Language.JAVA: "java", Language.C: "c++"}
 
-    def __init__(self, config):
+    def __init__(self, config, db_path: Path):
         self.config = config
         self.db = None
+        if db_path is not None:
+            self.db_path = db_path
+        else:
+            self.db_path = self.config.output_path
 
     def get_db_name(self):
         project_name = self.config.project_path.parts[-1]
@@ -29,25 +33,22 @@ class UnderstandDatabase:
         return db_name
 
     def get_und_db(self):
-        und_db_path = self.config.output_path / self.get_db_name()
+        und_db_path = self.db_path / self.get_db_name()
         rc = 0
         if not und_db_path.exists():
+            und_db_path.parent.mkdir(parents=True, exist_ok=True)
             start = time.time()
             language_argument = UnderstandDatabase.language_map[self.config.language]
             # print("Running understand analysis")
             und_command = f"und -verbose -db {und_db_path.as_posix()} create -languages {language_argument} add {self.config.project_path.as_posix()} analyze"
             rc = self.run_und_command(und_command)
-            # print(f'Created understand db at {und_db_path}, took {"{0:.2f}".format(time.time() - start)} seconds.')
+            if rc != 0:
+                print(f"Understand command failed with {rc} error code!")
+                sys.exit()
             self.db = understand.open(str(und_db_path))
-        elif und_db_path.exists() and self.db is None:
-            und_command = (
-                f"und -verbose -db {und_db_path.as_posix()} analyze -rescan -changed"
-            )
-            rc = self.run_und_command(und_command)
+
+        if self.db is None:
             self.db = understand.open(str(und_db_path))
-        if rc != 0:
-            print(f"Understand command failed with {rc} error code!")
-            sys.exit()
         return self.db
 
     def run_und_command(self, command):
@@ -128,8 +129,8 @@ class UnderstandDatabase:
 
 
 class UnderstandCDatabase(UnderstandDatabase):
-    def __init__(self, config):
-        UnderstandDatabase.__init__(self, config)
+    def __init__(self, config, db_path):
+        UnderstandDatabase.__init__(self, config, db_path)
         self.config.language = Language.C
 
     def get_ents(self):
@@ -167,8 +168,8 @@ class UnderstandCDatabase(UnderstandDatabase):
 
 
 class UnderstandJavaDatabase(UnderstandDatabase):
-    def __init__(self, config):
-        UnderstandDatabase.__init__(self, config)
+    def __init__(self, config, db_path):
+        UnderstandDatabase.__init__(self, config, db_path)
         self.config.language = Language.JAVA
 
     def get_entity_type(self, entity, rel_path):
