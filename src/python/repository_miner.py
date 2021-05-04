@@ -196,12 +196,7 @@ class RepositoryMiner:
         for commit in repository.traverse_commits():
             if commit.hash in self.merged_commits:
                 continue
-            changes = set()
-            commit_hashes = [commit.hash]
-            if commit.merge:
-                commit_hashes = self.merged_commit_list_d[commit.hash]
-            for change_hash in commit_hashes:
-                changes.update(self.commit_change_list_d[change_hash])
+            changes = self.get_changed_entities(commit)
             entity_changes = changes.intersection(ent_ids_set)
             if len(entity_changes) > 0:
                 co_changes.append(entity_changes)
@@ -220,6 +215,9 @@ class RepositoryMiner:
                 self.git_repository.repo.git.checkout(commit_hash)
             except:
                 return pd.DataFrame(), pd.DataFrame()
+            co_changes = self.compute_co_changes(
+                commit_hash, set(test_ids) | set(src_ids)
+            )
             code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
             with code_analyzer(self.config, analysis_path) as analyzer:
                 dep_graph = analyzer.compute_dependency_graph(src_ids, src_ids)
@@ -238,6 +236,18 @@ class RepositoryMiner:
             dep_graph.load_graph(dep_path, self.config.unique_separator)
             tar_graph.load_graph(tar_path, self.config.unique_separator)
             return dep_graph, tar_graph
+
+    def get_changed_entities(self, commit):
+        try:
+            changes = set()
+            commit_hashes = [commit.hash]
+            if commit.merge:
+                commit_hashes = self.merged_commit_list_d[commit.hash]
+            for change_hash in commit_hashes:
+                changes.update(self.commit_change_list_d[change_hash])
+            return changes
+        except:
+            return set()
 
     def compute_changed_entities(self, commit) -> List[EntityChange]:
         pass

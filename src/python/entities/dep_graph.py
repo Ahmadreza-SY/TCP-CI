@@ -13,6 +13,12 @@ class DepGraph:
         self.graph = {}
         self.weights = {}
 
+    def get_dependencies(self, ent_id):
+        return self.graph.get(ent_id, [])
+
+    def get_dependency_weights(self, ent_id):
+        return self.weights.get(ent_id, [])
+
     def add_edge(self, _from, to):
         self.graph.setdefault(_from, [])
         if to not in self.graph[_from] and _from != to:

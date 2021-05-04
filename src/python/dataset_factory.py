@@ -13,7 +13,7 @@ class DatasetFactory:
     TEST = "Test"
     BUILD = "Build"
     # Complexity Metrics
-    COM_static_feature_set = {
+    COM_metrics = {
         "CountDeclFunction",
         "CountLine",
         "CountLineBlank",
@@ -64,6 +64,11 @@ class DatasetFactory:
     EXC_RATE = "ExcRate"
     LAST_VERDICT = "LastVerdict"
     LAST_EXE_TIME = "LastExeTime"
+    # COV Features
+    CHN_SCORE_SUM = "ChnScoreSum"
+    IMP_SCORE_SUM = "ImpScoreSum"
+    CHN_COUNT = "ChnCount"
+    IMP_COUNT = "ImpCount"
     # Ground Truth
     VERDICT = "Verdict"
     DURATION = "Duration"
@@ -82,7 +87,7 @@ class DatasetFactory:
     def compute_static_metrics(self, test_entities, build_tc_features):
         for test in test_entities.to_dict("records"):
             for name, value in test.items():
-                if name in DatasetFactory.COM_static_feature_set:
+                if name in DatasetFactory.COM_metrics:
                     test_id = test[Entity.ID]
                     build_tc_features.setdefault(test_id, {})
                     build_tc_features[test_id][f"COM_{name}"] = value
@@ -239,6 +244,44 @@ class DatasetFactory:
             ] = last_exe_time
         return build_tc_features
 
+    def compute_cov_features(self, commit_hash, test_ids, src_ids, build_tc_features):
+        dep_graph, tar_graph = self.repository_miner.analyze_commit_dependency(
+            commit_hash, test_ids, src_ids
+        )
+
+        build_commit = self.git_repository.get_commit(commit_hash)
+        changed_ents = self.repository_miner.get_changed_entities(build_commit)
+        impacted_ents = set()
+        for changed_ent in changed_ents:
+            impacted_ents.update(dep_graph.get_dependencies(changed_ent))
+
+        for test_id in test_ids:
+            build_tc_features.setdefault(test_id, {})
+            target_ents = tar_graph.get_dependencies(test_id)
+            target_weights = tar_graph.get_dependency_weights(test_id)
+            changed_scores = []
+            impacted_scores = []
+            for i, target in enumerate(target_ents):
+                cov_score = 0.0 if target_weights[i] == 0 else target_weights[i][1]
+                if target in changed_ents:
+                    changed_scores.append(cov_score)
+                elif target in impacted_ents:
+                    impacted_scores.append(cov_score)
+
+            build_tc_features[test_id][f"COV_{DatasetFactory.CHN_SCORE_SUM}"] = sum(
+                changed_scores
+            )
+            build_tc_features[test_id][f"COV_{DatasetFactory.IMP_SCORE_SUM}"] = sum(
+                impacted_scores
+            )
+            build_tc_features[test_id][f"COV_{DatasetFactory.CHN_COUNT}"] = len(
+                changed_scores
+            )
+            build_tc_features[test_id][f"COV_{DatasetFactory.IMP_COUNT}"] = len(
+                impacted_scores
+            )
+        return build_tc_features
+
     def select_valid_builds(self, builds, exe_df):
         builds.sort(key=lambda e: e.id)
         valid_builds = []
@@ -258,14 +301,6 @@ class DatasetFactory:
                 continue
             valid_builds.append(build)
         return valid_builds
-
-    def compute_cov_features(self, commit_hash, test_ids, src_ids):
-        co_changes = self.repository_miner.compute_co_changes(
-            commit_hash, set(test_ids) | set(src_ids)
-        )
-        dep_graph, tar_graph = self.repository_miner.analyze_commit_dependency(
-            commit_hash, test_ids, src_ids, co_changes
-        )
 
     def create_dataset(self, builds, exe_records):
         exe_df = pd.DataFrame.from_records([e.to_dict() for e in exe_records])
@@ -288,8 +323,7 @@ class DatasetFactory:
             self.compute_static_metrics(tests_df, build_tc_features)
             self.compute_process_metrics(commit_hash, tests_df, build_tc_features)
             self.compute_rec_features(tests_df, exe_df, build, build_tc_features)
-
-            self.compute_cov_features(commit_hash, test_ids, src_ids)
+            self.compute_cov_features(commit_hash, test_ids, src_ids, build_tc_features)
 
             for test_id, features in build_tc_features.items():
                 features[DatasetFactory.BUILD] = build.id
