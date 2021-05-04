@@ -1,13 +1,10 @@
 from pydriller.git_repository import GitRepository
-from pydriller import RepositoryMining
-from .module_factory import ModuleFactory
-from .entities.entity import EntityType, Entity
+from .entities.entity import Entity
 from .entities.entity_change import EntityChange
 from .entities.execution_record import ExecutionRecord, TestVerdict
 from tqdm import tqdm
 import pandas as pd
 from scipy.stats.mstats import gmean
-from git import Git
 
 pd.options.mode.chained_assignment = None
 
@@ -105,34 +102,17 @@ class DatasetFactory:
         devs["Exp"] = devs["AuthoredLines"] / devs["AuthoredLines"].sum() * 100.0
         return devs
 
-    def get_merge_commits(self, merge_commit):
-        if not merge_commit.merge:
-            return [merge_commit]
-
-        parents = merge_commit.parents
-        g = Git(str(self.config.project_path))
-        merge_base = g.execute(f"git merge-base {parents[0]} {parents[1]}".split())
-        merge_commits = []
-        last_commit = self.git_repository.get_commit(parents[1])
-        while last_commit.hash != merge_base:
-            if last_commit.merge:
-                merge_commits.extend(self.get_merge_commits(last_commit))
-            else:
-                merge_commits.append(last_commit)
-            last_commit = self.git_repository.get_commit(last_commit.parents[0])
-        return merge_commits
-
     def compute_process_metrics(self, commit_hash, test_entities, build_tc_features):
         commit = self.git_repository.get_commit(commit_hash)
         commit_date = commit.author_date
         build_change_history = self.change_history[
             self.change_history[EntityChange.COMMIT_DATE] <= commit_date
         ]
-        commit_hashes = [commit_hash]
+        search_column = EntityChange.COMMIT
         if commit.merge:
-            commit_hashes = map(lambda c: c.hash, self.get_merge_commits(commit))
-        commit_changes = self.change_history[
-            self.change_history[EntityChange.COMMIT].isin(commit_hashes)
+            search_column = EntityChange.MERGE_COMMIT
+        build_changes = self.change_history[
+            self.change_history[search_column] == commit_hash
         ]
         project_devs = self.compute_contributions(build_change_history)
         for test in test_entities.to_dict("records"):
@@ -141,7 +121,7 @@ class DatasetFactory:
             test_change_history = build_change_history[
                 build_change_history[EntityChange.ID] == test_id
             ]
-            test_changes = commit_changes[commit_changes[EntityChange.ID] == test_id]
+            test_changes = build_changes[build_changes[EntityChange.ID] == test_id]
             test_devs = self.compute_contributions(test_change_history)
             test_devs_ids = test_devs[EntityChange.CONTRIBUTOR].values
             owner_id = test_devs.iloc[0][EntityChange.CONTRIBUTOR]
@@ -279,43 +259,10 @@ class DatasetFactory:
             valid_builds.append(build)
         return valid_builds
 
-    def compute_co_changes(self, commit_hash, ent_ids_set):
-        from .services import DataCollectionService
-
-        DataCollectionService.checkout_default_branch(self.config.project_path)
-        build_commit = self.git_repository.get_commit(commit_hash)
-        commit_date = build_commit.author_date
-        build_change_history = self.change_history[
-            self.change_history[EntityChange.COMMIT_DATE] <= commit_date
-        ]
-        commit_change_lists = (
-            build_change_history[[EntityChange.ID, EntityChange.COMMIT]]
-            .groupby(EntityChange.COMMIT)[EntityChange.ID]
-            .apply(list)
-            .reset_index(name="changes")
-        )
-        commit_change_lists_d = dict(
-            zip(
-                commit_change_lists[EntityChange.COMMIT].values.tolist(),
-                commit_change_lists["changes"].values.tolist(),
-            )
-        )
-        repository = RepositoryMining(str(self.config.project_path), to=commit_date)
-        co_changes = []
-        for commit in repository.traverse_commits():
-            changes = set()
-            commit_hashes = [commit.hash]
-            if commit.merge:
-                commit_hashes = map(lambda c: c.hash, self.get_merge_commits(commit))
-            for change_hash in commit_hashes:
-                changes.update(commit_change_lists_d[change_hash])
-            entity_changes = changes.intersection(ent_ids_set)
-            if len(entity_changes) > 0:
-                co_changes.append(entity_changes)
-        return co_changes
-
     def compute_cov_features(self, commit_hash, test_ids, src_ids):
-        co_changes = self.compute_co_changes(commit_hash, set(test_ids) | set(src_ids))
+        co_changes = self.repository_miner.compute_co_changes(
+            commit_hash, set(test_ids) | set(src_ids)
+        )
         dep_graph, tar_graph = self.repository_miner.analyze_commit_dependency(
             commit_hash, test_ids, src_ids, co_changes
         )

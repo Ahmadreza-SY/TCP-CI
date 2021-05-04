@@ -8,6 +8,7 @@ class EntityChange:
     CONTRIBUTOR = "Contributor"
     COMMIT = "Commit"
     COMMIT_DATE = "CommitDate"
+    MERGE_COMMIT = "MergeCommit"
 
     def __init__(
         self,
@@ -17,6 +18,7 @@ class EntityChange:
         contributor: int,
         commit_hash: str,
         commit_date: datetime,
+        merge_commit: str,
     ):
         self.id = id
         self.added_lines = added_lines
@@ -24,6 +26,7 @@ class EntityChange:
         self.contributor = contributor
         self.commit_hash = commit_hash
         self.commit_date = commit_date
+        self.merge_commit = merge_commit
 
     def to_dict(self):
         d = {
@@ -33,6 +36,7 @@ class EntityChange:
             EntityChange.CONTRIBUTOR: self.contributor,
             EntityChange.COMMIT: self.commit_hash,
             EntityChange.COMMIT_DATE: self.commit_date,
+            EntityChange.MERGE_COMMIT: self.merge_commit,
         }
         return d
 

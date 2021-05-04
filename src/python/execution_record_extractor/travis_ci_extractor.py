@@ -149,7 +149,7 @@ class TravisCICExtractor(TravisCIExtractor):
         return LogType.GTEST
 
     def create_test_name_to_id_mapping(self, exe_df, metadata_df):
-        test_metadata = metadata_df[metadata_df.EntityType == "TEST"]
+        test_metadata = metadata_df[metadata_df.EntityType == EntityType.TEST.name]
         test_files = zip(test_metadata.Id.values, test_metadata.FilePath.values)
         test_names = exe_df.test_name.unique()
         test_name_to_id = {}
