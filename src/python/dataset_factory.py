@@ -5,6 +5,7 @@ from .entities.execution_record import ExecutionRecord, TestVerdict
 from tqdm import tqdm
 import pandas as pd
 from scipy.stats.mstats import gmean
+import numpy as np
 
 pd.options.mode.chained_assignment = None
 
@@ -13,7 +14,7 @@ class DatasetFactory:
     TEST = "Test"
     BUILD = "Build"
     # Complexity Metrics
-    COM_metrics = {
+    complexity_metrics = {
         "CountDeclFunction",
         "CountLine",
         "CountLineBlank",
@@ -84,14 +85,14 @@ class DatasetFactory:
         self.change_history = change_history
         self.repository_miner = repository_miner
 
-    def compute_static_metrics(self, test_entities, build_tc_features):
-        for test in test_entities.to_dict("records"):
-            for name, value in test.items():
-                if name in DatasetFactory.COM_metrics:
-                    test_id = test[Entity.ID]
-                    build_tc_features.setdefault(test_id, {})
-                    build_tc_features[test_id][f"COM_{name}"] = value
-        return build_tc_features
+    def compute_static_metrics(self, ent_ids, ent_dict):
+        metrics = {}
+        for ent_id in ent_ids:
+            metrics[ent_id] = {}
+            for name, value in ent_dict[ent_id].items():
+                if name in DatasetFactory.complexity_metrics:
+                    metrics[ent_id][name] = value
+        return metrics
 
     def compute_contributions(self, change_history):
         change_history["AuthoredLines"] = (
@@ -107,7 +108,8 @@ class DatasetFactory:
         devs["Exp"] = devs["AuthoredLines"] / devs["AuthoredLines"].sum() * 100.0
         return devs
 
-    def compute_process_metrics(self, commit_hash, test_entities, build_tc_features):
+    def compute_process_metrics(self, commit_hash, ent_ids, ent_dict):
+        metrics = {}
         commit = self.git_repository.get_commit(commit_hash)
         commit_date = commit.author_date
         build_change_history = self.change_history[
@@ -120,55 +122,55 @@ class DatasetFactory:
             self.change_history[search_column] == commit_hash
         ]
         project_devs = self.compute_contributions(build_change_history)
-        for test in test_entities.to_dict("records"):
-            test_id = test[Entity.ID]
-            build_tc_features.setdefault(test_id, {})
-            test_change_history = build_change_history[
-                build_change_history[EntityChange.ID] == test_id
+        for ent_id in ent_ids:
+            metrics[ent_id] = {}
+            ent_change_history = build_change_history[
+                build_change_history[EntityChange.ID] == ent_id
             ]
-            test_changes = build_changes[build_changes[EntityChange.ID] == test_id]
-            test_devs = self.compute_contributions(test_change_history)
-            test_devs_ids = test_devs[EntityChange.CONTRIBUTOR].values
-            owner_id = test_devs.iloc[0][EntityChange.CONTRIBUTOR]
+            ent_changes = build_changes[build_changes[EntityChange.ID] == ent_id]
+            ent_devs = self.compute_contributions(ent_change_history)
+            ent_devs_ids = ent_devs[EntityChange.CONTRIBUTOR].values
+            owner_id = ent_devs.iloc[0][EntityChange.CONTRIBUTOR]
 
-            commit_count = len(test_change_history)
-            distict_dev_count = test_change_history[EntityChange.CONTRIBUTOR].nunique()
-            lines_added = test_changes[EntityChange.ADDED_LINES].sum()
-            lines_deleted = test_changes[EntityChange.DELETED_LINES].sum()
-            owners_contribution = test_devs.iloc[0]["Exp"]
-            minor_contributor_count = len(test_devs[test_devs["Exp"] < 5.0])
+            commit_count = len(ent_change_history)
+            distict_dev_count = ent_change_history[EntityChange.CONTRIBUTOR].nunique()
+            lines_added = ent_changes[EntityChange.ADDED_LINES].sum()
+            lines_deleted = ent_changes[EntityChange.DELETED_LINES].sum()
+            owners_contribution = ent_devs.iloc[0]["Exp"]
+            minor_contributor_count = len(ent_devs[ent_devs["Exp"] < 5.0])
             owners_experience = project_devs[
                 project_devs[EntityChange.CONTRIBUTOR] == owner_id
             ]["Exp"].values[0]
-            test_devs_exp = project_devs[
-                project_devs[EntityChange.CONTRIBUTOR].isin(test_devs_ids)
+            ent_devs_exp = project_devs[
+                project_devs[EntityChange.CONTRIBUTOR].isin(ent_devs_ids)
             ]["Exp"].values
-            all_commiters_experience = gmean(test_devs_exp)
+            all_commiters_experience = gmean(ent_devs_exp)
 
-            build_tc_features[test_id][
-                f"COM_{DatasetFactory.COMMIT_COUNT}"
-            ] = commit_count
-            build_tc_features[test_id][
-                f"COM_{DatasetFactory.D_DEV_COUNT}"
-            ] = distict_dev_count
-            build_tc_features[test_id][
-                f"COM_{DatasetFactory.LINES_ADDED}"
-            ] = lines_added
-            build_tc_features[test_id][
-                f"COM_{DatasetFactory.LINES_DELETED}"
-            ] = lines_deleted
-            build_tc_features[test_id][
-                f"COM_{DatasetFactory.OWNERS_CONTRIBUTION}"
-            ] = owners_contribution
-            build_tc_features[test_id][
-                f"COM_{DatasetFactory.MINOR_CONTRIBUTOR_COUNT}"
+            metrics[ent_id][DatasetFactory.COMMIT_COUNT] = commit_count
+            metrics[ent_id][DatasetFactory.D_DEV_COUNT] = distict_dev_count
+            metrics[ent_id][DatasetFactory.LINES_ADDED] = lines_added
+            metrics[ent_id][DatasetFactory.LINES_DELETED] = lines_deleted
+            metrics[ent_id][DatasetFactory.OWNERS_CONTRIBUTION] = owners_contribution
+            metrics[ent_id][
+                DatasetFactory.MINOR_CONTRIBUTOR_COUNT
             ] = minor_contributor_count
-            build_tc_features[test_id][
-                f"COM_{DatasetFactory.OWNERS_EXPERIENCE}"
-            ] = owners_experience
-            build_tc_features[test_id][
-                f"COM_{DatasetFactory.ALL_COMMITERS_EXPERIENCE}"
+            metrics[ent_id][DatasetFactory.OWNERS_EXPERIENCE] = owners_experience
+            metrics[ent_id][
+                DatasetFactory.ALL_COMMITERS_EXPERIENCE
             ] = all_commiters_experience
+        return metrics
+
+    def compute_com_features(self, commit_hash, test_ids, ent_dict, build_tc_features):
+        test_com_metrics = self.compute_static_metrics(test_ids, ent_dict)
+        test_process_metrics = self.compute_process_metrics(
+            commit_hash, test_ids, ent_dict
+        )
+        for test_id in test_ids:
+            build_tc_features.setdefault(test_id, {})
+            for name, value in test_com_metrics[test_id].items():
+                build_tc_features[test_id][f"COM_{name}"] = value
+            for name, value in test_process_metrics[test_id].items():
+                build_tc_features[test_id][f"COM_{name}"] = value
         return build_tc_features
 
     def compute_rec_features(self, test_entities, exe_df, build, build_tc_features):
@@ -244,29 +246,34 @@ class DatasetFactory:
             ] = last_exe_time
         return build_tc_features
 
-    def compute_cov_features(self, commit_hash, test_ids, src_ids, build_tc_features):
+    def compute_test_coverage(self, commit_hash, test_ids, src_ids):
         dep_graph, tar_graph = self.repository_miner.analyze_commit_dependency(
             commit_hash, test_ids, src_ids
         )
-
         build_commit = self.git_repository.get_commit(commit_hash)
         changed_ents = self.repository_miner.get_changed_entities(build_commit)
         impacted_ents = set()
         for changed_ent in changed_ents:
             impacted_ents.update(dep_graph.get_dependencies(changed_ent))
 
+        coverage = {}
         for test_id in test_ids:
-            build_tc_features.setdefault(test_id, {})
+            coverage[test_id] = {"chn": [], "imp": []}
             target_ents = tar_graph.get_dependencies(test_id)
             target_weights = tar_graph.get_dependency_weights(test_id)
-            changed_scores = []
-            impacted_scores = []
             for i, target in enumerate(target_ents):
                 cov_score = 0.0 if target_weights[i] == 0 else target_weights[i][1]
                 if target in changed_ents:
-                    changed_scores.append(cov_score)
+                    coverage[test_id]["chn"].append((target, cov_score))
                 elif target in impacted_ents:
-                    impacted_scores.append(cov_score)
+                    coverage[test_id]["imp"].append((target, cov_score))
+        return coverage
+
+    def compute_cov_features(self, test_ids, coverage, build_tc_features):
+        for test_id in test_ids:
+            build_tc_features.setdefault(test_id, {})
+            changed_scores = [c[1] for c in coverage[test_id]["chn"]]
+            impacted_scores = [c[1] for c in coverage[test_id]["imp"]]
 
             build_tc_features[test_id][f"COV_{DatasetFactory.CHN_SCORE_SUM}"] = sum(
                 changed_scores
@@ -280,6 +287,62 @@ class DatasetFactory:
             build_tc_features[test_id][f"COV_{DatasetFactory.IMP_COUNT}"] = len(
                 impacted_scores
             )
+        return build_tc_features
+
+    def aggregate_cod_cov_metrics(self, covered_ents, com_metrics, process_metrics):
+        scores = []
+        metrics = {}
+        for ent_id, score in covered_ents:
+            scores.append(score)
+            for name, value in com_metrics[ent_id].items():
+                metrics.setdefault(name, [])
+                metrics[name].append(value)
+            for name, value in process_metrics[ent_id].items():
+                metrics.setdefault(name, [])
+                metrics[name].append(value)
+
+        result = {}
+        for name, values in metrics.items():
+            weighted_sum = 0.0
+            if sum(scores) == 0.0:
+                weighted_sum = sum(values)
+            else:
+                v = np.array(values)
+                w = np.array(scores)
+                weighted_sum = v.dot(w / np.sum(w))
+            result[name] = weighted_sum
+        return result
+
+    def compute_cod_cov_features(
+        self, commit_hash, test_ids, coverage, ent_dict, build_tc_features
+    ):
+        all_affected_ents = set()
+        for test_id in test_ids:
+            all_affected_ents.update([c[0] for c in coverage[test_id]["chn"]])
+            all_affected_ents.update([c[0] for c in coverage[test_id]["imp"]])
+
+        all_affected_ents = list(all_affected_ents)
+        ents_com_metrics = self.compute_static_metrics(all_affected_ents, ent_dict)
+        ents_process_metrics = self.compute_process_metrics(
+            commit_hash, all_affected_ents, ent_dict
+        )
+
+        for test_id in test_ids:
+            build_tc_features.setdefault(test_id, {})
+            changed_coverage = coverage[test_id]["chn"]
+            agg_changed_metrics = self.aggregate_cod_cov_metrics(
+                changed_coverage, ents_com_metrics, ents_process_metrics
+            )
+            impacted_coverage = coverage[test_id]["imp"]
+            agg_impacted_metrics = self.aggregate_cod_cov_metrics(
+                impacted_coverage, ents_com_metrics, ents_process_metrics
+            )
+
+            for name, value in agg_changed_metrics.items():
+                build_tc_features[test_id][f"COD_COV_CHN_{name}"] = value
+            for name, value in agg_impacted_metrics.items():
+                build_tc_features[test_id][f"COD_COV_IMP_{name}"] = value
+
         return build_tc_features
 
     def select_valid_builds(self, builds, exe_df):
@@ -312,6 +375,7 @@ class DatasetFactory:
                 self.repository_miner.get_analysis_path(commit_hash) / "metadata.csv"
             )
             entities_df = pd.read_csv(metadata_path)
+            entities_dict = {e[Entity.ID]: e for e in entities_df.to_dict("records")}
             build_exe_df = exe_df[exe_df[ExecutionRecord.BUILD] == build.id]
             if build_exe_df.empty:
                 continue
@@ -320,10 +384,16 @@ class DatasetFactory:
             tests_df = entities_df[entities_df[Entity.ID].isin(test_ids)]
 
             build_tc_features = {}
-            self.compute_static_metrics(tests_df, build_tc_features)
-            self.compute_process_metrics(commit_hash, tests_df, build_tc_features)
+            self.compute_com_features(
+                commit_hash, test_ids, entities_dict, build_tc_features
+            )
             self.compute_rec_features(tests_df, exe_df, build, build_tc_features)
-            self.compute_cov_features(commit_hash, test_ids, src_ids, build_tc_features)
+
+            coverage = self.compute_test_coverage(commit_hash, test_ids, src_ids)
+            self.compute_cov_features(test_ids, coverage, build_tc_features)
+            self.compute_cod_cov_features(
+                commit_hash, test_ids, coverage, entities_dict, build_tc_features
+            )
 
             for test_id, features in build_tc_features.items():
                 features[DatasetFactory.BUILD] = build.id

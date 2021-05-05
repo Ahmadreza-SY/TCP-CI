@@ -202,7 +202,7 @@ class RepositoryMiner:
                 co_changes.append(entity_changes)
         return co_changes
 
-    def analyze_commit_dependency(self, commit_hash, test_ids, src_ids, co_changes):
+    def analyze_commit_dependency(self, commit_hash, test_ids, src_ids):
         from .module_factory import ModuleFactory
 
         test_ids.sort()
