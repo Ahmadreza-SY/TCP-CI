@@ -11,6 +11,7 @@ pd.options.mode.chained_assignment = None
 
 
 class DatasetFactory:
+    DEFAULT_VALUE = -1
     TEST = "Test"
     BUILD = "Build"
     # Complexity Metrics
@@ -56,6 +57,16 @@ class DatasetFactory:
     MINOR_CONTRIBUTOR_COUNT = "MinorContributorCount"
     OWNERS_EXPERIENCE = "OwnersExperience"
     ALL_COMMITERS_EXPERIENCE = "AllCommitersExperience"
+    process_metrics = {
+        COMMIT_COUNT,
+        D_DEV_COUNT,
+        LINES_ADDED,
+        LINES_DELETED,
+        OWNERS_CONTRIBUTION,
+        MINOR_CONTRIBUTOR_COUNT,
+        OWNERS_EXPERIENCE,
+        ALL_COMMITERS_EXPERIENCE,
+    }
     # REC Features
     AVG_EXE_TIME = "AvgExeTime"
     MAX_EXE_TIME = "MaxExeTime"
@@ -65,6 +76,16 @@ class DatasetFactory:
     EXC_RATE = "ExcRate"
     LAST_VERDICT = "LastVerdict"
     LAST_EXE_TIME = "LastExeTime"
+    rec_features = [
+        AVG_EXE_TIME,
+        MAX_EXE_TIME,
+        AGE,
+        FAIL_RATE,
+        ASSERT_RATE,
+        EXC_RATE,
+        LAST_VERDICT,
+        LAST_EXE_TIME,
+    ]
     # COV Features
     CHN_SCORE_SUM = "ChnScoreSum"
     IMP_SCORE_SUM = "ImpScoreSum"
@@ -194,6 +215,10 @@ class DatasetFactory:
             test_exe_df = exe_df[exe_df[ExecutionRecord.TEST] == test_id]
             test_exe_window = test_exe_df[test_exe_df[ExecutionRecord.BUILD] < build.id]
             if test_exe_window.empty:
+                for feature in DatasetFactory.rec_features:
+                    build_tc_features[test_id][
+                        f"REC_{feature}"
+                    ] = DatasetFactory.DEFAULT_VALUE
                 build_tc_features[test_id][f"REC_{DatasetFactory.AGE}"] = 0
                 continue
 
@@ -329,6 +354,19 @@ class DatasetFactory:
 
         for test_id in test_ids:
             build_tc_features.setdefault(test_id, {})
+            for metric in (
+                DatasetFactory.complexity_metrics | DatasetFactory.process_metrics
+            ):
+                build_tc_features[test_id][
+                    f"COD_COV_CHN_{metric}"
+                ] = DatasetFactory.DEFAULT_VALUE
+            for metric in (
+                DatasetFactory.complexity_metrics | DatasetFactory.process_metrics
+            ):
+                build_tc_features[test_id][
+                    f"COD_COV_IMP_{metric}"
+                ] = DatasetFactory.DEFAULT_VALUE
+
             changed_coverage = coverage[test_id]["chn"]
             agg_changed_metrics = self.aggregate_cod_cov_metrics(
                 changed_coverage, ents_com_metrics, ents_process_metrics
