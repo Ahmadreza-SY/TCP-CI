@@ -1,4 +1,5 @@
 from pydriller.git_repository import GitRepository
+from pydriller.domain.commit import DMMProperty
 from .entities.entity import Entity
 from .entities.entity_change import EntityChange
 from .entities.execution_record import ExecutionRecord, TestVerdict
@@ -15,7 +16,7 @@ class DatasetFactory:
     TEST = "Test"
     BUILD = "Build"
     # Complexity Metrics
-    complexity_metrics = {
+    complexity_metrics = [
         "CountDeclFunction",
         "CountLine",
         "CountLineBlank",
@@ -47,7 +48,7 @@ class DatasetFactory:
         "CountDeclMethodPrivate",
         "CountDeclMethodProtected",
         "CountDeclMethodPublic",
-    }
+    ]
     # Process Metrics
     COMMIT_COUNT = "CommitCount"
     D_DEV_COUNT = "DistinctDevCount"
@@ -57,7 +58,10 @@ class DatasetFactory:
     MINOR_CONTRIBUTOR_COUNT = "MinorContributorCount"
     OWNERS_EXPERIENCE = "OwnersExperience"
     ALL_COMMITERS_EXPERIENCE = "AllCommitersExperience"
-    process_metrics = {
+    DMM_SIZE = "DMMSize"
+    DMM_COMPLEXITY = "DMMComplexity"
+    DMM_INTERFACING = "DMMInterfacing"
+    process_metrics = [
         COMMIT_COUNT,
         D_DEV_COUNT,
         LINES_ADDED,
@@ -66,7 +70,10 @@ class DatasetFactory:
         MINOR_CONTRIBUTOR_COUNT,
         OWNERS_EXPERIENCE,
         ALL_COMMITERS_EXPERIENCE,
-    }
+        DMM_SIZE,
+        DMM_COMPLEXITY,
+        DMM_INTERFACING,
+    ]
     # REC Features
     AVG_EXE_TIME = "AvgExeTime"
     MAX_EXE_TIME = "MaxExeTime"
@@ -129,6 +136,24 @@ class DatasetFactory:
         devs["Exp"] = devs["AuthoredLines"] / devs["AuthoredLines"].sum() * 100.0
         return devs
 
+    def compute_dmm(self, changes, dmm_prop):
+        lr = 0
+        hr = 0
+        if dmm_prop == DMMProperty.UNIT_SIZE:
+            lr = changes[EntityChange.DMM_SIZE_LR].sum()
+            hr = changes[EntityChange.DMM_SIZE_HR].sum()
+        elif dmm_prop == DMMProperty.UNIT_COMPLEXITY:
+            lr = changes[EntityChange.DMM_COMPLEXITY_LR].sum()
+            hr = changes[EntityChange.DMM_COMPLEXITY_HR].sum()
+        elif dmm_prop == DMMProperty.UNIT_INTERFACING:
+            lr = changes[EntityChange.DMM_INTERFACING_LR].sum()
+            hr = changes[EntityChange.DMM_INTERFACING_HR].sum()
+
+        if (lr + hr) == 0:
+            return 1.0
+        else:
+            return float(lr) / float(lr + hr)
+
     def compute_process_metrics(self, commit_hash, ent_ids, ent_dict):
         metrics = {}
         commit = self.git_repository.get_commit(commit_hash)
@@ -166,6 +191,11 @@ class DatasetFactory:
                 project_devs[EntityChange.CONTRIBUTOR].isin(ent_devs_ids)
             ]["Exp"].values
             all_commiters_experience = gmean(ent_devs_exp)
+            dmm_size = self.compute_dmm(ent_changes, DMMProperty.UNIT_SIZE)
+            dmm_complexity = self.compute_dmm(ent_changes, DMMProperty.UNIT_COMPLEXITY)
+            dmm_interfacing = self.compute_dmm(
+                ent_changes, DMMProperty.UNIT_INTERFACING
+            )
 
             metrics[ent_id][DatasetFactory.COMMIT_COUNT] = commit_count
             metrics[ent_id][DatasetFactory.D_DEV_COUNT] = distict_dev_count
@@ -179,6 +209,9 @@ class DatasetFactory:
             metrics[ent_id][
                 DatasetFactory.ALL_COMMITERS_EXPERIENCE
             ] = all_commiters_experience
+            metrics[ent_id][DatasetFactory.DMM_SIZE] = dmm_size
+            metrics[ent_id][DatasetFactory.DMM_COMPLEXITY] = dmm_complexity
+            metrics[ent_id][DatasetFactory.DMM_INTERFACING] = dmm_interfacing
         return metrics
 
     def compute_com_features(self, commit_hash, test_ids, ent_dict, build_tc_features):
@@ -355,13 +388,13 @@ class DatasetFactory:
         for test_id in test_ids:
             build_tc_features.setdefault(test_id, {})
             for metric in (
-                DatasetFactory.complexity_metrics | DatasetFactory.process_metrics
+                DatasetFactory.complexity_metrics + DatasetFactory.process_metrics
             ):
                 build_tc_features[test_id][
                     f"COD_COV_CHN_{metric}"
                 ] = DatasetFactory.DEFAULT_VALUE
             for metric in (
-                DatasetFactory.complexity_metrics | DatasetFactory.process_metrics
+                DatasetFactory.complexity_metrics + DatasetFactory.process_metrics
             ):
                 build_tc_features[test_id][
                     f"COD_COV_IMP_{metric}"

@@ -2,7 +2,7 @@ from .entities.entity_change import EntityChange, Contributor
 from .entities.entity import Language, Entity
 from .entities.dep_graph import DepGraph
 from typing import List
-from pydriller.domain.commit import ModificationType
+from pydriller.domain.commit import ModificationType, DMMProperty
 from pydriller import RepositoryMining, GitRepository
 import pandas as pd
 from tqdm import tqdm
@@ -245,8 +245,34 @@ class RepositoryMiner:
     def compute_changed_entities(self, commit) -> List[EntityChange]:
         pass
 
+    def compute_function_diff(self, func, diff_parsed):
+        added = 0
+        for diff in diff_parsed["added"]:
+            if func.start_line <= diff[0] <= func.end_line:
+                added += 1
+        deleted = 0
+        for diff in diff_parsed["deleted"]:
+            if func.start_line <= diff[0] <= func.end_line:
+                deleted += 1
+        return added, deleted
+
 
 class FileRepositoryMiner(RepositoryMiner):
+    def compute_dmm(self, modification, dmm_prop):
+        lr_changes = 0
+        hr_changes = 0
+        diff_parsed = modification.diff_parsed
+        for method in modification.changed_methods:
+            added_changes, deleted_changes = self.compute_function_diff(
+                method, diff_parsed
+            )
+            changes = added_changes + deleted_changes
+            if method.is_low_risk(dmm_prop):
+                lr_changes += changes
+            else:
+                hr_changes += changes
+        return (lr_changes, hr_changes)
+
     def compute_changed_entities(self, commit):
         changed_entities = []
         contributor_id = self.get_contributor_id(commit)
@@ -272,6 +298,9 @@ class FileRepositoryMiner(RepositoryMiner):
                 changed_file_id,
                 mod.added,
                 mod.removed,
+                self.compute_dmm(mod, DMMProperty.UNIT_SIZE),
+                self.compute_dmm(mod, DMMProperty.UNIT_COMPLEXITY),
+                self.compute_dmm(mod, DMMProperty.UNIT_INTERFACING),
                 contributor_id,
                 commit.hash,
                 commit.author_date,
@@ -282,6 +311,12 @@ class FileRepositoryMiner(RepositoryMiner):
 
 
 class FunctionRepositoryMiner(RepositoryMiner):
+    def compute_dmm(self, changed_method, dmm_prop):
+        if method.is_low_risk(dmm_prop):
+            return (1, 0)
+        else:
+            return (0, 1)
+
     def get_pydriller_function_unique_name(self, pydriller_function):
         if self.config.language == Language.JAVA:
             return pydriller_function.long_name.replace(" ", "")
@@ -298,17 +333,6 @@ class FunctionRepositoryMiner(RepositoryMiner):
             return function_name
         return None
 
-    def compute_function_diff(self, func, diff_parsed):
-        added = 0
-        for diff in diff_parsed["added"]:
-            if func.start_line <= diff[0] <= func.end_line:
-                added += 1
-        deleted = 0
-        for diff in diff_parsed["deleted"]:
-            if func.start_line <= diff[0] <= func.end_line:
-                deleted += 1
-        return added, deleted
-
     def compute_changed_entities(self, commit):
         changed_entities = []
         contributor_id = self.get_contributor_id(commit)
@@ -323,6 +347,9 @@ class FunctionRepositoryMiner(RepositoryMiner):
                         changed_method_id,
                         added,
                         deleted,
+                        self.compute_dmm(mod, DMMProperty.UNIT_SIZE),
+                        self.compute_dmm(mod, DMMProperty.UNIT_COMPLEXITY),
+                        self.compute_dmm(mod, DMMProperty.UNIT_INTERFACING),
                         contributor_id,
                         commit.hash,
                         commit.author_date,

@@ -1,10 +1,17 @@
 from datetime import datetime
+from typing import Tuple
 
 
 class EntityChange:
     ID = "EntityId"
     ADDED_LINES = "AddedLines"
     DELETED_LINES = "DeletedLines"
+    DMM_SIZE_LR = "DMMSizeLowRisk"
+    DMM_SIZE_HR = "DMMSizeHighRisk"
+    DMM_COMPLEXITY_LR = "DMMComplexityLowRisk"
+    DMM_COMPLEXITY_HR = "DMMComplexityHighRisk"
+    DMM_INTERFACING_LR = "DMMInterfacingLowRisk"
+    DMM_INTERFACING_HR = "DMMInterfacingHighRisk"
     CONTRIBUTOR = "Contributor"
     COMMIT = "Commit"
     COMMIT_DATE = "CommitDate"
@@ -15,6 +22,9 @@ class EntityChange:
         id: int,
         added_lines: int,
         deleted_lines: int,
+        dmm_size: Tuple[int, int],
+        dmm_complexity: Tuple[int, int],
+        dmm_interfacing: Tuple[int, int],
         contributor: int,
         commit_hash: str,
         commit_date: datetime,
@@ -23,6 +33,12 @@ class EntityChange:
         self.id = id
         self.added_lines = added_lines
         self.deleted_lines = deleted_lines
+        self.dmm_size_lr = dmm_size[0]
+        self.dmm_size_hr = dmm_size[1]
+        self.dmm_complexity_lr = dmm_complexity[0]
+        self.dmm_complexity_hr = dmm_complexity[1]
+        self.dmm_interfacing_lr = dmm_interfacing[0]
+        self.dmm_interfacing_hr = dmm_interfacing[1]
         self.contributor = contributor
         self.commit_hash = commit_hash
         self.commit_date = commit_date
@@ -33,6 +49,12 @@ class EntityChange:
             EntityChange.ID: self.id,
             EntityChange.ADDED_LINES: self.added_lines,
             EntityChange.DELETED_LINES: self.deleted_lines,
+            EntityChange.DMM_SIZE_LR: self.dmm_size_lr,
+            EntityChange.DMM_SIZE_HR: self.dmm_size_hr,
+            EntityChange.DMM_COMPLEXITY_LR: self.dmm_complexity_lr,
+            EntityChange.DMM_COMPLEXITY_HR: self.dmm_complexity_hr,
+            EntityChange.DMM_INTERFACING_LR: self.dmm_interfacing_lr,
+            EntityChange.DMM_INTERFACING_HR: self.dmm_interfacing_hr,
             EntityChange.CONTRIBUTOR: self.contributor,
             EntityChange.COMMIT: self.commit_hash,
             EntityChange.COMMIT_DATE: self.commit_date,
