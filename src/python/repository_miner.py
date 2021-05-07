@@ -30,7 +30,6 @@ class RepositoryMiner:
             self.max_id = 0
         self.id_mapper = IdMapper(config.output_path)
         self.git_repository = GitRepository(str(self.config.project_path))
-        self.merged_commits = None
         self.merged_commit_list_d = None
         self.commit_change_list_d = None
 
@@ -78,7 +77,6 @@ class RepositoryMiner:
         repository = RepositoryMining(str(self.config.project_path))
         commits = list(repository.traverse_commits())
         merge_map = {}
-        self.merged_commits = set()
         self.merged_commit_list_d = {}
         for commit in tqdm(commits, desc="Mining entity change history"):
             change_history.extend(self.compute_changed_entities(commit))
@@ -86,7 +84,6 @@ class RepositoryMiner:
                 self.merged_commit_list_d.setdefault(commit.hash, [])
                 for merged_commit in self.get_merge_commits(commit):
                     merge_map[merged_commit.hash] = commit.hash
-                    self.merged_commits.add(merged_commit.hash)
                     self.merged_commit_list_d[commit.hash].append(merged_commit.hash)
 
         for change in tqdm(change_history, desc="Detecting merge commits"):
@@ -182,11 +179,7 @@ class RepositoryMiner:
     def compute_co_changes(self, commit_hash, ent_ids_set):
         from .services import DataCollectionService
 
-        if (
-            (self.merged_commits is None)
-            or (self.merged_commit_list_d is None)
-            or (self.commit_change_list_d is None)
-        ):
+        if (self.merged_commit_list_d is None) or (self.commit_change_list_d is None):
             self.compute_and_save_entity_change_history()
         build_commit = self.git_repository.get_commit(commit_hash)
         commit_date = build_commit.author_date
@@ -194,7 +187,7 @@ class RepositoryMiner:
         repository = RepositoryMining(str(self.config.project_path), to=commit_date)
         co_changes = []
         for commit in repository.traverse_commits():
-            if commit.hash in self.merged_commits:
+            if commit.merge:
                 continue
             changes = self.get_changed_entities(commit)
             entity_changes = changes.intersection(ent_ids_set)
