@@ -10,6 +10,8 @@ import numpy as np
 from .id_mapper import IdMapper
 from apyori import apriori
 from git import Git
+import more_itertools as mit
+from itertools import combinations
 
 
 class RepositoryMiner:
@@ -246,15 +248,24 @@ class RepositoryMiner:
         pass
 
     def compute_function_diff(self, func, diff_parsed):
-        added = 0
+        added = []
         for diff in diff_parsed["added"]:
             if func.start_line <= diff[0] <= func.end_line:
-                added += 1
-        deleted = 0
+                added.append(diff[0])
+        deleted = []
         for diff in diff_parsed["deleted"]:
             if func.start_line <= diff[0] <= func.end_line:
-                deleted += 1
+                deleted.append(diff[0])
         return added, deleted
+
+    def compute_scattering(self, changed_lines):
+        changed_lines.sort()
+        chunks = [list(group) for group in mit.consecutive_groups(changed_lines)]
+        if len(chunks) <= 1:
+            return 0.0
+        combs = list(combinations(chunks, 2))
+        distance_sum = sum(map(lambda pair: abs(pair[0][0] - pair[1][0]), combs))
+        return (len(chunks) / len(combs)) * distance_sum
 
 
 class FileRepositoryMiner(RepositoryMiner):
@@ -266,7 +277,7 @@ class FileRepositoryMiner(RepositoryMiner):
             added_changes, deleted_changes = self.compute_function_diff(
                 method, diff_parsed
             )
-            changes = added_changes + deleted_changes
+            changes = len(added_changes) + len(deleted_changes)
             if method.is_low_risk(dmm_prop):
                 lr_changes += changes
             else:
@@ -294,10 +305,17 @@ class FileRepositoryMiner(RepositoryMiner):
                 )
             else:
                 changed_file_id = self.id_mapper.get_entity_id(mod.new_path)
+
+            diff = mod.diff_parsed
+            added_lines = list(map(lambda p: p[0], diff["added"]))
+            added_scattering = self.compute_scattering(added_lines)
+            deleted_lines = list(map(lambda p: p[0], diff["deleted"]))
+            deleted_scattering = self.compute_scattering(deleted_lines)
             changed_entity = EntityChange(
                 changed_file_id,
                 mod.added,
                 mod.removed,
+                (added_scattering, deleted_scattering),
                 self.compute_dmm(mod, DMMProperty.UNIT_SIZE),
                 self.compute_dmm(mod, DMMProperty.UNIT_COMPLEXITY),
                 self.compute_dmm(mod, DMMProperty.UNIT_INTERFACING),
@@ -312,7 +330,7 @@ class FileRepositoryMiner(RepositoryMiner):
 
 class FunctionRepositoryMiner(RepositoryMiner):
     def compute_dmm(self, changed_method, dmm_prop):
-        if method.is_low_risk(dmm_prop):
+        if changed_method.is_low_risk(dmm_prop):
             return (1, 0)
         else:
             return (0, 1)
@@ -343,10 +361,13 @@ class FunctionRepositoryMiner(RepositoryMiner):
                 if method_unique_name is not None:
                     changed_method_id = self.id_mapper.get_entity_id(method_unique_name)
                     added, deleted = self.compute_function_diff(method, diff_parsed)
+                    added_scattering = self.compute_scattering(added)
+                    deleted_scattering = self.compute_scattering(deleted)
                     entity_change = EntityChange(
                         changed_method_id,
-                        added,
-                        deleted,
+                        len(added),
+                        len(deleted),
+                        (added_scattering, deleted_scattering),
                         self.compute_dmm(mod, DMMProperty.UNIT_SIZE),
                         self.compute_dmm(mod, DMMProperty.UNIT_COMPLEXITY),
                         self.compute_dmm(mod, DMMProperty.UNIT_INTERFACING),

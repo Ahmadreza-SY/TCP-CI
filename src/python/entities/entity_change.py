@@ -12,6 +12,8 @@ class EntityChange:
     DMM_COMPLEXITY_HR = "DMMComplexityHighRisk"
     DMM_INTERFACING_LR = "DMMInterfacingLowRisk"
     DMM_INTERFACING_HR = "DMMInterfacingHighRisk"
+    ADDED_CHANGE_SCATTERING = "AddedChangeScattering"
+    DELETED_CHANGE_SCATTERING = "DeletedChangeScattering"
     CONTRIBUTOR = "Contributor"
     COMMIT = "Commit"
     COMMIT_DATE = "CommitDate"
@@ -22,6 +24,7 @@ class EntityChange:
         id: int,
         added_lines: int,
         deleted_lines: int,
+        change_scattering: Tuple[int, int],
         dmm_size: Tuple[int, int],
         dmm_complexity: Tuple[int, int],
         dmm_interfacing: Tuple[int, int],
@@ -33,6 +36,8 @@ class EntityChange:
         self.id = id
         self.added_lines = added_lines
         self.deleted_lines = deleted_lines
+        self.added_change_scattering = change_scattering[0]
+        self.deleted_change_scattering = change_scattering[1]
         self.dmm_size_lr = dmm_size[0]
         self.dmm_size_hr = dmm_size[1]
         self.dmm_complexity_lr = dmm_complexity[0]
@@ -49,6 +54,8 @@ class EntityChange:
             EntityChange.ID: self.id,
             EntityChange.ADDED_LINES: self.added_lines,
             EntityChange.DELETED_LINES: self.deleted_lines,
+            EntityChange.ADDED_CHANGE_SCATTERING: self.added_change_scattering,
+            EntityChange.DELETED_CHANGE_SCATTERING: self.deleted_change_scattering,
             EntityChange.DMM_SIZE_LR: self.dmm_size_lr,
             EntityChange.DMM_SIZE_HR: self.dmm_size_hr,
             EntityChange.DMM_COMPLEXITY_LR: self.dmm_complexity_lr,

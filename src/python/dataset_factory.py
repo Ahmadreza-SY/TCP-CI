@@ -58,6 +58,8 @@ class DatasetFactory:
     MINOR_CONTRIBUTOR_COUNT = "MinorContributorCount"
     OWNERS_EXPERIENCE = "OwnersExperience"
     ALL_COMMITERS_EXPERIENCE = "AllCommitersExperience"
+    ADDED_CHANGE_SCATTERING = "AddedChangeScattering"
+    DELETED_CHANGE_SCATTERING = "DeletedChangeScattering"
     DMM_SIZE = "DMMSize"
     DMM_COMPLEXITY = "DMMComplexity"
     DMM_INTERFACING = "DMMInterfacing"
@@ -70,6 +72,8 @@ class DatasetFactory:
         MINOR_CONTRIBUTOR_COUNT,
         OWNERS_EXPERIENCE,
         ALL_COMMITERS_EXPERIENCE,
+        ADDED_CHANGE_SCATTERING,
+        DELETED_CHANGE_SCATTERING,
         DMM_SIZE,
         DMM_COMPLEXITY,
         DMM_INTERFACING,
@@ -150,7 +154,7 @@ class DatasetFactory:
             hr = changes[EntityChange.DMM_INTERFACING_HR].sum()
 
         if (lr + hr) == 0:
-            return 1.0
+            return DatasetFactory.DEFAULT_VALUE
         else:
             return float(lr) / float(lr + hr)
 
@@ -191,6 +195,15 @@ class DatasetFactory:
                 project_devs[EntityChange.CONTRIBUTOR].isin(ent_devs_ids)
             ]["Exp"].values
             all_commiters_experience = gmean(ent_devs_exp)
+            added_change_scattering = DatasetFactory.DEFAULT_VALUE
+            deleted_change_scattering = DatasetFactory.DEFAULT_VALUE
+            if not ent_changes.empty:
+                added_change_scattering = ent_changes[
+                    EntityChange.ADDED_CHANGE_SCATTERING
+                ].mean()
+                deleted_change_scattering = ent_changes[
+                    EntityChange.DELETED_CHANGE_SCATTERING
+                ].mean()
             dmm_size = self.compute_dmm(ent_changes, DMMProperty.UNIT_SIZE)
             dmm_complexity = self.compute_dmm(ent_changes, DMMProperty.UNIT_COMPLEXITY)
             dmm_interfacing = self.compute_dmm(
@@ -209,6 +222,12 @@ class DatasetFactory:
             metrics[ent_id][
                 DatasetFactory.ALL_COMMITERS_EXPERIENCE
             ] = all_commiters_experience
+            metrics[ent_id][
+                DatasetFactory.ADDED_CHANGE_SCATTERING
+            ] = added_change_scattering
+            metrics[ent_id][
+                DatasetFactory.DELETED_CHANGE_SCATTERING
+            ] = deleted_change_scattering
             metrics[ent_id][DatasetFactory.DMM_SIZE] = dmm_size
             metrics[ent_id][DatasetFactory.DMM_COMPLEXITY] = dmm_complexity
             metrics[ent_id][DatasetFactory.DMM_INTERFACING] = dmm_interfacing
@@ -221,6 +240,12 @@ class DatasetFactory:
         )
         for test_id in test_ids:
             build_tc_features.setdefault(test_id, {})
+            for metric in (
+                DatasetFactory.complexity_metrics + DatasetFactory.process_metrics
+            ):
+                build_tc_features[test_id][
+                    f"COM_{metric}"
+                ] = DatasetFactory.DEFAULT_VALUE
             for name, value in test_com_metrics[test_id].items():
                 build_tc_features[test_id][f"COM_{name}"] = value
             for name, value in test_process_metrics[test_id].items():
