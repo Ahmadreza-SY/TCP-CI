@@ -52,32 +52,37 @@ class DatasetFactory:
     # Process Metrics
     COMMIT_COUNT = "CommitCount"
     D_DEV_COUNT = "DistinctDevCount"
-    LINES_ADDED = "LinesAdded"
-    LINES_DELETED = "LinesDeleted"
     OWNERS_CONTRIBUTION = "OwnersContribution"
     MINOR_CONTRIBUTOR_COUNT = "MinorContributorCount"
     OWNERS_EXPERIENCE = "OwnersExperience"
     ALL_COMMITERS_EXPERIENCE = "AllCommitersExperience"
+    process_metrics = [
+        COMMIT_COUNT,
+        D_DEV_COUNT,
+        OWNERS_CONTRIBUTION,
+        MINOR_CONTRIBUTOR_COUNT,
+        OWNERS_EXPERIENCE,
+        ALL_COMMITERS_EXPERIENCE,
+    ]
+    # Change Metrics
+    LINES_ADDED = "LinesAdded"
+    LINES_DELETED = "LinesDeleted"
     ADDED_CHANGE_SCATTERING = "AddedChangeScattering"
     DELETED_CHANGE_SCATTERING = "DeletedChangeScattering"
     DMM_SIZE = "DMMSize"
     DMM_COMPLEXITY = "DMMComplexity"
     DMM_INTERFACING = "DMMInterfacing"
-    process_metrics = [
-        COMMIT_COUNT,
-        D_DEV_COUNT,
+    change_metrics = [
         LINES_ADDED,
         LINES_DELETED,
-        OWNERS_CONTRIBUTION,
-        MINOR_CONTRIBUTOR_COUNT,
-        OWNERS_EXPERIENCE,
-        ALL_COMMITERS_EXPERIENCE,
         ADDED_CHANGE_SCATTERING,
         DELETED_CHANGE_SCATTERING,
         DMM_SIZE,
         DMM_COMPLEXITY,
         DMM_INTERFACING,
     ]
+    # All Metrics
+    all_metrics = complexity_metrics + process_metrics + change_metrics
     # REC Features
     AVG_EXE_TIME = "AvgExeTime"
     MAX_EXE_TIME = "MaxExeTime"
@@ -117,15 +122,6 @@ class DatasetFactory:
         self.change_history = change_history
         self.repository_miner = repository_miner
 
-    def compute_static_metrics(self, ent_ids, ent_dict):
-        metrics = {}
-        for ent_id in ent_ids:
-            metrics[ent_id] = {}
-            for name, value in ent_dict[ent_id].items():
-                if name in DatasetFactory.complexity_metrics:
-                    metrics[ent_id][name] = value
-        return metrics
-
     def compute_contributions(self, change_history):
         change_history["AuthoredLines"] = (
             change_history[EntityChange.ADDED_LINES]
@@ -154,9 +150,59 @@ class DatasetFactory:
             hr = changes[EntityChange.DMM_INTERFACING_HR].sum()
 
         if (lr + hr) == 0:
-            return DatasetFactory.DEFAULT_VALUE
+            return None
         else:
             return float(lr) / float(lr + hr)
+
+    def compute_static_metrics(self, ent_ids, ent_dict):
+        metrics = {}
+        for ent_id in ent_ids:
+            metrics.setdefault(ent_id, {})
+            for name, value in ent_dict[ent_id].items():
+                if name in DatasetFactory.complexity_metrics:
+                    metrics[ent_id][name] = value
+        return metrics
+
+    def compute_change_metrics(self, commit_hash, ent_ids, ent_dict):
+        metrics = {}
+        commit = self.git_repository.get_commit(commit_hash)
+        search_column = EntityChange.COMMIT
+        if commit.merge:
+            search_column = EntityChange.MERGE_COMMIT
+        build_changes = self.change_history[
+            self.change_history[search_column] == commit_hash
+        ]
+        for ent_id in ent_ids:
+            ent_changes = build_changes[build_changes[EntityChange.ID] == ent_id]
+            if ent_changes.empty:
+                continue
+
+            metrics.setdefault(ent_id, {})
+            metrics[ent_id][DatasetFactory.LINES_ADDED] = ent_changes[
+                EntityChange.ADDED_LINES
+            ].sum()
+            metrics[ent_id][DatasetFactory.LINES_DELETED] = ent_changes[
+                EntityChange.DELETED_LINES
+            ].sum()
+            metrics[ent_id][DatasetFactory.ADDED_CHANGE_SCATTERING] = ent_changes[
+                EntityChange.ADDED_CHANGE_SCATTERING
+            ].mean()
+            metrics[ent_id][DatasetFactory.DELETED_CHANGE_SCATTERING] = ent_changes[
+                EntityChange.DELETED_CHANGE_SCATTERING
+            ].mean()
+
+            dmm_size = self.compute_dmm(ent_changes, DMMProperty.UNIT_SIZE)
+            dmm_complexity = self.compute_dmm(ent_changes, DMMProperty.UNIT_COMPLEXITY)
+            dmm_interfacing = self.compute_dmm(
+                ent_changes, DMMProperty.UNIT_INTERFACING
+            )
+            if dmm_size is not None:
+                metrics[ent_id][DatasetFactory.DMM_SIZE] = dmm_size
+            if dmm_complexity is not None:
+                metrics[ent_id][DatasetFactory.DMM_COMPLEXITY] = dmm_complexity
+            if dmm_interfacing is not None:
+                metrics[ent_id][DatasetFactory.DMM_INTERFACING] = dmm_interfacing
+        return metrics
 
     def compute_process_metrics(self, commit_hash, ent_ids, ent_dict):
         metrics = {}
@@ -165,90 +211,59 @@ class DatasetFactory:
         build_change_history = self.change_history[
             self.change_history[EntityChange.COMMIT_DATE] <= commit_date
         ]
-        search_column = EntityChange.COMMIT
-        if commit.merge:
-            search_column = EntityChange.MERGE_COMMIT
-        build_changes = self.change_history[
-            self.change_history[search_column] == commit_hash
-        ]
         project_devs = self.compute_contributions(build_change_history)
         for ent_id in ent_ids:
-            metrics[ent_id] = {}
+            metrics.setdefault(ent_id, {})
             ent_change_history = build_change_history[
                 build_change_history[EntityChange.ID] == ent_id
             ]
-            ent_changes = build_changes[build_changes[EntityChange.ID] == ent_id]
             ent_devs = self.compute_contributions(ent_change_history)
             ent_devs_ids = ent_devs[EntityChange.CONTRIBUTOR].values
-            owner_id = ent_devs.iloc[0][EntityChange.CONTRIBUTOR]
-
-            commit_count = len(ent_change_history)
-            distict_dev_count = ent_change_history[EntityChange.CONTRIBUTOR].nunique()
-            lines_added = ent_changes[EntityChange.ADDED_LINES].sum()
-            lines_deleted = ent_changes[EntityChange.DELETED_LINES].sum()
-            owners_contribution = ent_devs.iloc[0]["Exp"]
-            minor_contributor_count = len(ent_devs[ent_devs["Exp"] < 5.0])
-            owners_experience = project_devs[
-                project_devs[EntityChange.CONTRIBUTOR] == owner_id
-            ]["Exp"].values[0]
             ent_devs_exp = project_devs[
                 project_devs[EntityChange.CONTRIBUTOR].isin(ent_devs_ids)
             ]["Exp"].values
-            all_commiters_experience = gmean(ent_devs_exp)
-            added_change_scattering = DatasetFactory.DEFAULT_VALUE
-            deleted_change_scattering = DatasetFactory.DEFAULT_VALUE
-            if not ent_changes.empty:
-                added_change_scattering = ent_changes[
-                    EntityChange.ADDED_CHANGE_SCATTERING
-                ].mean()
-                deleted_change_scattering = ent_changes[
-                    EntityChange.DELETED_CHANGE_SCATTERING
-                ].mean()
-            dmm_size = self.compute_dmm(ent_changes, DMMProperty.UNIT_SIZE)
-            dmm_complexity = self.compute_dmm(ent_changes, DMMProperty.UNIT_COMPLEXITY)
-            dmm_interfacing = self.compute_dmm(
-                ent_changes, DMMProperty.UNIT_INTERFACING
-            )
+            owner_id = ent_devs.iloc[0][EntityChange.CONTRIBUTOR]
 
-            metrics[ent_id][DatasetFactory.COMMIT_COUNT] = commit_count
-            metrics[ent_id][DatasetFactory.D_DEV_COUNT] = distict_dev_count
-            metrics[ent_id][DatasetFactory.LINES_ADDED] = lines_added
-            metrics[ent_id][DatasetFactory.LINES_DELETED] = lines_deleted
-            metrics[ent_id][DatasetFactory.OWNERS_CONTRIBUTION] = owners_contribution
-            metrics[ent_id][
-                DatasetFactory.MINOR_CONTRIBUTOR_COUNT
-            ] = minor_contributor_count
-            metrics[ent_id][DatasetFactory.OWNERS_EXPERIENCE] = owners_experience
-            metrics[ent_id][
-                DatasetFactory.ALL_COMMITERS_EXPERIENCE
-            ] = all_commiters_experience
-            metrics[ent_id][
-                DatasetFactory.ADDED_CHANGE_SCATTERING
-            ] = added_change_scattering
-            metrics[ent_id][
-                DatasetFactory.DELETED_CHANGE_SCATTERING
-            ] = deleted_change_scattering
-            metrics[ent_id][DatasetFactory.DMM_SIZE] = dmm_size
-            metrics[ent_id][DatasetFactory.DMM_COMPLEXITY] = dmm_complexity
-            metrics[ent_id][DatasetFactory.DMM_INTERFACING] = dmm_interfacing
+            metrics[ent_id][DatasetFactory.COMMIT_COUNT] = len(ent_change_history)
+            metrics[ent_id][DatasetFactory.D_DEV_COUNT] = ent_change_history[
+                EntityChange.CONTRIBUTOR
+            ].nunique()
+            metrics[ent_id][DatasetFactory.OWNERS_CONTRIBUTION] = ent_devs.iloc[0][
+                "Exp"
+            ]
+            metrics[ent_id][DatasetFactory.MINOR_CONTRIBUTOR_COUNT] = len(
+                ent_devs[ent_devs["Exp"] < 5.0]
+            )
+            metrics[ent_id][DatasetFactory.OWNERS_EXPERIENCE] = project_devs[
+                project_devs[EntityChange.CONTRIBUTOR] == owner_id
+            ]["Exp"].values[0]
+            metrics[ent_id][DatasetFactory.ALL_COMMITERS_EXPERIENCE] = gmean(
+                ent_devs_exp
+            )
         return metrics
 
+    def compute_all_metrics(self, commit_hash, ent_ids, ent_dict):
+        static_metrics = self.compute_static_metrics(ent_ids, ent_dict)
+        change_metrics = self.compute_change_metrics(commit_hash, ent_ids, ent_dict)
+        process_metrics = self.compute_process_metrics(commit_hash, ent_ids, ent_dict)
+        computed_metrics = [static_metrics, change_metrics, process_metrics]
+        all_metrics = {}
+        for computed_metric in computed_metrics:
+            for ent_id, metrics in computed_metric.items():
+                all_metrics.setdefault(ent_id, {})
+                for name, value in metrics.items():
+                    all_metrics[ent_id][name] = value
+        return all_metrics
+
     def compute_com_features(self, commit_hash, test_ids, ent_dict, build_tc_features):
-        test_com_metrics = self.compute_static_metrics(test_ids, ent_dict)
-        test_process_metrics = self.compute_process_metrics(
-            commit_hash, test_ids, ent_dict
-        )
+        test_metrics = self.compute_all_metrics(commit_hash, test_ids, ent_dict)
         for test_id in test_ids:
             build_tc_features.setdefault(test_id, {})
-            for metric in (
-                DatasetFactory.complexity_metrics + DatasetFactory.process_metrics
-            ):
+            for metric in DatasetFactory.all_metrics:
                 build_tc_features[test_id][
                     f"COM_{metric}"
                 ] = DatasetFactory.DEFAULT_VALUE
-            for name, value in test_com_metrics[test_id].items():
-                build_tc_features[test_id][f"COM_{name}"] = value
-            for name, value in test_process_metrics[test_id].items():
+            for name, value in test_metrics[test_id].items():
                 build_tc_features[test_id][f"COM_{name}"] = value
         return build_tc_features
 
@@ -372,25 +387,22 @@ class DatasetFactory:
             )
         return build_tc_features
 
-    def aggregate_cod_cov_metrics(self, covered_ents, com_metrics, process_metrics):
-        scores = []
-        metrics = {}
+    def aggregate_cod_cov_metrics(self, covered_ents, metrics):
+        metrics_list = {}
         for ent_id, score in covered_ents:
-            scores.append(score)
-            for name, value in com_metrics[ent_id].items():
-                metrics.setdefault(name, [])
-                metrics[name].append(value)
-            for name, value in process_metrics[ent_id].items():
-                metrics.setdefault(name, [])
-                metrics[name].append(value)
+            for name, value in metrics[ent_id].items():
+                metrics_list.setdefault(name, [])
+                metrics_list[name].append((value, score))
 
         result = {}
-        for name, values in metrics.items():
+        for name, values in metrics_list.items():
+            metric_values = [v[0] for v in values]
+            scores = [v[1] for v in values]
             weighted_sum = 0.0
             if sum(scores) == 0.0:
-                weighted_sum = sum(values)
+                weighted_sum = sum(metric_values)
             else:
-                v = np.array(values)
+                v = np.array(metric_values)
                 w = np.array(scores)
                 weighted_sum = v.dot(w / np.sum(w))
             result[name] = weighted_sum
@@ -405,16 +417,22 @@ class DatasetFactory:
             all_affected_ents.update([c[0] for c in coverage[test_id]["imp"]])
 
         all_affected_ents = list(all_affected_ents)
-        ents_com_metrics = self.compute_static_metrics(all_affected_ents, ent_dict)
-        ents_process_metrics = self.compute_process_metrics(
+        ents_metrics = self.compute_all_metrics(
             commit_hash, all_affected_ents, ent_dict
         )
 
         for test_id in test_ids:
+            changed_coverage = coverage[test_id]["chn"]
+            agg_changed_metrics = self.aggregate_cod_cov_metrics(
+                changed_coverage, ents_metrics
+            )
+            impacted_coverage = coverage[test_id]["imp"]
+            agg_impacted_metrics = self.aggregate_cod_cov_metrics(
+                impacted_coverage, ents_metrics
+            )
+
             build_tc_features.setdefault(test_id, {})
-            for metric in (
-                DatasetFactory.complexity_metrics + DatasetFactory.process_metrics
-            ):
+            for metric in DatasetFactory.all_metrics:
                 build_tc_features[test_id][
                     f"COD_COV_CHN_{metric}"
                 ] = DatasetFactory.DEFAULT_VALUE
@@ -424,15 +442,6 @@ class DatasetFactory:
                 build_tc_features[test_id][
                     f"COD_COV_IMP_{metric}"
                 ] = DatasetFactory.DEFAULT_VALUE
-
-            changed_coverage = coverage[test_id]["chn"]
-            agg_changed_metrics = self.aggregate_cod_cov_metrics(
-                changed_coverage, ents_com_metrics, ents_process_metrics
-            )
-            impacted_coverage = coverage[test_id]["imp"]
-            agg_impacted_metrics = self.aggregate_cod_cov_metrics(
-                impacted_coverage, ents_com_metrics, ents_process_metrics
-            )
 
             for name, value in agg_changed_metrics.items():
                 build_tc_features[test_id][f"COD_COV_CHN_{name}"] = value
