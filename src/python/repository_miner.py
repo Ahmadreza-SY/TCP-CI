@@ -1,6 +1,7 @@
 from .entities.entity_change import EntityChange, Contributor
 from .entities.entity import Language, Entity
 from .entities.dep_graph import DepGraph
+from .commit_classifier.commit_classifier import CommitClassifier, CommitType
 from typing import List
 from pydriller.domain.commit import ModificationType, DMMProperty
 from pydriller import RepositoryMining, GitRepository
@@ -34,6 +35,7 @@ class RepositoryMiner:
         self.git_repository = GitRepository(str(self.config.project_path))
         self.merged_commit_list_d = None
         self.commit_change_list_d = None
+        self.commit_clf = CommitClassifier()
 
     def get_contributor_id(self, commit):
         contributor = commit.author
@@ -267,6 +269,12 @@ class RepositoryMiner:
         distance_sum = sum(map(lambda pair: abs(pair[0][0] - pair[1][0]), combs))
         return (len(chunks) / len(combs)) * distance_sum
 
+    def get_commit_class(self, commit_msg):
+        commit_cls = CommitType.NONE_BUG
+        if commit_msg and commit_msg != "":
+            commit_cls = self.commit_clf.classify_commit(commit_msg)
+        return commit_cls
+
 
 class FileRepositoryMiner(RepositoryMiner):
     def compute_dmm(self, modification, dmm_prop):
@@ -320,6 +328,7 @@ class FileRepositoryMiner(RepositoryMiner):
                 self.compute_dmm(mod, DMMProperty.UNIT_COMPLEXITY),
                 self.compute_dmm(mod, DMMProperty.UNIT_INTERFACING),
                 contributor_id,
+                self.get_commit_class(commit.msg).value,
                 commit.hash,
                 commit.author_date,
                 None,
@@ -372,6 +381,7 @@ class FunctionRepositoryMiner(RepositoryMiner):
                         self.compute_dmm(mod, DMMProperty.UNIT_COMPLEXITY),
                         self.compute_dmm(mod, DMMProperty.UNIT_INTERFACING),
                         contributor_id,
+                        self.get_commit_class(commit.msg).value,
                         commit.hash,
                         commit.author_date,
                         None,

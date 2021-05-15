@@ -15,6 +15,7 @@ class EntityChange:
     ADDED_CHANGE_SCATTERING = "AddedChangeScattering"
     DELETED_CHANGE_SCATTERING = "DeletedChangeScattering"
     CONTRIBUTOR = "Contributor"
+    BUG_FIX = "BugFix"
     COMMIT = "Commit"
     COMMIT_DATE = "CommitDate"
     MERGE_COMMIT = "MergeCommit"
@@ -29,6 +30,7 @@ class EntityChange:
         dmm_complexity: Tuple[int, int],
         dmm_interfacing: Tuple[int, int],
         contributor: int,
+        bug_fix: bool,
         commit_hash: str,
         commit_date: datetime,
         merge_commit: str,
@@ -45,6 +47,7 @@ class EntityChange:
         self.dmm_interfacing_lr = dmm_interfacing[0]
         self.dmm_interfacing_hr = dmm_interfacing[1]
         self.contributor = contributor
+        self.bug_fix = bug_fix
         self.commit_hash = commit_hash
         self.commit_date = commit_date
         self.merge_commit = merge_commit
@@ -63,6 +66,7 @@ class EntityChange:
             EntityChange.DMM_INTERFACING_LR: self.dmm_interfacing_lr,
             EntityChange.DMM_INTERFACING_HR: self.dmm_interfacing_hr,
             EntityChange.CONTRIBUTOR: self.contributor,
+            EntityChange.BUG_FIX: self.bug_fix,
             EntityChange.COMMIT: self.commit_hash,
             EntityChange.COMMIT_DATE: self.commit_date,
             EntityChange.MERGE_COMMIT: self.merge_commit,

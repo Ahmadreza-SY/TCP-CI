@@ -107,6 +107,8 @@ class DatasetFactory:
     IMP_SCORE_SUM = "ImpScoreSum"
     CHN_COUNT = "ChnCount"
     IMP_COUNT = "ImpCount"
+    # DET Features
+    FAULTS = "Faults"
     # Ground Truth
     VERDICT = "Verdict"
     DURATION = "Duration"
@@ -207,9 +209,8 @@ class DatasetFactory:
     def compute_process_metrics(self, commit_hash, ent_ids, ent_dict):
         metrics = {}
         commit = self.git_repository.get_commit(commit_hash)
-        commit_date = commit.author_date
         build_change_history = self.change_history[
-            self.change_history[EntityChange.COMMIT_DATE] <= commit_date
+            self.change_history[EntityChange.COMMIT_DATE] <= commit.author_date
         ]
         project_devs = self.compute_contributions(build_change_history)
         for ent_id in ent_ids:
@@ -387,7 +388,7 @@ class DatasetFactory:
             )
         return build_tc_features
 
-    def aggregate_cod_cov_metrics(self, covered_ents, metrics):
+    def aggregate_cov_metrics(self, covered_ents, metrics):
         metrics_list = {}
         for ent_id, score in covered_ents:
             for name, value in metrics[ent_id].items():
@@ -408,26 +409,28 @@ class DatasetFactory:
             result[name] = weighted_sum
         return result
 
-    def compute_cod_cov_features(
-        self, commit_hash, test_ids, coverage, ent_dict, build_tc_features
-    ):
+    def get_all_affected_ents(self, test_ids, coverage):
         all_affected_ents = set()
         for test_id in test_ids:
             all_affected_ents.update([c[0] for c in coverage[test_id]["chn"]])
             all_affected_ents.update([c[0] for c in coverage[test_id]["imp"]])
+        return list(all_affected_ents)
 
-        all_affected_ents = list(all_affected_ents)
+    def compute_cod_cov_features(
+        self, commit_hash, test_ids, coverage, ent_dict, build_tc_features
+    ):
+        all_affected_ents = self.get_all_affected_ents(test_ids, coverage)
         ents_metrics = self.compute_all_metrics(
             commit_hash, all_affected_ents, ent_dict
         )
 
         for test_id in test_ids:
             changed_coverage = coverage[test_id]["chn"]
-            agg_changed_metrics = self.aggregate_cod_cov_metrics(
+            agg_changed_metrics = self.aggregate_cov_metrics(
                 changed_coverage, ents_metrics
             )
             impacted_coverage = coverage[test_id]["imp"]
-            agg_impacted_metrics = self.aggregate_cod_cov_metrics(
+            agg_impacted_metrics = self.aggregate_cov_metrics(
                 impacted_coverage, ents_metrics
             )
 
@@ -447,6 +450,41 @@ class DatasetFactory:
                 build_tc_features[test_id][f"COD_COV_CHN_{name}"] = value
             for name, value in agg_impacted_metrics.items():
                 build_tc_features[test_id][f"COD_COV_IMP_{name}"] = value
+
+        return build_tc_features
+
+    def compute_det_features(self, commit_hash, test_ids, coverage, build_tc_features):
+        commit = self.git_repository.get_commit(commit_hash)
+        build_change_history = self.change_history[
+            self.change_history[EntityChange.COMMIT_DATE] <= commit.author_date
+        ]
+        all_affected_ents = self.get_all_affected_ents(test_ids, coverage)
+        faults = {}
+        for ent_id in all_affected_ents:
+            ent_faults = build_change_history[
+                build_change_history[EntityChange.ID] == ent_id
+            ][EntityChange.BUG_FIX].sum()
+            faults[ent_id] = {}
+            faults[ent_id][DatasetFactory.FAULTS] = ent_faults
+
+        for test_id in test_ids:
+            changed_coverage = coverage[test_id]["chn"]
+            agg_changed_metrics = self.aggregate_cov_metrics(changed_coverage, faults)
+            impacted_coverage = coverage[test_id]["imp"]
+            agg_impacted_metrics = self.aggregate_cov_metrics(impacted_coverage, faults)
+
+            build_tc_features.setdefault(test_id, {})
+            build_tc_features[test_id][
+                f"DET_COV_CHN_{DatasetFactory.FAULTS}"
+            ] = DatasetFactory.DEFAULT_VALUE
+            build_tc_features[test_id][
+                f"DET_COV_IMP_{DatasetFactory.FAULTS}"
+            ] = DatasetFactory.DEFAULT_VALUE
+
+            for name, value in agg_changed_metrics.items():
+                build_tc_features[test_id][f"DET_COV_CHN_{name}"] = value
+            for name, value in agg_impacted_metrics.items():
+                build_tc_features[test_id][f"DET_COV_IMP_{name}"] = value
 
         return build_tc_features
 
@@ -498,6 +536,9 @@ class DatasetFactory:
             self.compute_cov_features(test_ids, coverage, build_tc_features)
             self.compute_cod_cov_features(
                 commit_hash, test_ids, coverage, entities_dict, build_tc_features
+            )
+            self.compute_det_features(
+                commit_hash, test_ids, coverage, build_tc_features
             )
 
             for test_id, features in build_tc_features.items():
