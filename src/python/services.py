@@ -3,29 +3,37 @@ from .entities.execution_record import ExecutionRecord
 from .dataset_factory import DatasetFactory
 from .module_factory import ModuleFactory
 import sys
+from .timer import tik, tok, save_time_measures
 
 
 class DataCollectionService:
     @staticmethod
     def create_dataset(args):
+        tik("Dataset Collection")
         repo_miner_class = ModuleFactory.get_repository_miner(args.level)
         repo_miner = repo_miner_class(args)
+        tik("Change History")
         change_history_df = repo_miner.compute_and_save_entity_change_history()
-
+        tok("Change History")
+        tik("Execution History")
         records, builds = DataCollectionService.fetch_and_save_execution_history(
             args, repo_miner
         )
-
+        tok("Execution History")
         if len(builds) == 0:
             print("No CI cycles found. Aborting...")
             sys.exit()
 
+        tik("Feature Extraction")
         dataset_factory = DatasetFactory(
             args,
             change_history_df,
             repo_miner,
         )
         dataset_factory.create_and_save_dataset(builds, records)
+        tok("Feature Extraction")
+        tok("Dataset Collection")
+        save_time_measures(args.output_path)
 
     @staticmethod
     def fetch_and_save_execution_history(args, repo_miner):

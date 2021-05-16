@@ -6,10 +6,9 @@ from ..code_analyzer.code_analyzer import AnalysisLevel
 import pandas as pd
 import subprocess
 import shlex
-import os
 import re
-from pathlib import Path
 from tqdm import tqdm
+from ..timer import tik, tok
 
 
 class LogType(Enum):
@@ -51,15 +50,18 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
 
         test_exe_history_path = self.config.output_path / "test_execution_history.csv"
         if not test_exe_history_path.exists():
+            tik("Download and Process TravisCI Logs")
             log_type = self.get_log_type().value
             command = f"ruby ./src/ruby/exe_feature_extractor.rb {self.config.project_slug} {log_type} {self.config.output_path.as_posix()}"
             return_code = subprocess.call(shlex.split(command))
+            tok("Download and Process TravisCI Logs")
             if return_code != 0:
                 print(f"failed ruby test execution history command: {command}")
                 return [], []
         else:
             print("Execution history exists, skipping fetch.")
 
+        tik("Link TravisCI Execution Records")
         builds_df = pd.read_csv(
             self.config.output_path / "full_builds.csv",
             sep=self.config.unique_separator,
@@ -123,6 +125,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
                 if exe_record.job.endswith(".1"):
                     exe_records.append(exe_record)
                 full_exe_records.append(exe_record)
+        tok("Link TravisCI Execution Records")
 
         full_exe_df = pd.DataFrame.from_records([e.to_dict() for e in full_exe_records])
         if len(full_exe_df) > 0:

@@ -7,6 +7,7 @@ from tqdm import tqdm
 import pandas as pd
 from scipy.stats.mstats import gmean
 import numpy as np
+from .timer import tik, tok
 
 pd.options.mode.chained_assignment = None
 
@@ -165,7 +166,7 @@ class DatasetFactory:
                     metrics[ent_id][name] = value
         return metrics
 
-    def compute_change_metrics(self, commit_hash, ent_ids, ent_dict):
+    def compute_change_metrics(self, commit_hash, ent_ids):
         metrics = {}
         commit = self.git_repository.get_commit(commit_hash)
         search_column = EntityChange.COMMIT
@@ -206,7 +207,7 @@ class DatasetFactory:
                 metrics[ent_id][DatasetFactory.DMM_INTERFACING] = dmm_interfacing
         return metrics
 
-    def compute_process_metrics(self, commit_hash, ent_ids, ent_dict):
+    def compute_process_metrics(self, commit_hash, ent_ids):
         metrics = {}
         commit = self.git_repository.get_commit(commit_hash)
         build_change_history = self.change_history[
@@ -244,9 +245,15 @@ class DatasetFactory:
         return metrics
 
     def compute_all_metrics(self, commit_hash, ent_ids, ent_dict):
+        tik("Static Metrics")
         static_metrics = self.compute_static_metrics(ent_ids, ent_dict)
-        change_metrics = self.compute_change_metrics(commit_hash, ent_ids, ent_dict)
-        process_metrics = self.compute_process_metrics(commit_hash, ent_ids, ent_dict)
+        tok("Static Metrics")
+        tik("Change Metrics")
+        change_metrics = self.compute_change_metrics(commit_hash, ent_ids)
+        tok("Change Metrics")
+        tik("Process Metircs")
+        process_metrics = self.compute_process_metrics(commit_hash, ent_ids)
+        tok("Process Metircs")
         computed_metrics = [static_metrics, change_metrics, process_metrics]
         all_metrics = {}
         for computed_metric in computed_metrics:
@@ -527,19 +534,31 @@ class DatasetFactory:
             tests_df = entities_df[entities_df[Entity.ID].isin(test_ids)]
 
             build_tc_features = {}
+            tik("COM Features")
             self.compute_com_features(
                 commit_hash, test_ids, entities_dict, build_tc_features
             )
+            tok("COM Features")
+            tik("REC Features")
             self.compute_rec_features(tests_df, exe_df, build, build_tc_features)
+            tok("REC Features")
 
+            tik("Coverage Computation")
             coverage = self.compute_test_coverage(commit_hash, test_ids, src_ids)
+            tok("Coverage Computation")
+            tik("COV Features")
             self.compute_cov_features(test_ids, coverage, build_tc_features)
+            tok("COV Features")
+            tik("COD_COV Features")
             self.compute_cod_cov_features(
                 commit_hash, test_ids, coverage, entities_dict, build_tc_features
             )
+            tok("COD_COV Features")
+            tik("DET Features")
             self.compute_det_features(
                 commit_hash, test_ids, coverage, build_tc_features
             )
+            tok("DET Features")
 
             for test_id, features in build_tc_features.items():
                 features[DatasetFactory.BUILD] = build.id

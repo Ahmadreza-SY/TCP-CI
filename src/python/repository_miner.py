@@ -15,6 +15,7 @@ import more_itertools as mit
 from itertools import combinations
 import sys
 import re
+from .timer import tik, tok
 
 
 class RepositoryMiner:
@@ -105,6 +106,7 @@ class RepositoryMiner:
             if change.commit_hash in merge_map:
                 change.merge_commit = merge_map[change.commit_hash]
 
+        tik("Create Commit Change List")
         change_history_df = pd.DataFrame.from_records(
             [ch.to_dict() for ch in change_history]
         )
@@ -120,6 +122,7 @@ class RepositoryMiner:
                 commit_change_lists["changes"].values.tolist(),
             )
         )
+        tok("Create Commit Change List")
 
         self.save_contributors()
         self.id_mapper.save_id_map()
@@ -148,6 +151,7 @@ class RepositoryMiner:
                 self.git_repository.repo.git.checkout(commit_hash)
             except:
                 return pd.DataFrame()
+            tik("Static Analysis")
             code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
             with code_analyzer(self.config, analysis_path) as analyzer:
                 entities = analyzer.get_entities()
@@ -155,6 +159,7 @@ class RepositoryMiner:
                 metadata_path.parent.mkdir(parents=True, exist_ok=True)
                 entities_df.sort_values(by=[Entity.ID], ignore_index=True, inplace=True)
                 entities_df.to_csv(metadata_path, index=False)
+            tok("Static Analysis")
             return entities_df
         else:
             return pd.read_csv(metadata_path)
@@ -221,6 +226,7 @@ class RepositoryMiner:
                 self.git_repository.repo.git.checkout(commit_hash)
             except:
                 return pd.DataFrame(), pd.DataFrame()
+            tik("Dependency Analysis")
             co_changes = self.compute_co_changes(
                 commit_hash, set(test_ids) | set(src_ids)
             )
@@ -235,6 +241,7 @@ class RepositoryMiner:
                     tar_path,
                     self.config.unique_separator,
                 )
+            tok("Dependency Analysis")
             return dep_graph, tar_graph
         else:
             dep_graph = DepGraph()
@@ -323,21 +330,31 @@ class FileRepositoryMiner(RepositoryMiner):
             else:
                 changed_file_id = self.id_mapper.get_entity_id(mod.new_path)
 
+            tik("Change Scattering")
             diff = mod.diff_parsed
             added_lines = list(map(lambda p: p[0], diff["added"]))
             added_scattering = self.compute_scattering(added_lines)
             deleted_lines = list(map(lambda p: p[0], diff["deleted"]))
             deleted_scattering = self.compute_scattering(deleted_lines)
+            tok("Change Scattering")
+            tik("DMM")
+            dmm_size = self.compute_dmm(mod, DMMProperty.UNIT_SIZE)
+            dmm_complexity = self.compute_dmm(mod, DMMProperty.UNIT_COMPLEXITY)
+            dmm_interfacing = self.compute_dmm(mod, DMMProperty.UNIT_INTERFACING)
+            tok("DMM")
+            tik("CommitClf")
+            commit_class = self.get_commit_class(commit.msg).value
+            tok("CommitClf")
             changed_entity = EntityChange(
                 changed_file_id,
                 mod.added,
                 mod.removed,
                 (added_scattering, deleted_scattering),
-                self.compute_dmm(mod, DMMProperty.UNIT_SIZE),
-                self.compute_dmm(mod, DMMProperty.UNIT_COMPLEXITY),
-                self.compute_dmm(mod, DMMProperty.UNIT_INTERFACING),
+                dmm_size,
+                dmm_complexity,
+                dmm_interfacing,
                 contributor_id,
-                self.get_commit_class(commit.msg).value,
+                commit_class,
                 commit.hash,
                 commit.author_date,
                 None,
