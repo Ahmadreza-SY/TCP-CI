@@ -496,9 +496,12 @@ class DatasetFactory:
         return build_tc_features
 
     def select_valid_builds(self, builds, exe_df):
+        all_commits_set = set(self.change_history[EntityChange.COMMIT].values.tolist())
         builds.sort(key=lambda e: e.id)
         valid_builds = []
         for build in builds:
+            if build.commit_hash not in all_commits_set:
+                continue
             metadata_path = (
                 self.repository_miner.get_analysis_path(build.commit_hash)
                 / "metadata.csv"
@@ -519,6 +522,9 @@ class DatasetFactory:
         exe_df = pd.DataFrame.from_records([e.to_dict() for e in exe_records])
         dataset = []
         valid_builds = self.select_valid_builds(builds, exe_df)
+        valid_build_ids = [b.id for b in valid_builds]
+        exe_df = exe_df[exe_df[ExecutionRecord.BUILD].isin(valid_build_ids)]
+
         for build in tqdm(valid_builds[1:], desc="Creating dataset"):
             commit_hash = build.commit_hash
             metadata_path = (
