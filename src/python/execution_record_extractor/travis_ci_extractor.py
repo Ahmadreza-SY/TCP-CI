@@ -1,7 +1,7 @@
 from .execution_record_extractor import *
 from enum import Enum
 from ..entities.execution_record import ExecutionRecord, TestVerdict, Build
-from ..entities.entity import Language
+from ..entities.entity import Language, EntityType
 from ..code_analyzer.code_analyzer import AnalysisLevel
 import pandas as pd
 import subprocess

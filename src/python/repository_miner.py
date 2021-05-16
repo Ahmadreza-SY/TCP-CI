@@ -13,6 +13,8 @@ from apyori import apriori
 from git import Git
 import more_itertools as mit
 from itertools import combinations
+import sys
+import re
 
 
 class RepositoryMiner:
@@ -36,6 +38,17 @@ class RepositoryMiner:
         self.merged_commit_list_d = None
         self.commit_change_list_d = None
         self.commit_clf = CommitClassifier()
+
+    def checkout_default_branch(self):
+        g = Git(self.config.project_path)
+        remote = g.execute("git remote show".split())
+        if remote == "":
+            print("Git repository has no remote! Please set a remote.")
+            sys.exit()
+        result = g.execute(f"git remote show {remote}".split())
+        default_branch = re.search("HEAD branch: (.+)", result).groups()[0]
+        git_repository = GitRepository(self.config.project_path)
+        git_repository.repo.git.checkout(default_branch)
 
     def get_contributor_id(self, commit):
         contributor = commit.author
@@ -74,9 +87,7 @@ class RepositoryMiner:
         return merge_commits
 
     def compute_entity_change_history(self) -> List[EntityChange]:
-        from .services import DataCollectionService
-
-        DataCollectionService.checkout_default_branch(self.config.project_path)
+        self.checkout_default_branch()
         change_history = []
         repository = RepositoryMining(str(self.config.project_path))
         commits = list(repository.traverse_commits())
@@ -181,13 +192,11 @@ class RepositoryMiner:
         return graph
 
     def compute_co_changes(self, commit_hash, ent_ids_set):
-        from .services import DataCollectionService
-
         if (self.merged_commit_list_d is None) or (self.commit_change_list_d is None):
             self.compute_and_save_entity_change_history()
         build_commit = self.git_repository.get_commit(commit_hash)
         commit_date = build_commit.author_date
-        DataCollectionService.checkout_default_branch(self.config.project_path)
+        self.checkout_default_branch()
         repository = RepositoryMining(str(self.config.project_path), to=commit_date)
         co_changes = []
         for commit in repository.traverse_commits():

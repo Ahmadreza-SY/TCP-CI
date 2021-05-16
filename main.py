@@ -9,28 +9,6 @@ from src.python.entities.entity import Language
 from pathlib import Path
 
 
-def history(args):
-    code_analyzer = ModuleFactory.get_code_analyzer(args.level)
-    with code_analyzer(
-        args.project_path, args.test_path, args.output_path, args.language, args.level
-    ) as analyzer:
-        DataCollectionService.compute_and_save_historical_data(args, analyzer)
-    extractor = ModuleFactory.get_execution_record_extractor(args.language)(
-        args.language,
-        args.level,
-        args.project_slug,
-        args.project_path,
-        args.output_path,
-        args.unique_separator,
-    )
-    DataCollectionService.fetch_and_save_execution_history(args, extractor)
-    print(f"All finished, results are saved in {args.output_path}")
-
-
-def release(args):
-    DataCollectionService.compute_and_save_release_data(args)
-
-
 def dataset(args):
     DataCollectionService.create_dataset(args)
 
@@ -53,14 +31,6 @@ def fetch_source_code_if_needed(args):
         if return_code != 0:
             print("Failure in fetching source code for GitHub!")
             sys.exit()
-
-
-def valid_date(s):
-    try:
-        return datetime.strptime(s, "%Y-%m-%d")
-    except ValueError:
-        msg = "Not a valid date: '{0}'.".format(s)
-        raise argparse.ArgumentTypeError(msg)
 
 
 def add_common_arguments(parser):
@@ -111,47 +81,9 @@ def add_common_arguments(parser):
 def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
-    history_parser = subparsers.add_parser(
-        "history", help="The history command extracts and computes code dependencies."
-    )
-    release_parser = subparsers.add_parser(
-        "release",
-        help="The release command extracts changed entities and their dependencies based on the pre-computed history.",
-    )
     dataset_parser = subparsers.add_parser(
         "dataset",
         help="Create training dataset including all test case features for each CI cycle.",
-    )
-
-    add_common_arguments(history_parser)
-    history_parser.set_defaults(func=history)
-    history_parser.add_argument(
-        "--since",
-        help="Start date for commits to analyze - format YYYY-MM-DD. Not providing this arguments means to analyze all commits.",
-        type=valid_date,
-        default=None,
-    )
-
-    add_common_arguments(release_parser)
-    release_parser.set_defaults(func=release)
-    release_parser.add_argument(
-        "-from",
-        "--from-commit",
-        help="Hash of the start commit of this release.",
-        required=True,
-    )
-    release_parser.add_argument(
-        "-to",
-        "--to-commit",
-        help="Hash of the last commit of this release.",
-        required=True,
-    )
-    release_parser.add_argument(
-        "-hist",
-        "--histories-dir",
-        help="Path to outputs of the history command.",
-        type=Path,
-        required=True,
     )
 
     add_common_arguments(dataset_parser)

@@ -1,11 +1,9 @@
 import os
 import re
-import glob
 import sys
 import time
 import subprocess
 import shlex
-from tqdm import tqdm
 import understand
 from ...entities.entity import Language, EntityType
 from ..code_analyzer import AnalysisLevel

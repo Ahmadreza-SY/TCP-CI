@@ -6,9 +6,6 @@ from ..understand.understand_database import (
 )
 from ...entities.entity import Language, File, Function, EntityType
 from ...entities.dep_graph import DepGraph
-import pandas as pd
-import numpy as np
-from pathlib import Path
 from ...id_mapper import IdMapper
 
 

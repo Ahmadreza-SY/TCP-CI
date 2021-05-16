@@ -1,5 +1,4 @@
 from enum import Enum
-from ..entities.entity import Entity
 
 
 class TestVerdict(Enum):
