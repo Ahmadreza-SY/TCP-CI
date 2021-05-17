@@ -87,11 +87,14 @@ class RepositoryMiner:
             last_commit = self.git_repository.get_commit(last_commit.parents[0])
         return merge_commits
 
+    def get_all_commits(self):
+        repository = RepositoryMining(str(self.config.project_path))
+        return list(repository.traverse_commits())
+
     def compute_entity_change_history(self) -> List[EntityChange]:
         self.checkout_default_branch()
         change_history = []
-        repository = RepositoryMining(str(self.config.project_path))
-        commits = list(repository.traverse_commits())
+        commits = self.get_all_commits()
         merge_map = {}
         self.merged_commit_list_d = {}
         for commit in tqdm(commits, desc="Mining entity change history"):
@@ -99,12 +102,14 @@ class RepositoryMiner:
             if commit.merge:
                 self.merged_commit_list_d.setdefault(commit.hash, [])
                 for merged_commit in self.get_merge_commits(commit):
-                    merge_map[merged_commit.hash] = commit.hash
+                    merge_map.setdefault(merged_commit.hash, [])
+                    if commit.hash not in merge_map[merged_commit.hash]:
+                        merge_map[merged_commit.hash].append(commit.hash)
                     self.merged_commit_list_d[commit.hash].append(merged_commit.hash)
 
         for change in tqdm(change_history, desc="Detecting merge commits"):
             if change.commit_hash in merge_map:
-                change.merge_commit = merge_map[change.commit_hash]
+                change.merge_commits = merge_map[change.commit_hash]
 
         tik("Create Commit Change List")
         change_history_df = pd.DataFrame.from_records(
@@ -141,17 +146,17 @@ class RepositoryMiner:
     def get_analysis_path(self, commit_hash):
         return self.config.output_path / "analysis" / commit_hash
 
-    def analyze_commit_statically(self, commit_hash):
+    def analyze_commit_statically(self, build):
         from .module_factory import ModuleFactory
 
-        analysis_path = self.get_analysis_path(commit_hash)
+        analysis_path = self.get_analysis_path(build.commit_hash)
         metadata_path = analysis_path / "metadata.csv"
         if not metadata_path.exists():
             try:
-                self.git_repository.repo.git.checkout(commit_hash)
+                self.git_repository.repo.git.checkout(build.commit_hash)
             except:
                 return pd.DataFrame()
-            tik("Static Analysis")
+            tik("Static Analysis", build.id)
             code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
             with code_analyzer(self.config, analysis_path) as analyzer:
                 entities = analyzer.get_entities()
@@ -159,7 +164,7 @@ class RepositoryMiner:
                 metadata_path.parent.mkdir(parents=True, exist_ok=True)
                 entities_df.sort_values(by=[Entity.ID], ignore_index=True, inplace=True)
                 entities_df.to_csv(metadata_path, index=False)
-            tok("Static Analysis")
+            tok("Static Analysis", build.id)
             return entities_df
         else:
             return pd.read_csv(metadata_path)
@@ -213,22 +218,22 @@ class RepositoryMiner:
                 co_changes.append(entity_changes)
         return co_changes
 
-    def analyze_commit_dependency(self, commit_hash, test_ids, src_ids):
+    def analyze_commit_dependency(self, build, test_ids, src_ids):
         from .module_factory import ModuleFactory
 
         test_ids.sort()
         src_ids.sort()
-        analysis_path = self.get_analysis_path(commit_hash)
+        analysis_path = self.get_analysis_path(build.commit_hash)
         dep_path = analysis_path / "dep.csv"
         tar_path = analysis_path / "tar.csv"
         if (not dep_path.exists()) or (not tar_path.exists()):
             try:
-                self.git_repository.repo.git.checkout(commit_hash)
+                self.git_repository.repo.git.checkout(build.commit_hash)
             except:
                 return pd.DataFrame(), pd.DataFrame()
-            tik("Dependency Analysis")
+            tik("Dependency Analysis", build.id)
             co_changes = self.compute_co_changes(
-                commit_hash, set(test_ids) | set(src_ids)
+                build.commit_hash, set(test_ids) | set(src_ids)
             )
             code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
             with code_analyzer(self.config, analysis_path) as analyzer:
@@ -241,7 +246,7 @@ class RepositoryMiner:
                     tar_path,
                     self.config.unique_separator,
                 )
-            tok("Dependency Analysis")
+            tok("Dependency Analysis", build.id)
             return dep_graph, tar_graph
         else:
             dep_graph = DepGraph()
@@ -342,9 +347,9 @@ class FileRepositoryMiner(RepositoryMiner):
             dmm_complexity = self.compute_dmm(mod, DMMProperty.UNIT_COMPLEXITY)
             dmm_interfacing = self.compute_dmm(mod, DMMProperty.UNIT_INTERFACING)
             tok("DMM")
-            tik("CommitClf")
+            tik("Commit Classification")
             commit_class = self.get_commit_class(commit.msg).value
-            tok("CommitClf")
+            tok("Commit Classification")
             changed_entity = EntityChange(
                 changed_file_id,
                 mod.added,
@@ -357,7 +362,6 @@ class FileRepositoryMiner(RepositoryMiner):
                 commit_class,
                 commit.hash,
                 commit.author_date,
-                None,
             )
             changed_entities.append(changed_entity)
         return changed_entities
@@ -410,7 +414,6 @@ class FunctionRepositoryMiner(RepositoryMiner):
                         self.get_commit_class(commit.msg).value,
                         commit.hash,
                         commit.author_date,
-                        None,
                     )
                     changed_entities.append(entity_change)
         return changed_entities

@@ -166,15 +166,20 @@ class DatasetFactory:
                     metrics[ent_id][name] = value
         return metrics
 
-    def compute_change_metrics(self, commit_hash, ent_ids):
+    def compute_change_metrics(self, build, ent_ids):
         metrics = {}
-        commit = self.git_repository.get_commit(commit_hash)
-        search_column = EntityChange.COMMIT
+        commit = self.git_repository.get_commit(build.commit_hash)
+        build_changes = None
         if commit.merge:
-            search_column = EntityChange.MERGE_COMMIT
-        build_changes = self.change_history[
-            self.change_history[search_column] == commit_hash
-        ]
+            build_changes = self.change_history[
+                self.change_history[EntityChange.MERGE_COMMITS].apply(
+                    lambda m: commit.hash in m
+                )
+            ]
+        else:
+            build_changes = self.change_history[
+                self.change_history[EntityChange.COMMIT] == commit.hash
+            ]
         for ent_id in ent_ids:
             ent_changes = build_changes[build_changes[EntityChange.ID] == ent_id]
             if ent_changes.empty:
@@ -207,9 +212,9 @@ class DatasetFactory:
                 metrics[ent_id][DatasetFactory.DMM_INTERFACING] = dmm_interfacing
         return metrics
 
-    def compute_process_metrics(self, commit_hash, ent_ids):
+    def compute_process_metrics(self, build, ent_ids):
         metrics = {}
-        commit = self.git_repository.get_commit(commit_hash)
+        commit = self.git_repository.get_commit(build.commit_hash)
         build_change_history = self.change_history[
             self.change_history[EntityChange.COMMIT_DATE] <= commit.author_date
         ]
@@ -244,16 +249,16 @@ class DatasetFactory:
             )
         return metrics
 
-    def compute_all_metrics(self, commit_hash, ent_ids, ent_dict):
-        tik("Static Metrics")
+    def compute_all_metrics(self, build, ent_ids, ent_dict):
+        tik("Static Metrics", build.id)
         static_metrics = self.compute_static_metrics(ent_ids, ent_dict)
-        tok("Static Metrics")
-        tik("Change Metrics")
-        change_metrics = self.compute_change_metrics(commit_hash, ent_ids)
-        tok("Change Metrics")
-        tik("Process Metircs")
-        process_metrics = self.compute_process_metrics(commit_hash, ent_ids)
-        tok("Process Metircs")
+        tok("Static Metrics", build.id)
+        tik("Change Metrics", build.id)
+        change_metrics = self.compute_change_metrics(build, ent_ids)
+        tok("Change Metrics", build.id)
+        tik("Process Metircs", build.id)
+        process_metrics = self.compute_process_metrics(build, ent_ids)
+        tok("Process Metircs", build.id)
         computed_metrics = [static_metrics, change_metrics, process_metrics]
         all_metrics = {}
         for computed_metric in computed_metrics:
@@ -263,8 +268,8 @@ class DatasetFactory:
                     all_metrics[ent_id][name] = value
         return all_metrics
 
-    def compute_com_features(self, commit_hash, test_ids, ent_dict, build_tc_features):
-        test_metrics = self.compute_all_metrics(commit_hash, test_ids, ent_dict)
+    def compute_com_features(self, build, test_ids, ent_dict, build_tc_features):
+        test_metrics = self.compute_all_metrics(build, test_ids, ent_dict)
         for test_id in test_ids:
             build_tc_features.setdefault(test_id, {})
             for metric in DatasetFactory.all_metrics:
@@ -352,11 +357,11 @@ class DatasetFactory:
             ] = last_exe_time
         return build_tc_features
 
-    def compute_test_coverage(self, commit_hash, test_ids, src_ids):
+    def compute_test_coverage(self, build, test_ids, src_ids):
         dep_graph, tar_graph = self.repository_miner.analyze_commit_dependency(
-            commit_hash, test_ids, src_ids
+            build, test_ids, src_ids
         )
-        build_commit = self.git_repository.get_commit(commit_hash)
+        build_commit = self.git_repository.get_commit(build.commit_hash)
         changed_ents = self.repository_miner.get_changed_entities(build_commit)
         impacted_ents = set()
         for changed_ent in changed_ents:
@@ -424,12 +429,10 @@ class DatasetFactory:
         return list(all_affected_ents)
 
     def compute_cod_cov_features(
-        self, commit_hash, test_ids, coverage, ent_dict, build_tc_features
+        self, build, test_ids, coverage, ent_dict, build_tc_features
     ):
         all_affected_ents = self.get_all_affected_ents(test_ids, coverage)
-        ents_metrics = self.compute_all_metrics(
-            commit_hash, all_affected_ents, ent_dict
-        )
+        ents_metrics = self.compute_all_metrics(build, all_affected_ents, ent_dict)
 
         for test_id in test_ids:
             changed_coverage = coverage[test_id]["chn"]
@@ -460,8 +463,8 @@ class DatasetFactory:
 
         return build_tc_features
 
-    def compute_det_features(self, commit_hash, test_ids, coverage, build_tc_features):
-        commit = self.git_repository.get_commit(commit_hash)
+    def compute_det_features(self, build, test_ids, coverage, build_tc_features):
+        commit = self.git_repository.get_commit(build.commit_hash)
         build_change_history = self.change_history[
             self.change_history[EntityChange.COMMIT_DATE] <= commit.author_date
         ]
@@ -496,7 +499,7 @@ class DatasetFactory:
         return build_tc_features
 
     def select_valid_builds(self, builds, exe_df):
-        all_commits_set = set(self.change_history[EntityChange.COMMIT].values.tolist())
+        all_commits_set = set([c.hash for c in self.repository_miner.get_all_commits()])
         builds.sort(key=lambda e: e.id)
         valid_builds = []
         for build in builds:
@@ -507,9 +510,7 @@ class DatasetFactory:
                 / "metadata.csv"
             )
             if not metadata_path.exists():
-                result = self.repository_miner.analyze_commit_statically(
-                    build.commit_hash
-                )
+                result = self.repository_miner.analyze_commit_statically(build)
                 if result.empty:
                     continue
             build_exe_df = exe_df[exe_df[ExecutionRecord.BUILD] == build.id]
@@ -526,9 +527,9 @@ class DatasetFactory:
         exe_df = exe_df[exe_df[ExecutionRecord.BUILD].isin(valid_build_ids)]
 
         for build in tqdm(valid_builds[1:], desc="Creating dataset"):
-            commit_hash = build.commit_hash
             metadata_path = (
-                self.repository_miner.get_analysis_path(commit_hash) / "metadata.csv"
+                self.repository_miner.get_analysis_path(build.commit_hash)
+                / "metadata.csv"
             )
             entities_df = pd.read_csv(metadata_path)
             entities_dict = {e[Entity.ID]: e for e in entities_df.to_dict("records")}
@@ -540,31 +541,27 @@ class DatasetFactory:
             tests_df = entities_df[entities_df[Entity.ID].isin(test_ids)]
 
             build_tc_features = {}
-            tik("COM Features")
-            self.compute_com_features(
-                commit_hash, test_ids, entities_dict, build_tc_features
-            )
-            tok("COM Features")
-            tik("REC Features")
+            tik("COM Features", build.id)
+            self.compute_com_features(build, test_ids, entities_dict, build_tc_features)
+            tok("COM Features", build.id)
+            tik("REC Features", build.id)
             self.compute_rec_features(tests_df, exe_df, build, build_tc_features)
-            tok("REC Features")
+            tok("REC Features", build.id)
 
-            tik("Coverage Computation")
-            coverage = self.compute_test_coverage(commit_hash, test_ids, src_ids)
-            tok("Coverage Computation")
-            tik("COV Features")
+            tik("Coverage Computation", build.id)
+            coverage = self.compute_test_coverage(build, test_ids, src_ids)
+            tok("Coverage Computation", build.id)
+            tik("COV Features", build.id)
             self.compute_cov_features(test_ids, coverage, build_tc_features)
-            tok("COV Features")
-            tik("COD_COV Features")
+            tok("COV Features", build.id)
+            tik("COD_COV Features", build.id)
             self.compute_cod_cov_features(
-                commit_hash, test_ids, coverage, entities_dict, build_tc_features
+                build, test_ids, coverage, entities_dict, build_tc_features
             )
-            tok("COD_COV Features")
-            tik("DET Features")
-            self.compute_det_features(
-                commit_hash, test_ids, coverage, build_tc_features
-            )
-            tok("DET Features")
+            tok("COD_COV Features", build.id)
+            tik("DET Features", build.id)
+            self.compute_det_features(build, test_ids, coverage, build_tc_features)
+            tok("DET Features", build.id)
 
             for test_id, features in build_tc_features.items():
                 features[DatasetFactory.BUILD] = build.id

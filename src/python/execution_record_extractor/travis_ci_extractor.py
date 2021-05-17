@@ -80,9 +80,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
                 / "metadata.csv"
             )
             if not metadata_path.exists():
-                result = self.repository_miner.analyze_commit_statically(
-                    build.commit_hash
-                )
+                result = self.repository_miner.analyze_commit_statically(build)
                 if result.empty:
                     continue
 
