@@ -33,6 +33,10 @@ def fetch_logs_and_create_dataset(repository_slug, test_extractor, output_path, 
 	retries = 0
 	begin
 		repository = Travis::Repository.find(repository_slug)
+		last_build = repository.last_build
+		if last_build.nil?
+			abort("Not Travis-CI build logs available for #{repository_slug}")
+		end
 		last_build_number = repository.last_build.number.to_i
 		build_numbers = (1..last_build_number).to_a
 	rescue StandardError => e
