@@ -216,7 +216,7 @@ class DatasetFactory:
         metrics = {}
         commit = self.git_repository.get_commit(build.commit_hash)
         build_change_history = self.change_history[
-            self.change_history[EntityChange.COMMIT_DATE] <= commit.author_date
+            self.change_history[EntityChange.COMMIT_DATE] <= commit.committer_date
         ]
         project_devs = self.compute_contributions(build_change_history)
         for ent_id in ent_ids:
@@ -466,7 +466,7 @@ class DatasetFactory:
     def compute_det_features(self, build, test_ids, coverage, build_tc_features):
         commit = self.git_repository.get_commit(build.commit_hash)
         build_change_history = self.change_history[
-            self.change_history[EntityChange.COMMIT_DATE] <= commit.author_date
+            self.change_history[EntityChange.COMMIT_DATE] <= commit.committer_date
         ]
         all_affected_ents = self.get_all_affected_ents(test_ids, coverage)
         faults = {}

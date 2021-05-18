@@ -16,6 +16,7 @@ from itertools import combinations
 import sys
 import re
 from .timer import tik, tok
+from git.exc import GitCommandError
 
 
 class RepositoryMiner:
@@ -70,21 +71,45 @@ class RepositoryMiner:
         )
         contributors_df.to_csv(self.contributors_path, index=False)
 
+    def get_merge_base(self, first_commit, second_commit):
+        g = Git(str(self.config.project_path))
+        try:
+            merge_base = g.execute(
+                f"git merge-base {first_commit} {second_commit}".split()
+            )
+            return merge_base, 0
+        except GitCommandError as e:
+            if e.status == 1:
+                last_commit = self.git_repository.get_commit(second_commit)
+                while len(last_commit.parents) > 0:
+                    last_commit = self.git_repository.get_commit(last_commit.parents[0])
+                merge_base = last_commit.hash
+                return merge_base, 1
+
     def get_merge_commits(self, merge_commit):
         if not merge_commit.merge:
             return [merge_commit]
 
-        parents = merge_commit.parents
-        g = Git(str(self.config.project_path))
-        merge_base = g.execute(f"git merge-base {parents[0]} {parents[1]}".split())
+        merge_parents = merge_commit.parents
         merge_commits = []
-        last_commit = self.git_repository.get_commit(parents[1])
-        while last_commit.hash != merge_base:
+        merge_base, status = self.get_merge_base(merge_parents[0], merge_parents[1])
+        merge_base = self.git_repository.get_commit(merge_base)
+        if status == 1:
+            merge_commits.append(merge_base)
+        last_commit = self.git_repository.get_commit(merge_parents[1])
+        while last_commit.hash != merge_base.hash:
             if last_commit.merge:
                 merge_commits.extend(self.get_merge_commits(last_commit))
             else:
                 merge_commits.append(last_commit)
             last_commit = self.git_repository.get_commit(last_commit.parents[0])
+            if last_commit.committer_date < merge_base.committer_date:
+                merge_base, status = self.get_merge_base(
+                    merge_base.hash, last_commit.hash
+                )
+                merge_base = self.git_repository.get_commit(merge_base)
+                if status == 1:
+                    merge_commits.append(merge_base)
         return merge_commits
 
     def get_all_commits(self):
@@ -101,7 +126,8 @@ class RepositoryMiner:
             change_history.extend(self.compute_changed_entities(commit))
             if commit.merge:
                 self.merged_commit_list_d.setdefault(commit.hash, [])
-                for merged_commit in self.get_merge_commits(commit):
+                merged_commits = self.get_merge_commits(commit)
+                for merged_commit in merged_commits:
                     merge_map.setdefault(merged_commit.hash, [])
                     if commit.hash not in merge_map[merged_commit.hash]:
                         merge_map[merged_commit.hash].append(commit.hash)
@@ -205,7 +231,7 @@ class RepositoryMiner:
         if (self.merged_commit_list_d is None) or (self.commit_change_list_d is None):
             self.compute_and_save_entity_change_history()
         build_commit = self.git_repository.get_commit(commit_hash)
-        commit_date = build_commit.author_date
+        commit_date = build_commit.committer_date
         self.checkout_default_branch()
         repository = RepositoryMining(str(self.config.project_path), to=commit_date)
         co_changes = []
@@ -361,7 +387,7 @@ class FileRepositoryMiner(RepositoryMiner):
                 contributor_id,
                 commit_class,
                 commit.hash,
-                commit.author_date,
+                commit.committer_date,
             )
             changed_entities.append(changed_entity)
         return changed_entities
@@ -413,7 +439,7 @@ class FunctionRepositoryMiner(RepositoryMiner):
                         contributor_id,
                         self.get_commit_class(commit.msg).value,
                         commit.hash,
-                        commit.author_date,
+                        commit.committer_date,
                     )
                     changed_entities.append(entity_change)
         return changed_entities
