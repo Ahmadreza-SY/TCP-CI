@@ -186,10 +186,17 @@ class RepositoryMiner:
             code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
             with code_analyzer(self.config, analysis_path) as analyzer:
                 entities = analyzer.get_entities()
-                entities_df = pd.DataFrame.from_records([e.to_dict() for e in entities])
-                metadata_path.parent.mkdir(parents=True, exist_ok=True)
-                entities_df.sort_values(by=[Entity.ID], ignore_index=True, inplace=True)
-                entities_df.to_csv(metadata_path, index=False)
+                if len(entities) == 0:
+                    entities_df = pd.DataFrame()
+                else:
+                    entities_df = pd.DataFrame.from_records(
+                        [e.to_dict() for e in entities]
+                    )
+                    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+                    entities_df.sort_values(
+                        by=[Entity.ID], ignore_index=True, inplace=True
+                    )
+                    entities_df.to_csv(metadata_path, index=False)
             tok("Static Analysis", build.id)
             return entities_df
         else:
