@@ -53,4 +53,4 @@ class DataCollectionService:
             return exe_records, builds
         else:
             print("No execution history collected!")
-            return None, None
+            return [], []
