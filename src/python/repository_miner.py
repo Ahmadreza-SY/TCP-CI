@@ -113,11 +113,11 @@ class RepositoryMiner:
         return merge_commits
 
     def get_all_commits(self):
+        self.checkout_default_branch()
         repository = RepositoryMining(str(self.config.project_path))
         return list(repository.traverse_commits())
 
     def compute_entity_change_history(self) -> List[EntityChange]:
-        self.checkout_default_branch()
         change_history = []
         commits = self.get_all_commits()
         merge_map = {}
