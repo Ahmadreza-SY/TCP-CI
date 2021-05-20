@@ -8,6 +8,7 @@ import pandas as pd
 from scipy.stats.mstats import gmean
 import numpy as np
 from .timer import tik, tok
+import sys
 
 pd.options.mode.chained_assignment = None
 
@@ -525,6 +526,10 @@ class DatasetFactory:
         valid_builds = self.select_valid_builds(builds, exe_df)
         valid_build_ids = [b.id for b in valid_builds]
         exe_df = exe_df[exe_df[ExecutionRecord.BUILD].isin(valid_build_ids)]
+
+        if len(valid_builds) == 0:
+            print("No valid builds found. Aborting ...")
+            sys.exit()
 
         for build in tqdm(valid_builds[1:], desc="Creating dataset"):
             metadata_path = (
