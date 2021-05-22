@@ -169,18 +169,10 @@ class DatasetFactory:
 
     def compute_change_metrics(self, build, ent_ids):
         metrics = {}
-        commit = self.git_repository.get_commit(build.commit_hash)
-        build_changes = None
-        if commit.merge:
-            build_changes = self.change_history[
-                self.change_history[EntityChange.MERGE_COMMITS].apply(
-                    lambda m: commit.hash in m
-                )
-            ]
-        else:
-            build_changes = self.change_history[
-                self.change_history[EntityChange.COMMIT] == commit.hash
-            ]
+        build_changes = self.change_history[
+            self.change_history[EntityChange.COMMIT] == build.commit_hash
+        ]
+
         for ent_id in ent_ids:
             ent_changes = build_changes[build_changes[EntityChange.ID] == ent_id]
             if ent_changes.empty:
@@ -217,7 +209,8 @@ class DatasetFactory:
         metrics = {}
         commit = self.git_repository.get_commit(build.commit_hash)
         build_change_history = self.change_history[
-            self.change_history[EntityChange.COMMIT_DATE] <= commit.committer_date
+            (self.change_history[EntityChange.COMMIT_DATE] <= commit.committer_date)
+            & (self.change_history[EntityChange.MERGE_COMMIT] == False)
         ]
         project_devs = self.compute_contributions(build_change_history)
         for ent_id in ent_ids:
@@ -467,7 +460,8 @@ class DatasetFactory:
     def compute_det_features(self, build, test_ids, coverage, build_tc_features):
         commit = self.git_repository.get_commit(build.commit_hash)
         build_change_history = self.change_history[
-            self.change_history[EntityChange.COMMIT_DATE] <= commit.committer_date
+            (self.change_history[EntityChange.COMMIT_DATE] <= commit.committer_date)
+            & (self.change_history[EntityChange.MERGE_COMMIT] == False)
         ]
         all_affected_ents = self.get_all_affected_ents(test_ids, coverage)
         faults = {}

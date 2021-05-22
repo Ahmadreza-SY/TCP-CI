@@ -16,7 +16,6 @@ from itertools import combinations
 import sys
 import re
 from .timer import tik, tok
-from git.exc import GitCommandError
 
 
 class RepositoryMiner:
@@ -37,7 +36,6 @@ class RepositoryMiner:
             self.max_id = 0
         self.id_mapper = IdMapper(config.output_path)
         self.git_repository = GitRepository(str(self.config.project_path))
-        self.merged_commit_list_d = None
         self.commit_change_list_d = None
         self.commit_clf = CommitClassifier()
 
@@ -71,47 +69,6 @@ class RepositoryMiner:
         )
         contributors_df.to_csv(self.contributors_path, index=False)
 
-    def get_merge_base(self, first_commit, second_commit):
-        g = Git(str(self.config.project_path))
-        try:
-            merge_base = g.execute(
-                f"git merge-base {first_commit} {second_commit}".split()
-            )
-            return merge_base, 0
-        except GitCommandError as e:
-            if e.status == 1:
-                last_commit = self.git_repository.get_commit(second_commit)
-                while len(last_commit.parents) > 0:
-                    last_commit = self.git_repository.get_commit(last_commit.parents[0])
-                merge_base = last_commit.hash
-                return merge_base, 1
-
-    def get_merge_commits(self, merge_commit):
-        if not merge_commit.merge:
-            return [merge_commit]
-
-        merge_parents = merge_commit.parents
-        merge_commits = []
-        merge_base, status = self.get_merge_base(merge_parents[0], merge_parents[1])
-        merge_base = self.git_repository.get_commit(merge_base)
-        if status == 1:
-            merge_commits.append(merge_base)
-        last_commit = self.git_repository.get_commit(merge_parents[1])
-        while last_commit.hash != merge_base.hash:
-            if last_commit.merge:
-                merge_commits.extend(self.get_merge_commits(last_commit))
-            else:
-                merge_commits.append(last_commit)
-            last_commit = self.git_repository.get_commit(last_commit.parents[0])
-            if last_commit.committer_date < merge_base.committer_date:
-                merge_base, status = self.get_merge_base(
-                    merge_base.hash, last_commit.hash
-                )
-                merge_base = self.git_repository.get_commit(merge_base)
-                if status == 1:
-                    merge_commits.append(merge_base)
-        return merge_commits
-
     def get_all_commits(self):
         self.checkout_default_branch()
         repository = RepositoryMining(str(self.config.project_path))
@@ -120,22 +77,18 @@ class RepositoryMiner:
     def compute_entity_change_history(self) -> List[EntityChange]:
         change_history = []
         commits = self.get_all_commits()
-        merge_map = {}
-        self.merged_commit_list_d = {}
         for commit in tqdm(commits, desc="Mining entity change history"):
-            change_history.extend(self.compute_changed_entities(commit))
+            tik("Compute Commit Modifications")
+            modifications = commit.modifications
             if commit.merge:
-                self.merged_commit_list_d.setdefault(commit.hash, [])
-                merged_commits = self.get_merge_commits(commit)
-                for merged_commit in merged_commits:
-                    merge_map.setdefault(merged_commit.hash, [])
-                    if commit.hash not in merge_map[merged_commit.hash]:
-                        merge_map[merged_commit.hash].append(commit.hash)
-                    self.merged_commit_list_d[commit.hash].append(merged_commit.hash)
-
-        for change in tqdm(change_history, desc="Detecting merge commits"):
-            if change.commit_hash in merge_map:
-                change.merge_commits = merge_map[change.commit_hash]
+                diff_index = commit._c_object.parents[0].diff(
+                    commit._c_object, create_patch=True
+                )
+                modifications = commit._parse_diff(diff_index)
+            tok("Compute Commit Modifications")
+            tik("Compute Changed Ents")
+            change_history.extend(self.compute_changed_entities(commit, modifications))
+            tok("Compute Changed Ents")
 
         tik("Create Commit Change List")
         change_history_df = pd.DataFrame.from_records(
@@ -235,7 +188,7 @@ class RepositoryMiner:
         return graph
 
     def compute_co_changes(self, commit_hash, ent_ids_set):
-        if (self.merged_commit_list_d is None) or (self.commit_change_list_d is None):
+        if self.commit_change_list_d is None:
             self.compute_and_save_entity_change_history()
         build_commit = self.git_repository.get_commit(commit_hash)
         commit_date = build_commit.committer_date
@@ -289,18 +242,9 @@ class RepositoryMiner:
             return dep_graph, tar_graph
 
     def get_changed_entities(self, commit):
-        try:
-            changes = set()
-            commit_hashes = [commit.hash]
-            if commit.merge:
-                commit_hashes = self.merged_commit_list_d[commit.hash]
-            for change_hash in commit_hashes:
-                changes.update(self.commit_change_list_d[change_hash])
-            return changes
-        except:
-            return set()
+        return set(self.commit_change_list_d[commit.hash])
 
-    def compute_changed_entities(self, commit) -> List[EntityChange]:
+    def compute_changed_entities(self, commit, modifications) -> List[EntityChange]:
         pass
 
     def compute_function_diff(self, func, diff_parsed):
@@ -346,10 +290,11 @@ class FileRepositoryMiner(RepositoryMiner):
                 hr_changes += changes
         return (lr_changes, hr_changes)
 
-    def compute_changed_entities(self, commit):
+    def compute_changed_entities(self, commit, modifications):
         changed_entities = []
         contributor_id = self.get_contributor_id(commit)
-        for mod in commit.modifications:
+        for mod in modifications:
+            tik("Get Entity Id")
             changed_file_id = None
             if mod.change_type in [
                 ModificationType.ADD,
@@ -367,6 +312,7 @@ class FileRepositoryMiner(RepositoryMiner):
                 )
             else:
                 changed_file_id = self.id_mapper.get_entity_id(mod.new_path)
+            tok("Get Entity Id")
 
             tik("Change Scattering")
             diff = mod.diff_parsed
@@ -383,6 +329,7 @@ class FileRepositoryMiner(RepositoryMiner):
             tik("Commit Classification")
             commit_class = self.get_commit_class(commit.msg).value
             tok("Commit Classification")
+            tik("Create EntityChange")
             changed_entity = EntityChange(
                 changed_file_id,
                 mod.added,
@@ -395,8 +342,10 @@ class FileRepositoryMiner(RepositoryMiner):
                 commit_class,
                 commit.hash,
                 commit.committer_date,
+                commit.merge,
             )
             changed_entities.append(changed_entity)
+            tok("Create EntityChange")
         return changed_entities
 
 
@@ -423,10 +372,10 @@ class FunctionRepositoryMiner(RepositoryMiner):
             return function_name
         return None
 
-    def compute_changed_entities(self, commit):
+    def compute_changed_entities(self, commit, modifications):
         changed_entities = []
         contributor_id = self.get_contributor_id(commit)
-        for mod in commit.modifications:
+        for mod in modifications:
             diff_parsed = mod.diff_parsed
             for method in mod.changed_methods:
                 method_unique_name = self.get_pydriller_function_unique_name(method)
@@ -447,6 +396,7 @@ class FunctionRepositoryMiner(RepositoryMiner):
                         self.get_commit_class(commit.msg).value,
                         commit.hash,
                         commit.committer_date,
+                        commit.merge,
                     )
                     changed_entities.append(entity_change)
         return changed_entities

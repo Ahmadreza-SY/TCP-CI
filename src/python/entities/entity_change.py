@@ -18,7 +18,7 @@ class EntityChange:
     BUG_FIX = "BugFix"
     COMMIT = "Commit"
     COMMIT_DATE = "CommitDate"
-    MERGE_COMMITS = "MergeCommits"
+    MERGE_COMMIT = "MergeCommit"
 
     def __init__(
         self,
@@ -33,6 +33,7 @@ class EntityChange:
         bug_fix: bool,
         commit_hash: str,
         commit_date: datetime,
+        merge_commit: bool,
     ):
         self.id = id
         self.added_lines = added_lines
@@ -49,7 +50,7 @@ class EntityChange:
         self.bug_fix = bug_fix
         self.commit_hash = commit_hash
         self.commit_date = commit_date
-        self.merge_commits = []
+        self.merge_commit = merge_commit
 
     def to_dict(self):
         d = {
@@ -68,7 +69,7 @@ class EntityChange:
             EntityChange.BUG_FIX: self.bug_fix,
             EntityChange.COMMIT: self.commit_hash,
             EntityChange.COMMIT_DATE: self.commit_date,
-            EntityChange.MERGE_COMMITS: self.merge_commits,
+            EntityChange.MERGE_COMMIT: self.merge_commit,
         }
         return d
 
