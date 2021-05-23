@@ -76,6 +76,7 @@ class RepositoryMiner:
 
     def compute_entity_change_history(self) -> List[EntityChange]:
         change_history = []
+        self.commit_change_list_d = {}
         commits = self.get_all_commits()
         for commit in tqdm(commits, desc="Mining entity change history"):
             tik("Compute Commit Modifications")
@@ -87,26 +88,10 @@ class RepositoryMiner:
                 modifications = commit._parse_diff(diff_index)
             tok("Compute Commit Modifications")
             tik("Compute Changed Ents")
-            change_history.extend(self.compute_changed_entities(commit, modifications))
+            entity_changes = self.compute_changed_entities(commit, modifications)
+            change_history.extend(entity_changes)
+            self.commit_change_list_d[commit.hash] = [ec.id for ec in entity_changes]
             tok("Compute Changed Ents")
-
-        tik("Create Commit Change List")
-        change_history_df = pd.DataFrame.from_records(
-            [ch.to_dict() for ch in change_history]
-        )
-        commit_change_lists = (
-            change_history_df[[EntityChange.ID, EntityChange.COMMIT]]
-            .groupby(EntityChange.COMMIT)[EntityChange.ID]
-            .apply(list)
-            .reset_index(name="changes")
-        )
-        self.commit_change_list_d = dict(
-            zip(
-                commit_change_lists[EntityChange.COMMIT].values.tolist(),
-                commit_change_lists["changes"].values.tolist(),
-            )
-        )
-        tok("Create Commit Change List")
 
         self.save_contributors()
         self.id_mapper.save_id_map()
