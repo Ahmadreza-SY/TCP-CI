@@ -218,6 +218,14 @@ class DatasetFactory:
             ent_change_history = build_change_history[
                 build_change_history[EntityChange.ID] == ent_id
             ]
+            if ent_change_history.empty:
+                ent_change_history = self.change_history[
+                    (
+                        self.change_history[EntityChange.COMMIT_DATE]
+                        <= commit.committer_date
+                    )
+                    & (self.change_history[EntityChange.ID] == ent_id)
+                ]
             ent_devs = self.compute_contributions(ent_change_history)
             ent_devs_ids = ent_devs[EntityChange.CONTRIBUTOR].values
             ent_devs_exp = project_devs[
