@@ -29,7 +29,9 @@ class IdMapper:
     def merge_entity_ids(self, unique_identifiers):
         a = unique_identifiers[0]
         b = unique_identifiers[1]
-        if a in self.id_map:
+        if a in self.id_map and b in self.id_map:
+            self.id_map[a] = self.id_map[b]
+        elif a in self.id_map and b not in self.id_map:
             self.id_map[b] = self.id_map[a]
         elif a not in self.id_map and b in self.id_map:
             self.id_map[a] = self.id_map[b]
