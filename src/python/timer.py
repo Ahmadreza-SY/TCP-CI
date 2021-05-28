@@ -41,6 +41,16 @@ def tok(name, build=None):
         internal_tok(name, time_measures)
 
 
+def tik_list(names, build=None):
+    for name in names:
+        tik(name, build)
+
+
+def tok_list(names, build=None):
+    for name in names:
+        tik(name, build)
+
+
 def save_time_measures(output_path):
     global time_measures
     keys = list(time_measures.keys())
