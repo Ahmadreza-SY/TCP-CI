@@ -354,7 +354,11 @@ class DatasetFactory:
             build, test_ids, src_ids
         )
         build_commit = self.git_repository.get_commit(build.commit_hash)
-        changed_ents = self.repository_miner.get_changed_entities(build_commit)
+        modifications = self.repository_miner.compute_modifications(build_commit)
+        changed_ents = set()
+        for mod in modifications:
+            changed_entity_id = self.repository_miner.get_changed_entity_id(mod)
+            changed_ents.add(changed_entity_id)
         impacted_ents = set()
         for changed_ent in changed_ents:
             impacted_ents.update(dep_graph.get_dependencies(changed_ent))
