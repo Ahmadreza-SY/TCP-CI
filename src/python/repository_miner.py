@@ -74,21 +74,24 @@ class RepositoryMiner:
         repository = RepositoryMining(str(self.config.project_path))
         return list(repository.traverse_commits())
 
+    def compute_modifications(self, commit):
+        tik("Compute Commit Modifications")
+        modifications = commit.modifications
+        if commit.merge:
+            diff_index = commit._c_object.parents[0].diff(
+                commit._c_object, create_patch=True
+            )
+            modifications = commit._parse_diff(diff_index)
+        tok("Compute Commit Modifications")
+        return modifications
+
     def compute_entity_change_history(self) -> List[EntityChange]:
         change_history = []
         self.commit_change_list_d = {}
         commits = self.get_all_commits()
         for commit in tqdm(commits, desc="Mining entity change history"):
-            tik("Compute Commit Modifications")
-            modifications = commit.modifications
-            if commit.merge:
-                diff_index = commit._c_object.parents[0].diff(
-                    commit._c_object, create_patch=True
-                )
-                modifications = commit._parse_diff(diff_index)
-            tok("Compute Commit Modifications")
             tik("Compute Changed Ents")
-            entity_changes = self.compute_changed_entities(commit, modifications)
+            entity_changes = self.compute_changed_entities(commit)
             change_history.extend(entity_changes)
             self.commit_change_list_d[commit.hash] = [ec.id for ec in entity_changes]
             tok("Compute Changed Ents")
@@ -273,44 +276,39 @@ class FileRepositoryMiner(RepositoryMiner):
                 lr_changes += changes
             else:
                 hr_changes += changes
-        return (lr_changes, hr_changes)
+        if (lr_changes + hr_changes) == 0:
+            return None
+        else:
+            return float(lr_changes) / float(lr_changes + hr_changes)
 
-    def compute_changed_entities(self, commit, modifications):
+    def get_changed_entity_id(self, modification):
+        changed_file_id = None
+        if modification.change_type in [
+            ModificationType.ADD,
+            ModificationType.COPY,
+        ]:
+            changed_file_id = self.id_mapper.get_entity_id(modification.new_path)
+        elif modification.change_type in [
+            ModificationType.DELETE,
+            ModificationType.MODIFY,
+        ]:
+            changed_file_id = self.id_mapper.get_entity_id(modification.old_path)
+        elif modification.change_type == ModificationType.RENAME:
+            changed_file_id = self.id_mapper.merge_entity_ids(
+                (modification.old_path, modification.new_path)
+            )
+        else:
+            changed_file_id = self.id_mapper.get_entity_id(modification.new_path)
+        return changed_file_id
+
+    def compute_changed_entities(self, commit):
         changed_entities = []
         contributor_id = self.get_contributor_id(commit)
+        modifications = self.compute_modifications(commit)
         for mod in modifications:
             tik("Get Entity Id")
-            changed_file_id = None
-            if mod.change_type in [
-                ModificationType.ADD,
-                ModificationType.COPY,
-            ]:
-                changed_file_id = self.id_mapper.get_entity_id(mod.new_path)
-            elif mod.change_type in [
-                ModificationType.DELETE,
-                ModificationType.MODIFY,
-            ]:
-                changed_file_id = self.id_mapper.get_entity_id(mod.old_path)
-            elif mod.change_type == ModificationType.RENAME:
-                changed_file_id = self.id_mapper.merge_entity_ids(
-                    (mod.old_path, mod.new_path)
-                )
-            else:
-                changed_file_id = self.id_mapper.get_entity_id(mod.new_path)
+            changed_file_id = self.get_changed_entity_id(mod)
             tok("Get Entity Id")
-
-            tik("Change Scattering")
-            diff = mod.diff_parsed
-            added_lines = list(map(lambda p: p[0], diff["added"]))
-            added_scattering = self.compute_scattering(added_lines)
-            deleted_lines = list(map(lambda p: p[0], diff["deleted"]))
-            deleted_scattering = self.compute_scattering(deleted_lines)
-            tok("Change Scattering")
-            tik("DMM")
-            dmm_size = self.compute_dmm(mod, DMMProperty.UNIT_SIZE)
-            dmm_complexity = self.compute_dmm(mod, DMMProperty.UNIT_COMPLEXITY)
-            dmm_interfacing = self.compute_dmm(mod, DMMProperty.UNIT_INTERFACING)
-            tok("DMM")
             tik("Commit Classification")
             commit_class = self.get_commit_class(commit.msg).value
             tok("Commit Classification")
@@ -319,10 +317,6 @@ class FileRepositoryMiner(RepositoryMiner):
                 changed_file_id,
                 mod.added,
                 mod.removed,
-                (added_scattering, deleted_scattering),
-                dmm_size,
-                dmm_complexity,
-                dmm_interfacing,
                 contributor_id,
                 commit_class,
                 commit.hash,
@@ -337,9 +331,9 @@ class FileRepositoryMiner(RepositoryMiner):
 class FunctionRepositoryMiner(RepositoryMiner):
     def compute_dmm(self, changed_method, dmm_prop):
         if changed_method.is_low_risk(dmm_prop):
-            return (1, 0)
+            return 1.0
         else:
-            return (0, 1)
+            return 0.0
 
     def get_pydriller_function_unique_name(self, pydriller_function):
         if self.config.language == Language.JAVA:
@@ -357,9 +351,10 @@ class FunctionRepositoryMiner(RepositoryMiner):
             return function_name
         return None
 
-    def compute_changed_entities(self, commit, modifications):
+    def compute_changed_entities(self, commit):
         changed_entities = []
         contributor_id = self.get_contributor_id(commit)
+        modifications = self.compute_modifications(commit)
         for mod in modifications:
             diff_parsed = mod.diff_parsed
             for method in mod.changed_methods:
@@ -367,16 +362,16 @@ class FunctionRepositoryMiner(RepositoryMiner):
                 if method_unique_name is not None:
                     changed_method_id = self.id_mapper.get_entity_id(method_unique_name)
                     added, deleted = self.compute_function_diff(method, diff_parsed)
-                    added_scattering = self.compute_scattering(added)
-                    deleted_scattering = self.compute_scattering(deleted)
+                    # added_scattering = self.compute_scattering(added)
+                    # deleted_scattering = self.compute_scattering(deleted)
                     entity_change = EntityChange(
                         changed_method_id,
                         len(added),
                         len(deleted),
-                        (added_scattering, deleted_scattering),
-                        self.compute_dmm(mod, DMMProperty.UNIT_SIZE),
-                        self.compute_dmm(mod, DMMProperty.UNIT_COMPLEXITY),
-                        self.compute_dmm(mod, DMMProperty.UNIT_INTERFACING),
+                        # (added_scattering, deleted_scattering),
+                        # self.compute_dmm(mod, DMMProperty.UNIT_SIZE),
+                        # self.compute_dmm(mod, DMMProperty.UNIT_COMPLEXITY),
+                        # self.compute_dmm(mod, DMMProperty.UNIT_INTERFACING),
                         contributor_id,
                         self.get_commit_class(commit.msg).value,
                         commit.hash,

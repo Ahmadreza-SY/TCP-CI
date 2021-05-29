@@ -140,24 +140,6 @@ class DatasetFactory:
         devs["Exp"] = devs["AuthoredLines"] / devs["AuthoredLines"].sum() * 100.0
         return devs
 
-    def compute_dmm(self, changes, dmm_prop):
-        lr = 0
-        hr = 0
-        if dmm_prop == DMMProperty.UNIT_SIZE:
-            lr = changes[EntityChange.DMM_SIZE_LR].sum()
-            hr = changes[EntityChange.DMM_SIZE_HR].sum()
-        elif dmm_prop == DMMProperty.UNIT_COMPLEXITY:
-            lr = changes[EntityChange.DMM_COMPLEXITY_LR].sum()
-            hr = changes[EntityChange.DMM_COMPLEXITY_HR].sum()
-        elif dmm_prop == DMMProperty.UNIT_INTERFACING:
-            lr = changes[EntityChange.DMM_INTERFACING_LR].sum()
-            hr = changes[EntityChange.DMM_INTERFACING_HR].sum()
-
-        if (lr + hr) == 0:
-            return None
-        else:
-            return float(lr) / float(lr + hr)
-
     def compute_static_metrics(self, ent_ids, ent_dict):
         metrics = {}
         for ent_id in ent_ids:
@@ -169,33 +151,40 @@ class DatasetFactory:
 
     def compute_change_metrics(self, build, ent_ids):
         metrics = {}
-        build_changes = self.change_history[
-            self.change_history[EntityChange.COMMIT] == build.commit_hash
-        ]
+        commit = self.git_repository.get_commit(build.commit_hash)
+        modifications = self.repository_miner.compute_modifications(commit)
+        mod_map = {}
+        for mod in modifications:
+            changed_entity_id = self.repository_miner.get_changed_entity_id(mod)
+            mod_map[changed_entity_id] = mod
 
         for ent_id in ent_ids:
-            ent_changes = build_changes[build_changes[EntityChange.ID] == ent_id]
-            if ent_changes.empty:
+            if ent_id not in mod_map:
                 continue
 
+            ent_mod = mod_map[ent_id]
             metrics.setdefault(ent_id, {})
-            metrics[ent_id][DatasetFactory.LINES_ADDED] = ent_changes[
-                EntityChange.ADDED_LINES
-            ].sum()
-            metrics[ent_id][DatasetFactory.LINES_DELETED] = ent_changes[
-                EntityChange.DELETED_LINES
-            ].sum()
-            metrics[ent_id][DatasetFactory.ADDED_CHANGE_SCATTERING] = ent_changes[
-                EntityChange.ADDED_CHANGE_SCATTERING
-            ].mean()
-            metrics[ent_id][DatasetFactory.DELETED_CHANGE_SCATTERING] = ent_changes[
-                EntityChange.DELETED_CHANGE_SCATTERING
-            ].mean()
+            metrics[ent_id][DatasetFactory.LINES_ADDED] = ent_mod.added
+            metrics[ent_id][DatasetFactory.LINES_DELETED] = ent_mod.removed
+            tik("Change Scattering")
+            diff = ent_mod.diff_parsed
+            added_lines = list(map(lambda p: p[0], diff["added"]))
+            metrics[ent_id][
+                DatasetFactory.ADDED_CHANGE_SCATTERING
+            ] = self.repository_miner.compute_scattering(added_lines)
+            deleted_lines = list(map(lambda p: p[0], diff["deleted"]))
+            metrics[ent_id][
+                DatasetFactory.DELETED_CHANGE_SCATTERING
+            ] = self.repository_miner.compute_scattering(deleted_lines)
+            tok("Change Scattering")
 
-            dmm_size = self.compute_dmm(ent_changes, DMMProperty.UNIT_SIZE)
-            dmm_complexity = self.compute_dmm(ent_changes, DMMProperty.UNIT_COMPLEXITY)
-            dmm_interfacing = self.compute_dmm(
-                ent_changes, DMMProperty.UNIT_INTERFACING
+            tik("DMM")
+            dmm_size = self.repository_miner.compute_dmm(ent_mod, DMMProperty.UNIT_SIZE)
+            dmm_complexity = self.repository_miner.compute_dmm(
+                ent_mod, DMMProperty.UNIT_COMPLEXITY
+            )
+            dmm_interfacing = self.repository_miner.compute_dmm(
+                ent_mod, DMMProperty.UNIT_INTERFACING
             )
             if dmm_size is not None:
                 metrics[ent_id][DatasetFactory.DMM_SIZE] = dmm_size
@@ -203,6 +192,7 @@ class DatasetFactory:
                 metrics[ent_id][DatasetFactory.DMM_COMPLEXITY] = dmm_complexity
             if dmm_interfacing is not None:
                 metrics[ent_id][DatasetFactory.DMM_INTERFACING] = dmm_interfacing
+            tok("DMM")
         return metrics
 
     def compute_process_metrics(self, build, ent_ids):
