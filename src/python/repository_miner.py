@@ -15,7 +15,7 @@ import more_itertools as mit
 from itertools import combinations
 import sys
 import re
-from .timer import tik, tok
+from .timer import tik, tok, tik_list, tok_list
 
 
 class RepositoryMiner:
@@ -75,14 +75,12 @@ class RepositoryMiner:
         return list(repository.traverse_commits())
 
     def compute_modifications(self, commit):
-        tik("Compute Commit Modifications")
         modifications = commit.modifications
         if commit.merge:
             diff_index = commit._c_object.parents[0].diff(
                 commit._c_object, create_patch=True
             )
             modifications = commit._parse_diff(diff_index)
-        tok("Compute Commit Modifications")
         return modifications
 
     def compute_entity_change_history(self) -> List[EntityChange]:
@@ -90,11 +88,11 @@ class RepositoryMiner:
         self.commit_change_list_d = {}
         commits = self.get_all_commits()
         for commit in tqdm(commits, desc="Mining entity change history"):
-            tik("Compute Changed Ents")
+            tik_list(["TES_PRO_P", "COD_COV_PRO_P"])
             entity_changes = self.compute_changed_entities(commit)
             change_history.extend(entity_changes)
             self.commit_change_list_d[commit.hash] = [ec.id for ec in entity_changes]
-            tok("Compute Changed Ents")
+            tok_list(["TES_PRO_P", "COD_COV_PRO_P"])
 
         self.save_contributors()
         self.id_mapper.save_id_map()
@@ -123,7 +121,7 @@ class RepositoryMiner:
                 self.git_repository.repo.git.checkout(build.commit_hash)
             except:
                 return pd.DataFrame()
-            tik("Static Analysis", build.id)
+            tik_list(["TES_COM_P", "COD_COV_COM_P"], build.id)
             code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
             with code_analyzer(self.config, analysis_path) as analyzer:
                 entities = analyzer.get_entities()
@@ -138,7 +136,7 @@ class RepositoryMiner:
                         by=[Entity.ID], ignore_index=True, inplace=True
                     )
                     entities_df.to_csv(metadata_path, index=False)
-            tok("Static Analysis", build.id)
+            tok_list(["TES_COM_P", "COD_COV_COM_P"], build.id)
             return entities_df
         else:
             return pd.read_csv(metadata_path)
@@ -205,7 +203,6 @@ class RepositoryMiner:
                 self.git_repository.repo.git.checkout(build.commit_hash)
             except:
                 return pd.DataFrame(), pd.DataFrame()
-            tik("Dependency Analysis", build.id)
             co_changes = self.compute_co_changes(
                 build.commit_hash, set(test_ids) | set(src_ids)
             )
@@ -220,7 +217,6 @@ class RepositoryMiner:
                     tar_path,
                     self.config.unique_separator,
                 )
-            tok("Dependency Analysis", build.id)
             return dep_graph, tar_graph
         else:
             dep_graph = DepGraph()
@@ -306,13 +302,10 @@ class FileRepositoryMiner(RepositoryMiner):
         contributor_id = self.get_contributor_id(commit)
         modifications = self.compute_modifications(commit)
         for mod in modifications:
-            tik("Get Entity Id")
             changed_file_id = self.get_changed_entity_id(mod)
-            tok("Get Entity Id")
-            tik("Commit Classification")
+            tik("DET_COV_P")
             commit_class = self.get_commit_class(commit.msg).value
-            tok("Commit Classification")
-            tik("Create EntityChange")
+            tok("DET_COV_P")
             changed_entity = EntityChange(
                 changed_file_id,
                 mod.added,
@@ -324,7 +317,6 @@ class FileRepositoryMiner(RepositoryMiner):
                 commit.merge,
             )
             changed_entities.append(changed_entity)
-            tok("Create EntityChange")
         return changed_entities
 
 

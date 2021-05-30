@@ -7,7 +7,7 @@ from tqdm import tqdm
 import pandas as pd
 from scipy.stats.mstats import gmean
 import numpy as np
-from .timer import tik, tok
+from .timer import tik, tok, tik_list, tok_list
 import sys
 
 pd.options.mode.chained_assignment = None
@@ -166,7 +166,6 @@ class DatasetFactory:
             metrics.setdefault(ent_id, {})
             metrics[ent_id][DatasetFactory.LINES_ADDED] = ent_mod.added
             metrics[ent_id][DatasetFactory.LINES_DELETED] = ent_mod.removed
-            tik("Change Scattering")
             diff = ent_mod.diff_parsed
             added_lines = list(map(lambda p: p[0], diff["added"]))
             metrics[ent_id][
@@ -176,9 +175,7 @@ class DatasetFactory:
             metrics[ent_id][
                 DatasetFactory.DELETED_CHANGE_SCATTERING
             ] = self.repository_miner.compute_scattering(deleted_lines)
-            tok("Change Scattering")
 
-            tik("DMM")
             dmm_size = self.repository_miner.compute_dmm(ent_mod, DMMProperty.UNIT_SIZE)
             dmm_complexity = self.repository_miner.compute_dmm(
                 ent_mod, DMMProperty.UNIT_COMPLEXITY
@@ -192,7 +189,6 @@ class DatasetFactory:
                 metrics[ent_id][DatasetFactory.DMM_COMPLEXITY] = dmm_complexity
             if dmm_interfacing is not None:
                 metrics[ent_id][DatasetFactory.DMM_INTERFACING] = dmm_interfacing
-            tok("DMM")
         return metrics
 
     def compute_process_metrics(self, build, ent_ids):
@@ -241,16 +237,16 @@ class DatasetFactory:
             )
         return metrics
 
-    def compute_all_metrics(self, build, ent_ids, ent_dict):
-        tik("Static Metrics", build.id)
+    def compute_all_metrics(self, build, ent_ids, ent_dict, prefix=""):
+        tik(f"{prefix}COM_M", build.id)
         static_metrics = self.compute_static_metrics(ent_ids, ent_dict)
-        tok("Static Metrics", build.id)
-        tik("Change Metrics", build.id)
+        tok(f"{prefix}COM_M", build.id)
+        tik(f"{prefix}CHN_M", build.id)
         change_metrics = self.compute_change_metrics(build, ent_ids)
-        tok("Change Metrics", build.id)
-        tik("Process Metircs", build.id)
+        tok(f"{prefix}CHN_M", build.id)
+        tik(f"{prefix}PRO_M", build.id)
         process_metrics = self.compute_process_metrics(build, ent_ids)
-        tok("Process Metircs", build.id)
+        tok(f"{prefix}PRO_M", build.id)
         computed_metrics = [static_metrics, change_metrics, process_metrics]
         all_metrics = {}
         for computed_metric in computed_metrics:
@@ -260,16 +256,16 @@ class DatasetFactory:
                     all_metrics[ent_id][name] = value
         return all_metrics
 
-    def compute_com_features(self, build, test_ids, ent_dict, build_tc_features):
-        test_metrics = self.compute_all_metrics(build, test_ids, ent_dict)
+    def compute_tes_features(self, build, test_ids, ent_dict, build_tc_features):
+        test_metrics = self.compute_all_metrics(build, test_ids, ent_dict, "TES_")
         for test_id in test_ids:
             build_tc_features.setdefault(test_id, {})
             for metric in DatasetFactory.all_metrics:
                 build_tc_features[test_id][
-                    f"COM_{metric}"
+                    f"TES_{metric}"
                 ] = DatasetFactory.DEFAULT_VALUE
             for name, value in test_metrics[test_id].items():
-                build_tc_features[test_id][f"COM_{name}"] = value
+                build_tc_features[test_id][f"TES_{name}"] = value
         return build_tc_features
 
     def compute_rec_features(self, test_entities, exe_df, build, build_tc_features):
@@ -428,8 +424,11 @@ class DatasetFactory:
         self, build, test_ids, coverage, ent_dict, build_tc_features
     ):
         all_affected_ents = self.get_all_affected_ents(test_ids, coverage)
-        ents_metrics = self.compute_all_metrics(build, all_affected_ents, ent_dict)
+        ents_metrics = self.compute_all_metrics(
+            build, all_affected_ents, ent_dict, "COD_COV_"
+        )
 
+        tik_list(["COD_COV_COM_M", "COD_COV_PRO_M", "COD_COV_CHN_M"], build.id)
         for test_id in test_ids:
             changed_coverage = coverage[test_id]["chn"]
             agg_changed_metrics = self.aggregate_cov_metrics(
@@ -456,7 +455,7 @@ class DatasetFactory:
                 build_tc_features[test_id][f"COD_COV_CHN_{name}"] = value
             for name, value in agg_impacted_metrics.items():
                 build_tc_features[test_id][f"COD_COV_IMP_{name}"] = value
-
+        tok_list(["COD_COV_COM_M", "COD_COV_PRO_M", "COD_COV_CHN_M"], build.id)
         return build_tc_features
 
     def compute_det_features(self, build, test_ids, coverage, build_tc_features):
@@ -542,27 +541,41 @@ class DatasetFactory:
             tests_df = entities_df[entities_df[Entity.ID].isin(test_ids)]
 
             build_tc_features = {}
-            tik("COM Features", build.id)
-            self.compute_com_features(build, test_ids, entities_dict, build_tc_features)
-            tok("COM Features", build.id)
-            tik("REC Features", build.id)
+            self.compute_tes_features(build, test_ids, entities_dict, build_tc_features)
+            tik("REC_M", build.id)
             self.compute_rec_features(tests_df, exe_df, build, build_tc_features)
-            tok("REC Features", build.id)
+            tok("REC_M", build.id)
 
-            tik("Coverage Computation", build.id)
+            tik_list(
+                [
+                    "COV_P",
+                    "COD_COV_COM_P",
+                    "COD_COV_PRO_P",
+                    "COD_COV_CHN_P",
+                    "DET_COV_P",
+                ],
+                build.id,
+            )
             coverage = self.compute_test_coverage(build, test_ids, src_ids)
-            tok("Coverage Computation", build.id)
-            tik("COV Features", build.id)
+            tok_list(
+                [
+                    "COV_P",
+                    "COD_COV_COM_P",
+                    "COD_COV_PRO_P",
+                    "COD_COV_CHN_P",
+                    "DET_COV_P",
+                ],
+                build.id,
+            )
+            tik("COV_M", build.id)
             self.compute_cov_features(test_ids, coverage, build_tc_features)
-            tok("COV Features", build.id)
-            tik("COD_COV Features", build.id)
+            tok("COV_M", build.id)
             self.compute_cod_cov_features(
                 build, test_ids, coverage, entities_dict, build_tc_features
             )
-            tok("COD_COV Features", build.id)
-            tik("DET Features", build.id)
+            tik("DET_COV_M", build.id)
             self.compute_det_features(build, test_ids, coverage, build_tc_features)
-            tok("DET Features", build.id)
+            tok("DET_COV_M", build.id)
 
             for test_id, features in build_tc_features.items():
                 features[DatasetFactory.BUILD] = build.id

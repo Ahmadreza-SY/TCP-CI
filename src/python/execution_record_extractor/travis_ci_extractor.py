@@ -50,18 +50,17 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
 
         test_exe_history_path = self.config.output_path / "test_execution_history.csv"
         if not test_exe_history_path.exists():
-            tik("Download and Process TravisCI Logs")
+            tik("REC_P")
             log_type = self.get_log_type().value
             command = f"ruby ./src/ruby/exe_feature_extractor.rb {self.config.project_slug} {log_type} {self.config.output_path.as_posix()}"
             return_code = subprocess.call(shlex.split(command))
-            tok("Download and Process TravisCI Logs")
+            tok("REC_P")
             if return_code != 0:
                 print(f"failed ruby test execution history command: {command}")
                 return [], []
         else:
             print("Execution history exists, skipping fetch.")
 
-        tik("Link TravisCI Execution Records")
         builds_df = pd.read_csv(
             self.config.output_path / "full_builds.csv",
             sep=self.config.unique_separator,
@@ -84,6 +83,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
                 if result.empty:
                     continue
 
+            tik("REC_P")
             entities_df = pd.read_csv(metadata_path)
             build_exe_df = exe_df[(exe_df[ExecutionRecord.BUILD] == build.id)]
             if len(build_exe_df) == 0:
@@ -123,7 +123,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
                 if exe_record.job.endswith(".1"):
                     exe_records.append(exe_record)
                 full_exe_records.append(exe_record)
-        tok("Link TravisCI Execution Records")
+            tok("REC_P")
 
         full_exe_df = pd.DataFrame.from_records([e.to_dict() for e in full_exe_records])
         if len(full_exe_df) > 0:

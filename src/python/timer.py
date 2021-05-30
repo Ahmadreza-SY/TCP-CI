@@ -48,7 +48,7 @@ def tik_list(names, build=None):
 
 def tok_list(names, build=None):
     for name in names:
-        tik(name, build)
+        tok(name, build)
 
 
 def save_time_measures(output_path):
