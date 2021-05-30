@@ -50,17 +50,16 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
 
         test_exe_history_path = self.config.output_path / "test_execution_history.csv"
         if not test_exe_history_path.exists():
-            tik("REC_P")
             log_type = self.get_log_type().value
             command = f"ruby ./src/ruby/exe_feature_extractor.rb {self.config.project_slug} {log_type} {self.config.output_path.as_posix()}"
             return_code = subprocess.call(shlex.split(command))
-            tok("REC_P")
             if return_code != 0:
                 print(f"failed ruby test execution history command: {command}")
                 return [], []
         else:
             print("Execution history exists, skipping fetch.")
 
+        tik("REC_P")
         builds_df = pd.read_csv(
             self.config.output_path / "full_builds.csv",
             sep=self.config.unique_separator,
@@ -72,6 +71,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
         exe_df = pd.read_csv(test_exe_history_path, dtype={ExecutionRecord.JOB: str})
         exe_records = []
         full_exe_records = []
+        tok("REC_P")
 
         for build in tqdm(builds, desc="Creating execution records"):
             metadata_path = (

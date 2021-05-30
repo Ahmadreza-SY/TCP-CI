@@ -51,7 +51,7 @@ def tok_list(names, build=None):
         tok(name, build)
 
 
-def save_time_measures(output_path):
+def create_time_measures_df():
     global time_measures
     keys = list(time_measures.keys())
     for key in keys:
@@ -59,9 +59,10 @@ def save_time_measures(output_path):
             time_measures.pop(key)
     process_name = list(time_measures.keys())
     duration = list(time_measures.values())
-    df = pd.DataFrame({"ProcessName": process_name, "Duration": duration})
-    df.to_csv(f"{output_path}/time_measure.csv", index=False)
+    return pd.DataFrame({"ProcessName": process_name, "Duration": duration})
 
+
+def create_build_time_measures_df():
     global build_time_measures
     builds = []
     process_names = []
@@ -73,7 +74,77 @@ def save_time_measures(output_path):
             builds.append(build)
             process_names.append(pname)
             durations.append(d)
-    df = pd.DataFrame(
+    return pd.DataFrame(
         {"Build": builds, "ProcessName": process_names, "Duration": durations}
     )
-    df.to_csv(f"{output_path}/build_time_measure.csv", index=False)
+
+
+def create_feature_group_time_df(time_df, build_time_df, valid_builds):
+    feature_groups = [
+        "TES_COM",
+        "TES_PRO",
+        "TES_CHN",
+        "REC",
+        "COV",
+        "COD_COV_COM",
+        "COD_COV_PRO",
+        "COD_COV_CHN",
+        "DET_COV",
+    ]
+    valid_build_time_df = build_time_df[build_time_df["Build"].isin(valid_builds)]
+    build_names = valid_build_time_df.groupby("Build")["ProcessName"].apply(list)
+    build_durations = valid_build_time_df.groupby("Build")["Duration"].apply(list)
+    builds = []
+    features = []
+    preprocessings = []
+    measurements = []
+    total = []
+    for build, durations in build_durations.iteritems():
+        for fg in feature_groups:
+            preprocessing = 0.0
+            fgp_df = time_df[time_df["ProcessName"] == f"{fg}_P"]
+            if len(fgp_df) > 0:
+                preprocessing += fgp_df["Duration"].values.tolist()[0]
+            try:
+                i = build_names[build].index(f"{fg}_P")
+                preprocessing += durations[i]
+            except:
+                pass
+
+            measurement = 0.0
+            try:
+                i = build_names[build].index(f"{fg}_M")
+                measurement += durations[i]
+            except:
+                pass
+            builds.append(build)
+            features.append(fg)
+            preprocessings.append(preprocessing)
+            measurements.append(measurement)
+            total.append(preprocessing + measurement)
+
+    return pd.DataFrame(
+        {
+            "Build": builds,
+            "FeatureGroup": features,
+            "PreprocessingTime": preprocessings,
+            "MeasurementTime": measurements,
+            "TotalTime": total,
+        }
+    )
+
+
+def save_time_measures(output_path):
+    time_df = create_time_measures_df()
+    time_df.to_csv(f"{output_path}/time_measure.csv", index=False)
+
+    build_time_df = create_build_time_measures_df()
+    valid_builds = (
+        pd.read_csv(f"{output_path}/dataset.csv", usecols=["Build"])["Build"]
+        .unique()
+        .tolist()
+    )
+    feature_group_time_df = create_feature_group_time_df(
+        time_df, build_time_df, valid_builds
+    )
+    feature_group_time_df.to_csv(f"{output_path}/feature_group_time.csv", index=False)
