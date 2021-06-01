@@ -496,9 +496,12 @@ class DatasetFactory:
 
     def select_valid_builds(self, builds, exe_df):
         all_commits_set = set([c.hash for c in self.repository_miner.get_all_commits()])
+        included_build_commits = set()
         builds.sort(key=lambda e: e.id)
         valid_builds = []
         for build in builds:
+            if build.commit_hash in included_build_commits:
+                continue
             if build.commit_hash not in all_commits_set:
                 continue
             metadata_path = (
@@ -513,6 +516,7 @@ class DatasetFactory:
             if build_exe_df.empty:
                 continue
             valid_builds.append(build)
+            included_build_commits.add(build.commit_hash)
         return valid_builds
 
     def create_dataset(self, builds, exe_records):
