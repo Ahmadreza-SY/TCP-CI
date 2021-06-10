@@ -88,11 +88,11 @@ class RepositoryMiner:
         self.commit_change_list_d = {}
         commits = self.get_all_commits()
         for commit in tqdm(commits, desc="Mining entity change history"):
-            tik_list(["TES_PRO_P", "COD_COV_PRO_P"])
+            tik_list(["TES_PRO_P", "COD_COV_PRO_P"], commit=commit.hash)
             entity_changes = self.compute_changed_entities(commit)
             change_history.extend(entity_changes)
             self.commit_change_list_d[commit.hash] = [ec.id for ec in entity_changes]
-            tok_list(["TES_PRO_P", "COD_COV_PRO_P"])
+            tok_list(["TES_PRO_P", "COD_COV_PRO_P"], commit=commit.hash)
 
         self.save_contributors()
         self.id_mapper.save_id_map()
@@ -303,9 +303,9 @@ class FileRepositoryMiner(RepositoryMiner):
         modifications = self.compute_modifications(commit)
         for mod in modifications:
             changed_file_id = self.get_changed_entity_id(mod)
-            tik("DET_COV_P")
+            tik("DET_COV_P", commit=commit.hash)
             commit_class = self.get_commit_class(commit.msg).value
-            tok("DET_COV_P")
+            tok("DET_COV_P", commit=commit.hash)
             changed_entity = EntityChange(
                 changed_file_id,
                 mod.added,

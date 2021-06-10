@@ -59,7 +59,6 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
         else:
             print("Execution history exists, skipping fetch.")
 
-        tik("REC_P")
         builds_df = pd.read_csv(
             self.config.output_path / "full_builds.csv",
             sep=self.config.unique_separator,
@@ -71,7 +70,6 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
         exe_df = pd.read_csv(test_exe_history_path, dtype={ExecutionRecord.JOB: str})
         exe_records = []
         full_exe_records = []
-        tok("REC_P")
 
         for build in tqdm(builds, desc="Creating execution records"):
             metadata_path = (
@@ -83,7 +81,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
                 if result.empty:
                     continue
 
-            tik("REC_P")
+            tik("REC_P", build.id)
             entities_df = pd.read_csv(metadata_path)
             build_exe_df = exe_df[(exe_df[ExecutionRecord.BUILD] == build.id)]
             if len(build_exe_df) == 0:
@@ -123,7 +121,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
                 if exe_record.job.endswith(".1"):
                     exe_records.append(exe_record)
                 full_exe_records.append(exe_record)
-            tok("REC_P")
+            tok("REC_P", build.id)
 
         full_exe_df = pd.DataFrame.from_records([e.to_dict() for e in full_exe_records])
         if len(full_exe_df) > 0:
