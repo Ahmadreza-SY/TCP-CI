@@ -179,7 +179,6 @@ class RankLibLearner:
             if feature_stats_out.returncode != 0:
                 print(f"Error in training:\n{feature_stats_out.stderr}")
                 sys.exit()
-            print(build_ds_path)
             self.extract_and_save_feature_stats(
                 feature_stats_out.stdout.decode("utf-8"), build_ds_path
             )
