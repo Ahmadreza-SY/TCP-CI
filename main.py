@@ -13,24 +13,8 @@ def dataset(args):
     DataCollectionService.create_dataset(args)
 
 
-def fetch_source_code_if_needed(args):
-    path = args.project_path
-    slug = args.project_slug
-    if path is None and slug is None:
-        print(
-            f"At least one of the --project-path or --project-slug should be provided."
-        )
-        sys.exit()
-    if path is None:
-        name = slug.split("/")[-1]
-        args.project_path = args.output_path / name
-        if args.project_path.exists():
-            return
-        clone_command = f"git clone https://github.com/{slug}.git {args.project_path}"
-        return_code = subprocess.call(clone_command, shell=True)
-        if return_code != 0:
-            print("Failure in fetching source code for GitHub!")
-            sys.exit()
+def learn(args):
+    DataCollectionService.learn(args)
 
 
 def add_common_arguments(parser):
@@ -65,7 +49,7 @@ def add_common_arguments(parser):
     parser.add_argument(
         "-o",
         "--output-path",
-        help="Specifies the directory to save resulting datasets.",
+        help="Specifies the directory to save and load resulting datasets.",
         type=Path,
         default=".",
     )
@@ -85,6 +69,10 @@ def main():
         "dataset",
         help="Create training dataset including all test case features for each CI cycle.",
     )
+    learn_parser = subparsers.add_parser(
+        "learn",
+        help="Perform learning experiments on collected features using RankLib.",
+    )
 
     add_common_arguments(dataset_parser)
     dataset_parser.set_defaults(func=dataset)
@@ -96,9 +84,17 @@ def main():
         required=True,
     )
 
+    learn_parser.set_defaults(func=learn)
+    learn_parser.add_argument(
+        "-o",
+        "--output-path",
+        help="Specifies the directory to save and load resulting datasets.",
+        type=Path,
+        default=".",
+    )
+
     args = parser.parse_args()
     args.output_path.mkdir(parents=True, exist_ok=True)
-    fetch_source_code_if_needed(args)
     args.unique_separator = "\t"
     args.func(args)
 
