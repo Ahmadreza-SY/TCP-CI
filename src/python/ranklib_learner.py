@@ -118,6 +118,8 @@ class RankLibLearner:
     def compute_napfd(self, pred):
         n = len(pred)
         m = len(pred[pred["verdict"] > 0])
+        if n <= 1:
+            return 1.0
         fault_pos_sum = np.sum(pred[pred["verdict"] > 0].index + 1)
         apfd = 1 - fault_pos_sum / (n * m) + 1 / (2 * n)
         napfd = (2 * n * apfd - m) / (2 * n - 2 * m)
@@ -132,6 +134,8 @@ class RankLibLearner:
 
     def compute_nrpa(self, l):
         k = len(l)
+        if k <= 1:
+            return 1.0
         min_rpa = self.compute_rpa([i + 1 for i in range(k)])
         max_rpa = self.compute_rpa([i + 1 for i in reversed(range(k))])
         rpa = self.compute_rpa(l)
