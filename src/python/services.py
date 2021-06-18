@@ -6,6 +6,7 @@ import sys
 from .timer import tik, tok, save_time_measures
 from .ranklib_learner import RankLibLearner
 import subprocess
+from .constants import *
 
 
 class DataCollectionService:
@@ -81,35 +82,37 @@ class DataCollectionService:
             return [], []
 
     @staticmethod
-    def learn(args):
+    def run_all_tsp_accuracy_experiments(args):
         dataset_path = args.output_path / "dataset.csv"
         if not dataset_path.exists():
             print("No dataset.csv found in the output directory. Aborting ...")
             sys.exit()
+        print(f"##### Running experiments for {dataset_path.parent.name} #####")
         learner = RankLibLearner(args)
-
-        print("Starting NRPA experiments")
-        nrpa_dataset = pd.read_csv(dataset_path)
-        nrpa_ranklib_ds = learner.convert_to_ranklib_dataset(nrpa_dataset)
-        traning_sets_path = args.output_path / "nrpa-full"
-        learner.create_ranklib_training_sets(nrpa_ranklib_ds, traning_sets_path)
-        nrpa_results = learner.train_and_test("nrpa", traning_sets_path)
-        nrpa_results.to_csv(traning_sets_path / "results.csv", index=False)
-
-        failed_builds = (
-            nrpa_dataset[nrpa_dataset[DatasetFactory.VERDICT] > 0][DatasetFactory.BUILD]
-            .unique()
-            .tolist()
+        dataset_df = pd.read_csv(dataset_path)
+        results_path = args.output_path / "tsp_accuracy_results"
+        print("***** Running full feature set experiments *****")
+        learner.run_accuracy_experiments(dataset_df, "full", results_path)
+        print()
+        print("***** Running w/o impacted feature set experiments *****")
+        learner.run_accuracy_experiments(
+            dataset_df.drop(IMPACTED_FEATURES, axis=1), "wo-impacted", results_path
         )
-        if len(failed_builds) > 1:
-            print("Starting APFD experiments")
-            apfd_dataset = nrpa_dataset[
-                nrpa_dataset[DatasetFactory.BUILD].isin(failed_builds)
-            ].reset_index()
-            apfd_ranklib_ds = learner.convert_to_ranklib_dataset(apfd_dataset)
-            traning_sets_path = args.output_path / "apfd-full"
-            learner.create_ranklib_training_sets(apfd_ranklib_ds, traning_sets_path)
-            apfd_results = learner.train_and_test("napfd", traning_sets_path)
-            apfd_results.to_csv(traning_sets_path / "results.csv", index=False)
-        else:
-            print("Not enough failed builds for APFD experiments.")
+        print()
+        feature_groups_names = {
+            "TES_COM": TES_COM,
+            "TES_PRO": TES_PRO,
+            "TES_CHN": TES_CHN,
+            "REC": REC,
+            "COV": COV,
+            "COD_COV_COM": COD_COV_COM,
+            "COD_COV_PRO": COD_COV_PRO,
+            "COD_COV_CHN": COD_COV_CHN,
+            "DET_COV": DET_COV,
+        }
+        for feature_group, names in feature_groups_names.items():
+            print(f"***** Running w/o {feature_group} feature set experiments *****")
+            learner.run_accuracy_experiments(
+                dataset_df.drop(names, axis=1), f"wo-{feature_group}", results_path
+            )
+            print()

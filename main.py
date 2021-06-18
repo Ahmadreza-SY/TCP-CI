@@ -1,9 +1,5 @@
 from src.python.services import *
-from src.python.module_factory import ModuleFactory
 import argparse
-import os
-import sys
-import subprocess
 from src.python.code_analyzer.code_analyzer import AnalysisLevel
 from src.python.entities.entity import Language
 from pathlib import Path
@@ -14,7 +10,7 @@ def dataset(args):
 
 
 def learn(args):
-    DataCollectionService.learn(args)
+    DataCollectionService.run_all_tsp_accuracy_experiments(args)
 
 
 def add_common_arguments(parser):

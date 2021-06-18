@@ -170,26 +170,32 @@ class RankLibLearner:
             test_path = build_ds_path / "test.txt"
             model_path = build_ds_path / "model.txt"
             pred_path = build_ds_path / "pred.txt"
-            train_command = f"java -jar {ranklib_path} -train {train_path} -ranker 0 -save {model_path} -metric2t NDCG@10 -silent"
-            feature_stats_command = f"java -cp {ranklib_path}:{math3_path} ciir.umass.edu.features.FeatureManager -feature_stats {model_path}"
-            pred_command = f"java -jar {ranklib_path} -load {model_path} -rank {test_path} -indri {pred_path}"
-            train_out = subprocess.run(train_command, shell=True, capture_output=True)
-            if train_out.returncode != 0:
-                print(f"Error in training:\n{train_out.stderr}")
-                sys.exit()
-            feature_stats_out = subprocess.run(
-                feature_stats_command, shell=True, capture_output=True
-            )
-            if feature_stats_out.returncode != 0:
-                print(f"Error in training:\n{feature_stats_out.stderr}")
-                sys.exit()
-            self.extract_and_save_feature_stats(
-                feature_stats_out.stdout.decode("utf-8"), build_ds_path
-            )
-            pred_out = subprocess.run(pred_command, shell=True, capture_output=True)
-            if pred_out.returncode != 0:
-                print(f"Error in predicting:\n{pred_out.stderr}")
-                sys.exit()
+
+            if not model_path.exists():
+                train_command = f"java -jar {ranklib_path} -train {train_path} -ranker 0 -save {model_path} -metric2t NDCG@10 -silent"
+                train_out = subprocess.run(
+                    train_command, shell=True, capture_output=True
+                )
+                if train_out.returncode != 0:
+                    print(f"Error in training:\n{train_out.stderr}")
+                    sys.exit()
+            if not (build_ds_path / "feature_stats.csv").exists():
+                feature_stats_command = f"java -cp {ranklib_path}:{math3_path} ciir.umass.edu.features.FeatureManager -feature_stats {model_path}"
+                feature_stats_out = subprocess.run(
+                    feature_stats_command, shell=True, capture_output=True
+                )
+                if feature_stats_out.returncode != 0:
+                    print(f"Error in training:\n{feature_stats_out.stderr}")
+                    sys.exit()
+                self.extract_and_save_feature_stats(
+                    feature_stats_out.stdout.decode("utf-8"), build_ds_path
+                )
+            if not pred_path.exists():
+                pred_command = f"java -jar {ranklib_path} -load {model_path} -rank {test_path} -indri {pred_path}"
+                pred_out = subprocess.run(pred_command, shell=True, capture_output=True)
+                if pred_out.returncode != 0:
+                    print(f"Error in predicting:\n{pred_out.stderr}")
+                    sys.exit()
             pred_df = pd.read_csv(
                 pred_path,
                 sep=" ",
@@ -218,3 +224,29 @@ class RankLibLearner:
         results_df = pd.DataFrame(results)
         results_df.sort_values("build", ignore_index=True, inplace=True)
         return results_df
+
+    def run_accuracy_experiments(self, dataset_df, name, results_path):
+        print("Starting NRPA experiments")
+        nrpa_ranklib_ds = self.convert_to_ranklib_dataset(dataset_df)
+        traning_sets_path = results_path / name / "nrpa"
+        self.create_ranklib_training_sets(nrpa_ranklib_ds, traning_sets_path)
+        nrpa_results = self.train_and_test("nrpa", traning_sets_path)
+        nrpa_results.to_csv(traning_sets_path / "results.csv", index=False)
+
+        failed_builds = (
+            dataset_df[dataset_df[DatasetFactory.VERDICT] > 0][DatasetFactory.BUILD]
+            .unique()
+            .tolist()
+        )
+        if len(failed_builds) > 1:
+            print("Starting APFD experiments")
+            napfd_dataset = dataset_df[
+                dataset_df[DatasetFactory.BUILD].isin(failed_builds)
+            ].reset_index()
+            napfd_ranklib_ds = self.convert_to_ranklib_dataset(napfd_dataset)
+            traning_sets_path = results_path / name / "napfd"
+            self.create_ranklib_training_sets(napfd_ranklib_ds, traning_sets_path)
+            apfd_results = self.train_and_test("napfd", traning_sets_path)
+            apfd_results.to_csv(traning_sets_path / "results.csv", index=False)
+        else:
+            print("Not enough failed builds for APFD experiments.")
