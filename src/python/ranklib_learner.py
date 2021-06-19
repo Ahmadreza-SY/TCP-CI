@@ -102,18 +102,20 @@ class RankLibLearner:
             test_ds = ranklib_ds[ranklib_ds["i_build"] == build]
             build_out_path = output_path / str(build)
             build_out_path.mkdir(parents=True, exist_ok=True)
-            train_ds.to_csv(
-                output_path / str(build) / "train.txt",
-                sep=" ",
-                header=False,
-                index=False,
-            )
-            test_ds.to_csv(
-                output_path / str(build) / "test.txt",
-                sep=" ",
-                header=False,
-                index=False,
-            )
+            if not (output_path / str(build) / "train.txt").exists():
+                train_ds.to_csv(
+                    output_path / str(build) / "train.txt",
+                    sep=" ",
+                    header=False,
+                    index=False,
+                )
+            if not (output_path / str(build) / "test.txt").exists():
+                test_ds.to_csv(
+                    output_path / str(build) / "test.txt",
+                    sep=" ",
+                    header=False,
+                    index=False,
+                )
 
     def compute_napfd(self, pred):
         n = len(pred)
@@ -242,7 +244,7 @@ class RankLibLearner:
             print("Starting APFD experiments")
             napfd_dataset = dataset_df[
                 dataset_df[DatasetFactory.BUILD].isin(failed_builds)
-            ].reset_index()
+            ].reset_index(drop=True)
             napfd_ranklib_ds = self.convert_to_ranklib_dataset(napfd_dataset)
             traning_sets_path = results_path / name / "napfd"
             self.create_ranklib_training_sets(napfd_ranklib_ds, traning_sets_path)
