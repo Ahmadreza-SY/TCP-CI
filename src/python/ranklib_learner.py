@@ -225,6 +225,8 @@ class RankLibLearner:
                 eval_score = self.compute_nrpa(pred_df["target"].values.tolist())
             elif eval_metric == "napfd":
                 eval_score = self.compute_napfd(pred_df)
+            if len(set(pred_df["score"].values.tolist())) == 1:
+                eval_score = 0.5
             results["build"].append(int(build_ds_path.name))
             results[eval_metric].append(eval_score)
         results_df = pd.DataFrame(results)
