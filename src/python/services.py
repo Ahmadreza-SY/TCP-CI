@@ -116,3 +116,24 @@ class DataCollectionService:
                 dataset_df.drop(names, axis=1), f"wo-{feature_group}", results_path
             )
             print()
+
+        test_code_features = TES_COM + TES_PRO + TES_CHN
+        test_execution_features = REC
+        test_coverage_features = COV + COD_COV_COM + COD_COV_PRO + COD_COV_CHN + DET_COV
+        high_level_feature_groups = {
+            "Code": test_code_features,
+            "Execution": test_execution_features,
+            "Coverage": test_coverage_features,
+        }
+        non_feature_cols = [
+            DatasetFactory.BUILD,
+            DatasetFactory.TEST,
+            DatasetFactory.VERDICT,
+            DatasetFactory.DURATION,
+        ]
+        for feature_group, names in high_level_feature_groups.items():
+            print(f"***** Running with {feature_group} feature set experiments *****")
+            learner.run_accuracy_experiments(
+                dataset_df[non_feature_cols + names], f"W-{feature_group}", results_path
+            )
+            print()

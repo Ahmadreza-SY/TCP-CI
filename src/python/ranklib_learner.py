@@ -198,20 +198,24 @@ class RankLibLearner:
                 if pred_out.returncode != 0:
                     print(f"Error in predicting:\n{pred_out.stderr}")
                     sys.exit()
-            pred_df = pd.read_csv(
-                pred_path,
-                sep=" ",
-                names=[
-                    "qid",
-                    "Q",
-                    "target",
-                    "verdict",
-                    "test",
-                    "build",
-                    "no.",
-                    "score",
-                    "indri",
-                ],
+            pred_df = (
+                pd.read_csv(
+                    pred_path,
+                    sep=" ",
+                    names=[
+                        "qid",
+                        "Q",
+                        "target",
+                        "verdict",
+                        "test",
+                        "build",
+                        "no.",
+                        "score",
+                        "indri",
+                    ],
+                )
+                # Shuffle predictions when predicted scores are equal to randomize the order.
+                .sample(frac=1).reset_index(drop=True)
             )
             pred_df.sort_values(
                 "score", ascending=False, inplace=True, ignore_index=True
