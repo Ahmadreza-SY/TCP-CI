@@ -141,6 +141,7 @@ class DataCollectionService:
 
     @staticmethod
     def run_decay_test_experiments(args):
+        print(f"Running decay tests for {args.output_path.name}")
         repo_miner_class = ModuleFactory.get_repository_miner(AnalysisLevel.FILE)
         repo_miner = repo_miner_class(args)
         change_history_df = repo_miner.load_entity_change_history()
@@ -156,3 +157,5 @@ class DataCollectionService:
         datasets_path = args.output_path / "decay_datasets"
         models_path = args.output_path / "tsp_accuracy_results" / "full"
         learner.run_decay_test_experiments(datasets_path, models_path)
+        print(f"All finished and results are saved at {datasets_path}")
+        print()
