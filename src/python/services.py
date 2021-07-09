@@ -7,6 +7,7 @@ from .timer import tik, tok, save_time_measures
 from .ranklib_learner import RankLibLearner
 import subprocess
 from .constants import *
+from .code_analyzer.code_analyzer import AnalysisLevel
 
 
 class DataCollectionService:
@@ -137,3 +138,21 @@ class DataCollectionService:
                 dataset_df[non_feature_cols + names], f"W-{feature_group}", results_path
             )
             print()
+
+    @staticmethod
+    def run_decay_test_experiments(args):
+        repo_miner_class = ModuleFactory.get_repository_miner(AnalysisLevel.FILE)
+        repo_miner = repo_miner_class(args)
+        change_history_df = repo_miner.load_entity_change_history()
+        dataset_factory = DatasetFactory(
+            args,
+            change_history_df,
+            repo_miner,
+        )
+        dataset_df = pd.read_csv(args.output_path / "dataset.csv")
+        dataset_factory.create_decay_datasets(dataset_df)
+
+        learner = RankLibLearner(args)
+        datasets_path = args.output_path / "decay_datasets"
+        models_path = args.output_path / "tsp_accuracy_results" / "full"
+        learner.run_decay_test_experiments(datasets_path, models_path)

@@ -10,6 +10,19 @@ import re
 
 
 class RankLibLearner:
+
+    PRED_COLS = [
+        "qid",
+        "Q",
+        "target",
+        "verdict",
+        "test",
+        "build",
+        "no.",
+        "score",
+        "indri",
+    ]
+
     def __init__(self, config):
         self.feature_id_map_path = config.output_path / "feature_id_map.csv"
         if self.feature_id_map_path.exists():
@@ -56,9 +69,7 @@ class RankLibLearner:
             normalized_dataset[col] = dataset[col]
         builds = normalized_dataset[DatasetFactory.BUILD].unique()
         ranklib_ds_rows = []
-        for i, build in tqdm(
-            list(enumerate(builds)), desc="Converting dataset to RankLib format"
-        ):
+        for i, build in list(enumerate(builds)):
             build_ds = normalized_dataset[
                 normalized_dataset[DatasetFactory.BUILD] == build
             ].copy()
@@ -202,17 +213,7 @@ class RankLibLearner:
                 pd.read_csv(
                     pred_path,
                     sep=" ",
-                    names=[
-                        "qid",
-                        "Q",
-                        "target",
-                        "verdict",
-                        "test",
-                        "build",
-                        "no.",
-                        "score",
-                        "indri",
-                    ],
+                    names=RankLibLearner.PRED_COLS,
                 )
                 # Shuffle predictions when predicted scores are equal to randomize the order.
                 .sample(frac=1).reset_index(drop=True)
@@ -258,3 +259,98 @@ class RankLibLearner:
             apfd_results.to_csv(traning_sets_path / "results.csv", index=False)
         else:
             print("Not enough failed builds for APFD experiments.")
+
+    def convert_decay_datasets(self, datasets_path, failed_build_ids):
+        decay_dataset_paths = list(p for p in datasets_path.glob("*") if p.is_dir())
+        for decay_dataset_path in tqdm(
+            decay_dataset_paths, desc="Converting decay datasets"
+        ):
+            current_build_failed = int(decay_dataset_path.name) in failed_build_ids
+            nrpa_test_file = decay_dataset_path / "nrpa_test.txt"
+            napfd_test_file = decay_dataset_path / "napfd_test.txt"
+            # Check whether converted files already exist
+            if current_build_failed:
+                if nrpa_test_file.exists() and napfd_test_file.exists():
+                    continue
+            else:
+                if nrpa_test_file.exists():
+                    continue
+
+            decay_ds_df = pd.read_csv(decay_dataset_path / "dataset.csv")
+            decay_ranklib_ds = self.convert_to_ranklib_dataset(decay_ds_df)
+            if not nrpa_test_file.exists():
+                decay_ranklib_ds.to_csv(
+                    nrpa_test_file,
+                    sep=" ",
+                    header=False,
+                    index=False,
+                )
+            failed_builds = (
+                decay_ranklib_ds[decay_ranklib_ds["i_verdict"] > 0]["i_build"]
+                .unique()
+                .tolist()
+            )
+            if len(failed_builds) > 0 and current_build_failed:
+                napfd_decay_ds = decay_ranklib_ds[
+                    decay_ranklib_ds["i_build"].isin(failed_builds)
+                ].reset_index(drop=True)
+                if not napfd_test_file.exists():
+                    napfd_decay_ds.to_csv(
+                        napfd_test_file,
+                        sep=" ",
+                        header=False,
+                        index=False,
+                    )
+
+    def test_decay_datasets(self, eval_model_paths, datasets_path, eval_metric):
+        ranklib_path = Path("assets") / "RankLib.jar"
+        for model_path in tqdm(eval_model_paths, desc=f"Testing {eval_metric} models"):
+            model_file = model_path / "model.txt"
+            test_file = datasets_path / model_path.name / f"{eval_metric}_test.txt"
+            pred_file = datasets_path / model_path.name / f"{eval_metric}_pred.txt"
+            pred_command = f"java -jar {ranklib_path} -load {model_file} -rank {test_file} -indri {pred_file}"
+            pred_out = subprocess.run(pred_command, shell=True, capture_output=True)
+            if pred_out.returncode != 0:
+                print(f"Error in predicting:\n{pred_out.stderr}")
+                sys.exit()
+            preds_df = (
+                pd.read_csv(
+                    pred_file,
+                    sep=" ",
+                    names=RankLibLearner.PRED_COLS,
+                )
+                # Shuffle predictions when predicted scores are equal to randomize the order.
+                .sample(frac=1).reset_index(drop=True)
+            )
+            pred_builds = preds_df["build"].unique().tolist()
+            results = {"build": [], eval_metric: []}
+            for pred_build in pred_builds:
+                pred_df = (
+                    preds_df[preds_df["build"] == pred_build]
+                    .copy()
+                    .reset_index(drop=True)
+                    .sort_values("score", ascending=False, ignore_index=True)
+                )
+                results["build"].append(pred_build)
+                if eval_metric == "nrpa":
+                    eval_score = self.compute_nrpa(pred_df["target"].values.tolist())
+                elif eval_metric == "napfd":
+                    eval_score = self.compute_napfd(pred_df)
+                results[eval_metric].append(eval_score)
+            pd.DataFrame(results).sort_values("build", ignore_index=True).to_csv(
+                datasets_path / model_path.name / f"{eval_metric}_results.csv",
+                index=False,
+            )
+
+    def run_decay_test_experiments(self, datasets_path, models_path):
+        napfd_models_path = list(
+            p for p in (models_path / "napfd").glob("*") if p.is_dir()
+        )
+        failed_build_ids = [int(model.name) for model in napfd_models_path]
+        self.convert_decay_datasets(datasets_path, failed_build_ids)
+
+        nrpa_models_path = list(
+            p for p in (models_path / "nrpa").glob("*") if p.is_dir()
+        )
+        self.test_decay_datasets(nrpa_models_path, datasets_path, "nrpa")
+        self.test_decay_datasets(napfd_models_path, datasets_path, "napfd")

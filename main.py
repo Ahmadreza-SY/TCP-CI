@@ -13,6 +13,10 @@ def learn(args):
     DataCollectionService.run_all_tsp_accuracy_experiments(args)
 
 
+def decay_test(args):
+    DataCollectionService.run_decay_test_experiments(args)
+
+
 def add_common_arguments(parser):
     parser.add_argument(
         "-p",
@@ -69,6 +73,10 @@ def main():
         "learn",
         help="Perform learning experiments on collected features using RankLib.",
     )
+    decay_test_parser = subparsers.add_parser(
+        "decay_test",
+        help="Perform ML ranking models decay test experiments on trained models.",
+    )
 
     add_common_arguments(dataset_parser)
     dataset_parser.set_defaults(func=dataset)
@@ -87,6 +95,22 @@ def main():
         help="Specifies the directory to save and load resulting datasets.",
         type=Path,
         default=".",
+    )
+
+    decay_test_parser.set_defaults(func=decay_test)
+    decay_test_parser.add_argument(
+        "-o",
+        "--output-path",
+        help="Specifies the directory to save and load resulting datasets.",
+        type=Path,
+        default=".",
+    )
+    decay_test_parser.add_argument(
+        "-p",
+        "--project-path",
+        help="Project's source code git repository path.",
+        type=Path,
+        default=None,
     )
 
     args = parser.parse_args()

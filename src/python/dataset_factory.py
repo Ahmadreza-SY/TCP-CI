@@ -2,13 +2,14 @@ from pydriller.git_repository import GitRepository
 from pydriller.domain.commit import DMMProperty
 from .entities.entity import Entity
 from .entities.entity_change import EntityChange
-from .entities.execution_record import ExecutionRecord, TestVerdict
+from .entities.execution_record import ExecutionRecord, TestVerdict, Build
 from tqdm import tqdm
 import pandas as pd
 from scipy.stats.mstats import gmean
 import numpy as np
 from .timer import tik, tok, tik_list, tok_list
 import sys
+from .constants import *
 
 pd.options.mode.chained_assignment = None
 
@@ -237,12 +238,13 @@ class DatasetFactory:
             )
         return metrics
 
-    def compute_all_metrics(self, build, ent_ids, ent_dict, prefix=""):
+    def compute_all_metrics(self, build, ent_ids, ent_dict, prefix="", chn_build=None):
         tik(f"{prefix}COM_M", build.id)
         static_metrics = self.compute_static_metrics(ent_ids, ent_dict)
         tok(f"{prefix}COM_M", build.id)
         tik(f"{prefix}CHN_M", build.id)
-        change_metrics = self.compute_change_metrics(build, ent_ids)
+        change_metrics_build = build if chn_build is None else chn_build
+        change_metrics = self.compute_change_metrics(change_metrics_build, ent_ids)
         tok(f"{prefix}CHN_M", build.id)
         tik(f"{prefix}PRO_M", build.id)
         process_metrics = self.compute_process_metrics(build, ent_ids)
@@ -345,12 +347,15 @@ class DatasetFactory:
             ] = last_exe_time
         return build_tc_features
 
-    def compute_test_coverage(self, build, test_ids, src_ids):
+    def compute_test_coverage(self, build, test_ids, src_ids, chn_build=None):
         dep_graph, tar_graph = self.repository_miner.analyze_commit_dependency(
             build, test_ids, src_ids
         )
-        build_commit = self.git_repository.get_commit(build.commit_hash)
-        modifications = self.repository_miner.compute_modifications(build_commit)
+        chn_commit_hash = (
+            build.commit_hash if chn_build is None else chn_build.commit_hash
+        )
+        chn_build_commit = self.git_repository.get_commit(chn_commit_hash)
+        modifications = self.repository_miner.compute_modifications(chn_build_commit)
         changed_ents = set()
         for mod in modifications:
             changed_entity_id = self.repository_miner.get_changed_entity_id(mod)
@@ -375,8 +380,11 @@ class DatasetFactory:
     def compute_cov_features(self, test_ids, coverage, build_tc_features):
         for test_id in test_ids:
             build_tc_features.setdefault(test_id, {})
-            changed_scores = [c[1] for c in coverage[test_id]["chn"]]
-            impacted_scores = [c[1] for c in coverage[test_id]["imp"]]
+            if test_id in coverage:
+                changed_scores = [c[1] for c in coverage[test_id]["chn"]]
+                impacted_scores = [c[1] for c in coverage[test_id]["imp"]]
+            else:
+                changed_scores, impacted_scores = [], []
 
             build_tc_features[test_id][f"COV_{DatasetFactory.CHN_SCORE_SUM}"] = sum(
                 changed_scores
@@ -416,28 +424,34 @@ class DatasetFactory:
     def get_all_affected_ents(self, test_ids, coverage):
         all_affected_ents = set()
         for test_id in test_ids:
-            all_affected_ents.update([c[0] for c in coverage[test_id]["chn"]])
-            all_affected_ents.update([c[0] for c in coverage[test_id]["imp"]])
+            if test_id in coverage:
+                all_affected_ents.update([c[0] for c in coverage[test_id]["chn"]])
+                all_affected_ents.update([c[0] for c in coverage[test_id]["imp"]])
         return list(all_affected_ents)
 
     def compute_cod_cov_features(
-        self, build, test_ids, coverage, ent_dict, build_tc_features
+        self, build, test_ids, coverage, ent_dict, build_tc_features, chn_build=None
     ):
         all_affected_ents = self.get_all_affected_ents(test_ids, coverage)
         ents_metrics = self.compute_all_metrics(
-            build, all_affected_ents, ent_dict, "COD_COV_"
+            build, all_affected_ents, ent_dict, "COD_COV_", chn_build
         )
 
         tik_list(["COD_COV_COM_M", "COD_COV_PRO_M", "COD_COV_CHN_M"], build.id)
         for test_id in test_ids:
-            changed_coverage = coverage[test_id]["chn"]
-            agg_changed_metrics = self.aggregate_cov_metrics(
-                changed_coverage, ents_metrics
-            )
-            impacted_coverage = coverage[test_id]["imp"]
-            agg_impacted_metrics = self.aggregate_cov_metrics(
-                impacted_coverage, ents_metrics
-            )
+            if test_id in coverage:
+                changed_coverage = coverage[test_id]["chn"]
+                agg_changed_metrics = self.aggregate_cov_metrics(
+                    changed_coverage, ents_metrics
+                )
+
+                impacted_coverage = coverage[test_id]["imp"]
+                agg_impacted_metrics = self.aggregate_cov_metrics(
+                    impacted_coverage, ents_metrics
+                )
+            else:
+                agg_changed_metrics = {}
+                agg_impacted_metrics = {}
 
             build_tc_features.setdefault(test_id, {})
             for metric in DatasetFactory.all_metrics:
@@ -474,10 +488,18 @@ class DatasetFactory:
             faults[ent_id][DatasetFactory.FAULTS] = ent_faults
 
         for test_id in test_ids:
-            changed_coverage = coverage[test_id]["chn"]
-            agg_changed_metrics = self.aggregate_cov_metrics(changed_coverage, faults)
-            impacted_coverage = coverage[test_id]["imp"]
-            agg_impacted_metrics = self.aggregate_cov_metrics(impacted_coverage, faults)
+            if test_id in coverage:
+                changed_coverage = coverage[test_id]["chn"]
+                agg_changed_metrics = self.aggregate_cov_metrics(
+                    changed_coverage, faults
+                )
+                impacted_coverage = coverage[test_id]["imp"]
+                agg_impacted_metrics = self.aggregate_cov_metrics(
+                    impacted_coverage, faults
+                )
+            else:
+                agg_changed_metrics = {}
+                agg_impacted_metrics = {}
 
             build_tc_features.setdefault(test_id, {})
             build_tc_features[test_id][
@@ -598,3 +620,111 @@ class DatasetFactory:
         dataset_df = dataset_df[cols]
         dataset_df.to_csv(self.config.output_path / "dataset.csv", index=False)
         print(f'Saved dataset to {self.config.output_path / "dataset.csv"}')
+
+    def create_decay_dataset(self, dataset_df, og_build, test_builds):
+        og_build_dataset = dataset_df[
+            dataset_df[DatasetFactory.BUILD] == og_build.id
+        ].copy()
+        og_build_tc_features = {}
+        for _, row in og_build_dataset.iterrows():
+            test_id = row[DatasetFactory.TEST]
+            og_build_tc_features[test_id] = {}
+            for f in TES_COM + TES_PRO:
+                og_build_tc_features[test_id][f] = row[f]
+        og_test_ids = og_build_dataset[DatasetFactory.TEST].values.tolist()
+        og_metadata_path = (
+            self.repository_miner.get_analysis_path(og_build.commit_hash)
+            / "metadata.csv"
+        )
+        og_entities_df = pd.read_csv(og_metadata_path)
+        og_entities_dict = {e[Entity.ID]: e for e in og_entities_df.to_dict("records")}
+        og_src_ids = list(
+            set(og_entities_df[Entity.ID].values.tolist()) - set(og_test_ids)
+        )
+
+        decay_dataset = []
+        for test_build in test_builds:
+            test_build_dataset = dataset_df[
+                dataset_df[DatasetFactory.BUILD] == test_build.id
+            ].copy()
+            test_ids = test_build_dataset[DatasetFactory.TEST].values.tolist()
+            og_coverage = self.compute_test_coverage(
+                og_build,
+                og_test_ids,
+                og_src_ids,
+                test_build,
+            )
+
+            test_build_tc_features = {}
+            self.compute_cov_features(test_ids, og_coverage, test_build_tc_features)
+            self.compute_cod_cov_features(
+                og_build,
+                test_ids,
+                og_coverage,
+                og_entities_dict,
+                test_build_tc_features,
+                test_build,
+            )
+            self.compute_det_features(
+                og_build, test_ids, og_coverage, test_build_tc_features
+            )
+
+            for _, row in test_build_dataset.iterrows():
+                features = {}
+                test_id = row[DatasetFactory.TEST]
+                features[DatasetFactory.BUILD] = test_build.id
+                features[DatasetFactory.TEST] = test_id
+                features[DatasetFactory.VERDICT] = row[DatasetFactory.VERDICT]
+                features[DatasetFactory.DURATION] = row[DatasetFactory.DURATION]
+                for f in TES_COM + TES_PRO:
+                    if test_id not in og_build_tc_features:
+                        features[f] = None
+                        continue
+                    features[f] = og_build_tc_features[test_id][f]
+                for f in TES_CHN + REC:
+                    features[f] = row[f]
+                for f in COV + COD_COV_COM + COD_COV_PRO + COD_COV_CHN + DET_COV:
+                    if test_id not in test_build_tc_features:
+                        features[f] = None
+                        continue
+                    features[f] = test_build_tc_features[test_id][f]
+                decay_dataset.append(features)
+
+        return decay_dataset
+
+    def create_decay_datasets(self, dataset_df):
+        all_builds_df = pd.read_csv(
+            self.config.output_path / "full_builds.csv",
+            usecols=["id", "commit_hash"],
+            sep="\t",
+        )
+        build_to_commit = dict(
+            zip(
+                all_builds_df["id"].values.tolist(),
+                all_builds_df["commit_hash"].values.tolist(),
+            )
+        )
+        builds = dataset_df[DatasetFactory.BUILD].unique()
+        builds = np.sort(builds)
+        decay_datasets_path = self.config.output_path / "decay_datasets"
+        decay_datasets_path.mkdir(parents=True, exist_ok=True)
+        for i, build_id in tqdm(
+            enumerate(builds), desc="Creating decay datasets", total=len(builds)
+        ):
+            if i == 0:
+                continue
+
+            dataset_path = decay_datasets_path / str(build_id)
+            if (dataset_path / "dataset.csv").exists():
+                continue
+
+            og_build = Build(build_id, build_to_commit[build_id])
+            test_builds = [
+                Build(test_build_id, build_to_commit[test_build_id])
+                for test_build_id in builds[i:]
+            ]
+            decay_dataset = self.create_decay_dataset(dataset_df, og_build, test_builds)
+            decay_dataset_df = pd.DataFrame.from_records(decay_dataset)
+            decay_dataset_df = decay_dataset_df.fillna(decay_dataset_df.mean())
+            dataset_path.mkdir(parents=True, exist_ok=True)
+            decay_dataset_df.to_csv(dataset_path / "dataset.csv", index=False)

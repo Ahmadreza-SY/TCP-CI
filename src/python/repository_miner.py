@@ -108,6 +108,19 @@ class RepositoryMiner:
         )
         return change_history_df
 
+    def load_entity_change_history(self):
+        change_history_df = pd.read_csv(
+            self.config.output_path / "entity_change_history.csv",
+            parse_dates=[EntityChange.COMMIT_DATE],
+        )
+        self.commit_change_list_d = dict(
+            change_history_df[[EntityChange.COMMIT, EntityChange.ID]]
+            .groupby(EntityChange.COMMIT)[EntityChange.ID]
+            .apply(list)
+            .items()
+        )
+        return change_history_df
+
     def get_analysis_path(self, commit_hash):
         return self.config.output_path / "analysis" / commit_hash
 
