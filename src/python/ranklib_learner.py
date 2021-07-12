@@ -73,12 +73,14 @@ class RankLibLearner:
             build_ds = normalized_dataset[
                 normalized_dataset[DatasetFactory.BUILD] == build
             ].copy()
+            build_ds["B_Verdict"] = (build_ds[DatasetFactory.VERDICT] > 0).astype(int)
             build_ds.sort_values(
-                [DatasetFactory.VERDICT, DatasetFactory.DURATION],
-                ascending=False,
+                ["B_Verdict", DatasetFactory.DURATION],
+                ascending=[False, True],
                 inplace=True,
                 ignore_index=True,
             )
+            build_ds.drop("B_Verdict", axis=1, inplace=True)
             build_ds["Target"] = -build_ds.index + len(build_ds)
             for _, record in build_ds.iterrows():
                 row_items = [int(record["Target"]), f"qid:{i+1}"]
@@ -192,6 +194,7 @@ class RankLibLearner:
                 if train_out.returncode != 0:
                     print(f"Error in training:\n{train_out.stderr}")
                     sys.exit()
+                train_path.unlink()
             if not (build_ds_path / "feature_stats.csv").exists():
                 feature_stats_command = f"java -cp {ranklib_path}:{math3_path} ciir.umass.edu.features.FeatureManager -feature_stats {model_path}"
                 feature_stats_out = subprocess.run(
