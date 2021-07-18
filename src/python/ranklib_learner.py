@@ -24,6 +24,7 @@ class RankLibLearner:
     ]
 
     def __init__(self, config):
+        self.output_path = config.output_path
         self.feature_id_map_path = config.output_path / "feature_id_map.csv"
         if self.feature_id_map_path.exists():
             feature_id_map_df = pd.read_csv(self.feature_id_map_path)
@@ -47,13 +48,7 @@ class RankLibLearner:
         feature_id_map_df = pd.DataFrame({"key": keys, "value": values})
         feature_id_map_df.to_csv(self.feature_id_map_path, index=False)
 
-    def convert_to_ranklib_dataset(self, dataset):
-        if dataset.empty:
-            return None
-        dataset = dataset.copy()
-        dataset[DatasetFactory.VERDICT] = dataset[DatasetFactory.VERDICT].apply(
-            lambda v: int(v > 0)
-        )
+    def normalize_dataset(self, dataset, scaler):
         non_feature_cols = [
             DatasetFactory.BUILD,
             DatasetFactory.TEST,
@@ -61,12 +56,26 @@ class RankLibLearner:
             DatasetFactory.DURATION,
         ]
         feature_dataset = dataset.drop(non_feature_cols, axis=1)
+        if scaler == None:
+            scaler = MinMaxScaler()
+            scaler.fit(feature_dataset)
         normalized_dataset = pd.DataFrame(
-            MinMaxScaler().fit_transform(feature_dataset),
+            scaler.transform(feature_dataset),
             columns=feature_dataset.columns,
         )
         for col in non_feature_cols:
             normalized_dataset[col] = dataset[col]
+
+        return normalized_dataset, feature_dataset, scaler
+
+    def convert_to_ranklib_dataset(self, dataset, scaler=None):
+        if dataset.empty:
+            return None
+        dataset = dataset.copy()
+        dataset[DatasetFactory.VERDICT] = dataset[DatasetFactory.VERDICT].apply(
+            lambda v: int(v > 0)
+        )
+        normalized_dataset, feature_dataset, _ = self.normalize_dataset(dataset, scaler)
         builds = normalized_dataset[DatasetFactory.BUILD].unique()
         ranklib_ds_rows = []
         for i, build in list(enumerate(builds)):
@@ -84,9 +93,12 @@ class RankLibLearner:
             build_ds["Target"] = -build_ds.index + len(build_ds)
             for _, record in build_ds.iterrows():
                 row_items = [int(record["Target"]), f"qid:{i+1}"]
+                row_feature_items = []
                 for _, f in enumerate(feature_dataset.columns):
                     fid = self.get_feature_id(f)
-                    row_items.append(f"{fid}:{record[f]}")
+                    row_feature_items.append(f"{fid}:{record[f]}")
+                row_feature_items.sort(key=lambda v: int(v.split(":")[0]))
+                row_items.extend(row_feature_items)
                 row_items.extend(
                     [
                         "#",
@@ -264,6 +276,22 @@ class RankLibLearner:
             print("Not enough failed builds for APFD experiments.")
 
     def convert_decay_datasets(self, datasets_path, failed_build_ids):
+        original_ds_df = pd.read_csv(self.output_path / "dataset.csv")
+        _, _, nrpa_scaler = self.normalize_dataset(original_ds_df, None)
+        failed_builds = (
+            original_ds_df[original_ds_df[DatasetFactory.VERDICT] > 0][
+                DatasetFactory.BUILD
+            ]
+            .unique()
+            .tolist()
+        )
+        napfd_scaler = None
+        if len(failed_builds) > 1:
+            original_napfd_ds_df = original_ds_df[
+                original_ds_df[DatasetFactory.BUILD].isin(failed_builds)
+            ].reset_index(drop=True)
+            _, _, napfd_scaler = self.normalize_dataset(original_napfd_ds_df, None)
+
         decay_dataset_paths = list(p for p in datasets_path.glob("*") if p.is_dir())
         for decay_dataset_path in tqdm(
             decay_dataset_paths, desc="Converting decay datasets"
@@ -280,7 +308,7 @@ class RankLibLearner:
                     continue
 
             decay_ds_df = pd.read_csv(decay_dataset_path / "dataset.csv")
-            decay_ranklib_ds = self.convert_to_ranklib_dataset(decay_ds_df)
+            decay_ranklib_ds = self.convert_to_ranklib_dataset(decay_ds_df, nrpa_scaler)
             if not nrpa_test_file.exists():
                 decay_ranklib_ds.to_csv(
                     nrpa_test_file,
@@ -288,17 +316,23 @@ class RankLibLearner:
                     header=False,
                     index=False,
                 )
+
             failed_builds = (
-                decay_ranklib_ds[decay_ranklib_ds["i_verdict"] > 0]["i_build"]
+                decay_ds_df[decay_ds_df[DatasetFactory.VERDICT] > 0][
+                    DatasetFactory.BUILD
+                ]
                 .unique()
                 .tolist()
             )
             if len(failed_builds) > 0 and current_build_failed:
-                napfd_decay_ds = decay_ranklib_ds[
-                    decay_ranklib_ds["i_build"].isin(failed_builds)
+                napfd_decay_ds = decay_ds_df[
+                    decay_ds_df[DatasetFactory.BUILD].isin(failed_builds)
                 ].reset_index(drop=True)
+                napfd_decay_ranklib_ds = self.convert_to_ranklib_dataset(
+                    napfd_decay_ds, napfd_scaler
+                )
                 if not napfd_test_file.exists():
-                    napfd_decay_ds.to_csv(
+                    napfd_decay_ranklib_ds.to_csv(
                         napfd_test_file,
                         sep=" ",
                         header=False,

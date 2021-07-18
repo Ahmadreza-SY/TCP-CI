@@ -671,7 +671,9 @@ class DatasetFactory:
             )
 
             test_build_tc_features = {}
-            self.compute_cov_features(test_ids, og_coverage, test_build_tc_features)
+            self.compute_cov_features(
+                test_build, test_ids, og_coverage, test_build_tc_features
+            )
             self.compute_cod_cov_features(
                 og_build,
                 test_ids,
