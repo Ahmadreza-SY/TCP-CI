@@ -160,6 +160,18 @@ def create_feature_group_time_df(time_df, build_time_df, valid_builds):
     )
 
 
+def create_impacted_time_df(build_time_df, valid_builds):
+    valid_build_time_df = build_time_df[build_time_df["Build"].isin(valid_builds)]
+    valid_impacted_time_df = (
+        valid_build_time_df[
+            valid_build_time_df["ProcessName"].isin(["Impacted", "Total"])
+        ]
+        .copy()
+        .reset_index(drop=True)
+    )
+    return valid_impacted_time_df
+
+
 def save_time_measures(output_path):
     time_df = create_time_measures_df()
     time_df.to_csv(f"{output_path}/time_measure.csv", index=False)
@@ -181,3 +193,6 @@ def save_time_measures(output_path):
         time_df, build_time_df, valid_builds
     )
     feature_group_time_df.to_csv(f"{output_path}/feature_group_time.csv", index=False)
+
+    impacted_time_df = create_impacted_time_df(build_time_df, valid_builds)
+    impacted_time_df.to_csv(f"{output_path}/impacted_time.csv", index=False)

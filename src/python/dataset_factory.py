@@ -360,9 +360,11 @@ class DatasetFactory:
         for mod in modifications:
             changed_entity_id = self.repository_miner.get_changed_entity_id(mod)
             changed_ents.add(changed_entity_id)
+        tik("Impacted", build.id)
         impacted_ents = set()
         for changed_ent in changed_ents:
             impacted_ents.update(dep_graph.get_dependencies(changed_ent))
+        tok("Impacted", build.id)
 
         coverage = {}
         for test_id in test_ids:
@@ -377,12 +379,14 @@ class DatasetFactory:
                     coverage[test_id]["imp"].append((target, cov_score))
         return coverage
 
-    def compute_cov_features(self, test_ids, coverage, build_tc_features):
+    def compute_cov_features(self, build, test_ids, coverage, build_tc_features):
         for test_id in test_ids:
             build_tc_features.setdefault(test_id, {})
             if test_id in coverage:
                 changed_scores = [c[1] for c in coverage[test_id]["chn"]]
+                tik("Impacted", build.id)
                 impacted_scores = [c[1] for c in coverage[test_id]["imp"]]
+                tok("Impacted", build.id)
             else:
                 changed_scores, impacted_scores = [], []
 
@@ -445,10 +449,12 @@ class DatasetFactory:
                     changed_coverage, ents_metrics
                 )
 
+                tik("Impacted", build.id)
                 impacted_coverage = coverage[test_id]["imp"]
                 agg_impacted_metrics = self.aggregate_cov_metrics(
                     impacted_coverage, ents_metrics
                 )
+                tok("Impacted", build.id)
             else:
                 agg_changed_metrics = {}
                 agg_impacted_metrics = {}
@@ -458,17 +464,20 @@ class DatasetFactory:
                 build_tc_features[test_id][
                     f"COD_COV_CHN_{metric}"
                 ] = DatasetFactory.DEFAULT_VALUE
+            for name, value in agg_changed_metrics.items():
+                build_tc_features[test_id][f"COD_COV_CHN_{name}"] = value
+
+            tik("Impacted", build.id)
             for metric in (
                 DatasetFactory.complexity_metrics + DatasetFactory.process_metrics
             ):
                 build_tc_features[test_id][
                     f"COD_COV_IMP_{metric}"
                 ] = DatasetFactory.DEFAULT_VALUE
-
-            for name, value in agg_changed_metrics.items():
-                build_tc_features[test_id][f"COD_COV_CHN_{name}"] = value
             for name, value in agg_impacted_metrics.items():
                 build_tc_features[test_id][f"COD_COV_IMP_{name}"] = value
+            tok("Impacted", build.id)
+
         tok_list(["COD_COV_COM_M", "COD_COV_PRO_M", "COD_COV_CHN_M"], build.id)
         return build_tc_features
 
@@ -493,10 +502,12 @@ class DatasetFactory:
                 agg_changed_metrics = self.aggregate_cov_metrics(
                     changed_coverage, faults
                 )
+                tik("Impacted", build.id)
                 impacted_coverage = coverage[test_id]["imp"]
                 agg_impacted_metrics = self.aggregate_cov_metrics(
                     impacted_coverage, faults
                 )
+                tok("Impacted", build.id)
             else:
                 agg_changed_metrics = {}
                 agg_impacted_metrics = {}
@@ -505,14 +516,16 @@ class DatasetFactory:
             build_tc_features[test_id][
                 f"DET_COV_CHN_{DatasetFactory.FAULTS}"
             ] = DatasetFactory.DEFAULT_VALUE
+            for name, value in agg_changed_metrics.items():
+                build_tc_features[test_id][f"DET_COV_CHN_{name}"] = value
+
+            tik("Impacted", build.id)
             build_tc_features[test_id][
                 f"DET_COV_IMP_{DatasetFactory.FAULTS}"
             ] = DatasetFactory.DEFAULT_VALUE
-
-            for name, value in agg_changed_metrics.items():
-                build_tc_features[test_id][f"DET_COV_CHN_{name}"] = value
             for name, value in agg_impacted_metrics.items():
                 build_tc_features[test_id][f"DET_COV_IMP_{name}"] = value
+            tok("Impacted", build.id)
 
         return build_tc_features
 
@@ -553,6 +566,7 @@ class DatasetFactory:
             sys.exit()
 
         for build in tqdm(valid_builds[1:], desc="Creating dataset"):
+            tik("Total", build.id)
             metadata_path = (
                 self.repository_miner.get_analysis_path(build.commit_hash)
                 / "metadata.csv"
@@ -594,7 +608,7 @@ class DatasetFactory:
                 build.id,
             )
             tik("COV_M", build.id)
-            self.compute_cov_features(test_ids, coverage, build_tc_features)
+            self.compute_cov_features(build, test_ids, coverage, build_tc_features)
             tok("COV_M", build.id)
             self.compute_cod_cov_features(
                 build, test_ids, coverage, entities_dict, build_tc_features
@@ -607,6 +621,7 @@ class DatasetFactory:
                 features[DatasetFactory.BUILD] = build.id
                 features[DatasetFactory.TEST] = test_id
                 dataset.append(features)
+            tok("Total", build.id)
         return dataset
 
     def create_and_save_dataset(self, builds, exe_records):

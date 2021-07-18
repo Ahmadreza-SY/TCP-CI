@@ -88,11 +88,11 @@ class RepositoryMiner:
         self.commit_change_list_d = {}
         commits = self.get_all_commits()
         for commit in tqdm(commits, desc="Mining entity change history"):
-            tik_list(["TES_PRO_P", "COD_COV_PRO_P"], commit=commit.hash)
+            tik_list(["TES_PRO_P", "COD_COV_PRO_P", "Total"], commit=commit.hash)
             entity_changes = self.compute_changed_entities(commit)
             change_history.extend(entity_changes)
             self.commit_change_list_d[commit.hash] = [ec.id for ec in entity_changes]
-            tok_list(["TES_PRO_P", "COD_COV_PRO_P"], commit=commit.hash)
+            tok_list(["TES_PRO_P", "COD_COV_PRO_P", "Total"], commit=commit.hash)
 
         self.save_contributors()
         self.id_mapper.save_id_map()
@@ -134,7 +134,7 @@ class RepositoryMiner:
                 self.git_repository.repo.git.checkout(build.commit_hash)
             except:
                 return pd.DataFrame()
-            tik_list(["TES_COM_P", "COD_COV_COM_P"], build.id)
+            tik_list(["TES_COM_P", "COD_COV_COM_P", "Total"], build.id)
             code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
             with code_analyzer(self.config, analysis_path) as analyzer:
                 entities = analyzer.get_entities()
@@ -149,7 +149,7 @@ class RepositoryMiner:
                         by=[Entity.ID], ignore_index=True, inplace=True
                     )
                     entities_df.to_csv(metadata_path, index=False)
-            tok_list(["TES_COM_P", "COD_COV_COM_P"], build.id)
+            tok_list(["TES_COM_P", "COD_COV_COM_P", "Total"], build.id)
             return entities_df
         else:
             return pd.read_csv(metadata_path)
@@ -221,21 +221,25 @@ class RepositoryMiner:
             )
             code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
             with code_analyzer(self.config, analysis_path) as analyzer:
-                dep_graph = analyzer.compute_dependency_graph(src_ids, src_ids)
                 tar_graph = analyzer.compute_dependency_graph(test_ids, src_ids)
-                dep_graph = self.compute_dependency_weights(dep_graph, co_changes)
                 tar_graph = self.compute_dependency_weights(tar_graph, co_changes)
-                dep_graph.save_graph(dep_path, self.config.unique_separator)
                 tar_graph.save_graph(
                     tar_path,
                     self.config.unique_separator,
                 )
+                tik("Impacted", build.id)
+                dep_graph = analyzer.compute_dependency_graph(src_ids, src_ids)
+                dep_graph = self.compute_dependency_weights(dep_graph, co_changes)
+                dep_graph.save_graph(dep_path, self.config.unique_separator)
+                tok("Impacted", build.id)
             return dep_graph, tar_graph
         else:
-            dep_graph = DepGraph()
             tar_graph = DepGraph()
-            dep_graph.load_graph(dep_path, self.config.unique_separator)
             tar_graph.load_graph(tar_path, self.config.unique_separator)
+            tik("Impacted", build.id)
+            dep_graph = DepGraph()
+            dep_graph.load_graph(dep_path, self.config.unique_separator)
+            tok("Impacted", build.id)
             return dep_graph, tar_graph
 
     def get_changed_entities(self, commit):

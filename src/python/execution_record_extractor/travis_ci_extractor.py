@@ -8,7 +8,7 @@ import subprocess
 import shlex
 import re
 from tqdm import tqdm
-from ..timer import tik, tok
+from ..timer import tik_list, tok_list
 
 
 class LogType(Enum):
@@ -81,7 +81,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
                 if result.empty:
                     continue
 
-            tik("REC_P", build.id)
+            tik_list(["REC_P", "Total"], build.id)
             entities_df = pd.read_csv(metadata_path)
             build_exe_df = exe_df[(exe_df[ExecutionRecord.BUILD] == build.id)]
             if len(build_exe_df) == 0:
@@ -121,7 +121,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
                 if exe_record.job.endswith(".1"):
                     exe_records.append(exe_record)
                 full_exe_records.append(exe_record)
-            tok("REC_P", build.id)
+            tok_list(["REC_P", "Total"], build.id)
 
         full_exe_df = pd.DataFrame.from_records([e.to_dict() for e in full_exe_records])
         if len(full_exe_df) > 0:
