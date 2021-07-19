@@ -309,6 +309,9 @@ class RankLibLearner:
                     continue
 
             decay_ds_df = pd.read_csv(decay_dataset_path / "dataset.csv")
+            # Reoder columns for MinMaxScaler
+            decay_ds_df = decay_ds_df[original_ds_df.columns.tolist()]
+
             decay_ranklib_ds = self.convert_to_ranklib_dataset(decay_ds_df, nrpa_scaler)
             if not nrpa_test_file.exists():
                 decay_ranklib_ds.to_csv(
