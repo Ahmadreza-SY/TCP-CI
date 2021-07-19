@@ -7,6 +7,7 @@ from pathlib import Path
 from tqdm import tqdm
 import sys
 import re
+import os
 
 
 class RankLibLearner:
@@ -206,7 +207,7 @@ class RankLibLearner:
                 if train_out.returncode != 0:
                     print(f"Error in training:\n{train_out.stderr}")
                     sys.exit()
-                train_path.unlink()
+                os.remove(str(train_path))
             if not (build_ds_path / "feature_stats.csv").exists():
                 feature_stats_command = f"java -cp {ranklib_path}:{math3_path} ciir.umass.edu.features.FeatureManager -feature_stats {model_path}"
                 feature_stats_out = subprocess.run(
