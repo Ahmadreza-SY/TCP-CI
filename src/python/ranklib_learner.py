@@ -242,7 +242,7 @@ class RankLibLearner:
                 eval_score = self.compute_nrpa(pred_df["target"].values.tolist())
             elif eval_metric == "napfd":
                 eval_score = self.compute_napfd(pred_df)
-            if len(set(pred_df["score"].values.tolist())) == 1:
+            if len(set(pred_df["score"].values.tolist())) == 1 and len(pred_df) > 1:
                 eval_score = 0.5
             results["build"].append(int(build_ds_path.name))
             results[eval_metric].append(eval_score)
@@ -377,6 +377,8 @@ class RankLibLearner:
                     eval_score = self.compute_nrpa(pred_df["target"].values.tolist())
                 elif eval_metric == "napfd":
                     eval_score = self.compute_napfd(pred_df)
+                if len(set(pred_df["score"].values.tolist())) == 1 and len(pred_df) > 1:
+                    eval_score = 0.5
                 results[eval_metric].append(eval_score)
             pd.DataFrame(results).sort_values("build", ignore_index=True).to_csv(
                 datasets_path / model_path.name / f"{eval_metric}_results.csv",
