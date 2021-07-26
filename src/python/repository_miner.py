@@ -121,18 +121,37 @@ class RepositoryMiner:
         )
         return change_history_df
 
-    def get_analysis_path(self, commit_hash):
-        return self.config.output_path / "analysis" / commit_hash
+    def get_analysis_path(self, build):
+        return self.config.output_path / "analysis" / str(build.id)
 
-    def analyze_commit_statically(self, build):
+    def get_build_commits(self, build):
+        commits = []
+        for commit_hash in build.commits:
+            try:
+                commit = self.git_repository.get_commit(commit_hash)
+                commits.append(commit)
+            except:
+                pass
+
+        commits.sort(key=lambda c: c.committer_date, reverse=True)
+        return commits
+
+    def checkout_build_commit(self, build):
+        for commit in build.commits:
+            try:
+                self.git_repository.repo.git.checkout(commit)
+                return True
+            except:
+                pass
+        return False
+
+    def analyze_build_statically(self, build):
         from .module_factory import ModuleFactory
 
-        analysis_path = self.get_analysis_path(build.commit_hash)
+        analysis_path = self.get_analysis_path(build)
         metadata_path = analysis_path / "metadata.csv"
         if not metadata_path.exists():
-            try:
-                self.git_repository.repo.git.checkout(build.commit_hash)
-            except:
+            if not self.checkout_build_commit(build):
                 return pd.DataFrame()
             tik_list(["TES_COM_P", "COD_COV_COM_P", "Total"], build.id)
             code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
@@ -186,10 +205,10 @@ class RepositoryMiner:
             graph.add_weights(edge_start, dep_weights)
         return graph
 
-    def compute_co_changes(self, commit_hash, ent_ids_set):
+    def compute_co_changes(self, build, ent_ids_set):
         if self.commit_change_list_d is None:
             self.compute_and_save_entity_change_history()
-        build_commit = self.git_repository.get_commit(commit_hash)
+        build_commit = self.get_build_commits(build)[0]
         commit_date = build_commit.committer_date
         self.checkout_default_branch()
         repository = RepositoryMining(str(self.config.project_path), to=commit_date)
@@ -208,17 +227,13 @@ class RepositoryMiner:
 
         test_ids.sort()
         src_ids.sort()
-        analysis_path = self.get_analysis_path(build.commit_hash)
+        analysis_path = self.get_analysis_path(build)
         dep_path = analysis_path / "dep.csv"
         tar_path = analysis_path / "tar.csv"
         if (not dep_path.exists()) or (not tar_path.exists()):
-            try:
-                self.git_repository.repo.git.checkout(build.commit_hash)
-            except:
+            if not self.checkout_build_commit(build):
                 return pd.DataFrame(), pd.DataFrame()
-            co_changes = self.compute_co_changes(
-                build.commit_hash, set(test_ids) | set(src_ids)
-            )
+            co_changes = self.compute_co_changes(build, set(test_ids) | set(src_ids))
             code_analyzer = ModuleFactory.get_code_analyzer(self.config.level)
             with code_analyzer(self.config, analysis_path) as analyzer:
                 tar_graph = analyzer.compute_dependency_graph(test_ids, src_ids)
@@ -276,19 +291,20 @@ class RepositoryMiner:
 
 
 class FileRepositoryMiner(RepositoryMiner):
-    def compute_dmm(self, modification, dmm_prop):
+    def compute_dmm(self, modifications, dmm_prop):
         lr_changes = 0
         hr_changes = 0
-        diff_parsed = modification.diff_parsed
-        for method in modification.changed_methods:
-            added_changes, deleted_changes = self.compute_function_diff(
-                method, diff_parsed
-            )
-            changes = len(added_changes) + len(deleted_changes)
-            if method.is_low_risk(dmm_prop):
-                lr_changes += changes
-            else:
-                hr_changes += changes
+        for modification in modifications:
+            diff_parsed = modification.diff_parsed
+            for method in modification.changed_methods:
+                added_changes, deleted_changes = self.compute_function_diff(
+                    method, diff_parsed
+                )
+                changes = len(added_changes) + len(deleted_changes)
+                if method.is_low_risk(dmm_prop):
+                    lr_changes += changes
+                else:
+                    hr_changes += changes
         if (lr_changes + hr_changes) == 0:
             return None
         else:

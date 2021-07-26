@@ -51,7 +51,7 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
         test_exe_history_path = self.config.output_path / "test_execution_history.csv"
         if not test_exe_history_path.exists():
             log_type = self.get_log_type().value
-            command = f"ruby ./src/ruby/exe_feature_extractor.rb {self.config.project_slug} {log_type} {self.config.output_path.as_posix()}"
+            command = f"ruby -W0 ./src/ruby/exe_feature_extractor.rb {self.config.project_slug} {log_type} {self.config.output_path.as_posix()}"
             return_code = subprocess.call(shlex.split(command))
             if return_code != 0:
                 print(f"failed ruby test execution history command: {command}")
@@ -66,18 +66,17 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
         builds_df.sort_values(by=["id"], inplace=True, ignore_index=True)
         builds = []
         for i, row in builds_df.iterrows():
-            builds.append(Build(row["id"], row["commit_hash"]))
+            builds.append(Build(row["id"], [row["commit_hash"]]))
         exe_df = pd.read_csv(test_exe_history_path, dtype={ExecutionRecord.JOB: str})
         exe_records = []
         full_exe_records = []
 
         for build in tqdm(builds, desc="Creating execution records"):
             metadata_path = (
-                self.repository_miner.get_analysis_path(build.commit_hash)
-                / "metadata.csv"
+                self.repository_miner.get_analysis_path(build) / "metadata.csv"
             )
             if not metadata_path.exists():
-                result = self.repository_miner.analyze_commit_statically(build)
+                result = self.repository_miner.analyze_build_statically(build)
                 if result.empty:
                     continue
 

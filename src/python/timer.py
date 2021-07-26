@@ -85,10 +85,11 @@ def create_build_time_measures_df(commit_build_map):
             if pname.startswith("$TMP"):
                 continue
             if commit in commit_build_map:
-                build_time = build_time_measures[commit_build_map[commit]]
-                if pname not in build_time:
-                    build_time[pname] = 0.0
-                build_time[pname] = build_time[pname] + d
+                for build_id in commit_build_map[commit]:
+                    build_time = build_time_measures[build_id]
+                    if pname not in build_time:
+                        build_time[pname] = 0.0
+                    build_time[pname] = build_time[pname] + d
 
     builds = []
     process_names = []
@@ -172,7 +173,7 @@ def create_impacted_time_df(build_time_df, valid_builds):
     return valid_impacted_time_df
 
 
-def save_time_measures(output_path):
+def save_time_measures(output_path, builds):
     time_df = create_time_measures_df()
     time_df.to_csv(f"{output_path}/time_measure.csv", index=False)
 
@@ -181,13 +182,13 @@ def save_time_measures(output_path):
         .unique()
         .tolist()
     )
-    builds_df = pd.read_csv(
-        f"{output_path}/full_builds.csv", usecols=["id", "commit_hash"], sep="\t"
-    )
     commit_build_map = {}
-    for _, row in builds_df.iterrows():
-        if row["id"] in valid_builds:
-            commit_build_map[row["commit_hash"]] = row["id"]
+    for build in builds:
+        if build.id in valid_builds:
+            for commit_hash in build.commits:
+                if commit_hash not in commit_build_map:
+                    commit_build_map[commit_hash] = []
+                commit_build_map[commit_hash].append(build.id)
     build_time_df = create_build_time_measures_df(commit_build_map)
     feature_group_time_df = create_feature_group_time_df(
         time_df, build_time_df, valid_builds

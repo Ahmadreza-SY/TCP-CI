@@ -60,7 +60,7 @@ class DataCollectionService:
         dataset_factory.create_and_save_dataset(builds, records)
         tok("Feature Extraction")
         tok("Dataset Collection")
-        save_time_measures(args.output_path)
+        save_time_measures(args.output_path, builds)
 
     @staticmethod
     def fetch_and_save_execution_history(args, repo_miner):

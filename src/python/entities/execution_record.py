@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import List
 
 
 class TestVerdict(Enum):
@@ -36,10 +37,6 @@ class ExecutionRecord:
 
 
 class Build:
-    def __init__(self, id: int, commit_hash: str):
+    def __init__(self, id: int, commits: List[str]):
         self.id = id
-        self.commit_hash = commit_hash
-
-    def to_dict(self):
-        d = {"id": self.id, "commit_hash": self.commit_hash}
-        return d
+        self.commits = commits

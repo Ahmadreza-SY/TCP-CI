@@ -123,7 +123,6 @@ class DatasetFactory:
         repository_miner,
     ):
         self.config = config
-        self.git_repository = GitRepository(config.project_path)
         self.change_history = change_history
         self.repository_miner = repository_miner
 
@@ -152,37 +151,64 @@ class DatasetFactory:
 
     def compute_change_metrics(self, build, ent_ids):
         metrics = {}
-        commit = self.git_repository.get_commit(build.commit_hash)
-        modifications = self.repository_miner.compute_modifications(commit)
+        commits = self.repository_miner.get_build_commits(build)
+        all_merge = all([commit.merge for commit in commits])
+        modifications = []
+        for commit in commits:
+            if not all_merge and commit.merge:
+                continue
+            modifications.extend(self.repository_miner.compute_modifications(commit))
+
         mod_map = {}
         for mod in modifications:
             changed_entity_id = self.repository_miner.get_changed_entity_id(mod)
-            mod_map[changed_entity_id] = mod
+            if changed_entity_id not in mod_map:
+                mod_map[changed_entity_id] = []
+            mod_map[changed_entity_id].append(mod)
 
         for ent_id in ent_ids:
             if ent_id not in mod_map:
                 continue
 
-            ent_mod = mod_map[ent_id]
+            ent_mods = mod_map[ent_id]
             metrics.setdefault(ent_id, {})
-            metrics[ent_id][DatasetFactory.LINES_ADDED] = ent_mod.added
-            metrics[ent_id][DatasetFactory.LINES_DELETED] = ent_mod.removed
-            diff = ent_mod.diff_parsed
-            added_lines = list(map(lambda p: p[0], diff["added"]))
-            metrics[ent_id][
-                DatasetFactory.ADDED_CHANGE_SCATTERING
-            ] = self.repository_miner.compute_scattering(added_lines)
-            deleted_lines = list(map(lambda p: p[0], diff["deleted"]))
-            metrics[ent_id][
-                DatasetFactory.DELETED_CHANGE_SCATTERING
-            ] = self.repository_miner.compute_scattering(deleted_lines)
+            metrics[ent_id][DatasetFactory.LINES_ADDED] = sum(
+                [ent_mod.added for ent_mod in ent_mods]
+            )
+            metrics[ent_id][DatasetFactory.LINES_DELETED] = sum(
+                [ent_mod.removed for ent_mod in ent_mods]
+            )
 
-            dmm_size = self.repository_miner.compute_dmm(ent_mod, DMMProperty.UNIT_SIZE)
+            added_scatterings = []
+            for ent_mod in ent_mods:
+                diff = ent_mod.diff_parsed
+                added_lines = list(map(lambda p: p[0], diff["added"]))
+                added_scatterings.append(
+                    self.repository_miner.compute_scattering(added_lines)
+                )
+            metrics[ent_id][DatasetFactory.ADDED_CHANGE_SCATTERING] = max(
+                added_scatterings
+            )
+
+            deleted_scatterings = []
+            for ent_mod in ent_mods:
+                diff = ent_mod.diff_parsed
+                deleted_lines = list(map(lambda p: p[0], diff["deleted"]))
+                deleted_scatterings.append(
+                    self.repository_miner.compute_scattering(deleted_lines)
+                )
+            metrics[ent_id][DatasetFactory.DELETED_CHANGE_SCATTERING] = max(
+                deleted_scatterings
+            )
+
+            dmm_size = self.repository_miner.compute_dmm(
+                ent_mods, DMMProperty.UNIT_SIZE
+            )
             dmm_complexity = self.repository_miner.compute_dmm(
-                ent_mod, DMMProperty.UNIT_COMPLEXITY
+                ent_mods, DMMProperty.UNIT_COMPLEXITY
             )
             dmm_interfacing = self.repository_miner.compute_dmm(
-                ent_mod, DMMProperty.UNIT_INTERFACING
+                ent_mods, DMMProperty.UNIT_INTERFACING
             )
             if dmm_size is not None:
                 metrics[ent_id][DatasetFactory.DMM_SIZE] = dmm_size
@@ -194,7 +220,7 @@ class DatasetFactory:
 
     def compute_process_metrics(self, build, ent_ids):
         metrics = {}
-        commit = self.git_repository.get_commit(build.commit_hash)
+        commit = self.repository_miner.get_build_commits(build)[0]
         build_change_history = self.change_history[
             (self.change_history[EntityChange.COMMIT_DATE] <= commit.committer_date)
             & (self.change_history[EntityChange.MERGE_COMMIT] == False)
@@ -351,11 +377,12 @@ class DatasetFactory:
         dep_graph, tar_graph = self.repository_miner.analyze_commit_dependency(
             build, test_ids, src_ids
         )
-        chn_commit_hash = (
-            build.commit_hash if chn_build is None else chn_build.commit_hash
-        )
-        chn_build_commit = self.git_repository.get_commit(chn_commit_hash)
-        modifications = self.repository_miner.compute_modifications(chn_build_commit)
+        chn_build = build if chn_build is None else chn_build
+        chn_commits = self.repository_miner.get_build_commits(chn_build)
+        modifications = []
+        for commit in chn_commits:
+            modifications.extend(self.repository_miner.compute_modifications(commit))
+
         changed_ents = set()
         for mod in modifications:
             changed_entity_id = self.repository_miner.get_changed_entity_id(mod)
@@ -482,7 +509,7 @@ class DatasetFactory:
         return build_tc_features
 
     def compute_det_features(self, build, test_ids, coverage, build_tc_features):
-        commit = self.git_repository.get_commit(build.commit_hash)
+        commit = self.repository_miner.get_build_commits(build)[0]
         build_change_history = self.change_history[
             (self.change_history[EntityChange.COMMIT_DATE] <= commit.committer_date)
             & (self.change_history[EntityChange.MERGE_COMMIT] == False)
@@ -530,28 +557,20 @@ class DatasetFactory:
         return build_tc_features
 
     def select_valid_builds(self, builds, exe_df):
-        all_commits_set = set([c.hash for c in self.repository_miner.get_all_commits()])
-        included_build_commits = set()
         builds.sort(key=lambda e: e.id)
         valid_builds = []
         for build in builds:
-            if build.commit_hash in included_build_commits:
-                continue
-            if build.commit_hash not in all_commits_set:
-                continue
             metadata_path = (
-                self.repository_miner.get_analysis_path(build.commit_hash)
-                / "metadata.csv"
+                self.repository_miner.get_analysis_path(build) / "metadata.csv"
             )
             if not metadata_path.exists():
-                result = self.repository_miner.analyze_commit_statically(build)
+                result = self.repository_miner.analyze_build_statically(build)
                 if result.empty:
                     continue
             build_exe_df = exe_df[exe_df[ExecutionRecord.BUILD] == build.id]
             if build_exe_df.empty:
                 continue
             valid_builds.append(build)
-            included_build_commits.add(build.commit_hash)
         return valid_builds
 
     def create_dataset(self, builds, exe_records):
@@ -568,8 +587,7 @@ class DatasetFactory:
         for build in tqdm(valid_builds[1:], desc="Creating dataset"):
             tik("Total", build.id)
             metadata_path = (
-                self.repository_miner.get_analysis_path(build.commit_hash)
-                / "metadata.csv"
+                self.repository_miner.get_analysis_path(build) / "metadata.csv"
             )
             entities_df = pd.read_csv(metadata_path)
             entities_dict = {e[Entity.ID]: e for e in entities_df.to_dict("records")}
@@ -648,8 +666,7 @@ class DatasetFactory:
                 og_build_tc_features[test_id][f] = row[f]
         og_test_ids = og_build_dataset[DatasetFactory.TEST].values.tolist()
         og_metadata_path = (
-            self.repository_miner.get_analysis_path(og_build.commit_hash)
-            / "metadata.csv"
+            self.repository_miner.get_analysis_path(og_build) / "metadata.csv"
         )
         og_entities_df = pd.read_csv(og_metadata_path)
         og_entities_dict = {e[Entity.ID]: e for e in og_entities_df.to_dict("records")}
@@ -710,6 +727,7 @@ class DatasetFactory:
         return decay_dataset
 
     def create_decay_datasets(self, dataset_df):
+        # TODO: change to work with all CI extractors!
         all_builds_df = pd.read_csv(
             self.config.output_path / "full_builds.csv",
             usecols=["id", "commit_hash"],
