@@ -65,11 +65,12 @@ class DataCollectionService:
     @staticmethod
     def fetch_and_save_execution_history(args, repo_miner):
         execution_record_extractor = ModuleFactory.get_execution_record_extractor(
-            args.language
+            args.language, args.rtp_path
         )(args, repo_miner)
         exe_path = args.output_path / "exe.csv"
         exe_records, builds = execution_record_extractor.fetch_execution_records()
         exe_df = pd.DataFrame.from_records([e.to_dict() for e in exe_records])
+        builds_df = pd.DataFrame.from_records([b.to_dict() for b in builds])
         if len(exe_df) > 0:
             exe_df.sort_values(
                 by=[ExecutionRecord.BUILD, ExecutionRecord.JOB],
@@ -77,6 +78,12 @@ class DataCollectionService:
                 inplace=True,
             )
             exe_df.to_csv(exe_path, index=False)
+            builds_df.sort_values(
+                by=["started_at"],
+                ignore_index=True,
+                inplace=True,
+            )
+            builds_df.to_csv(args.output_path / "builds.csv", index=False)
             return exe_records, builds
         else:
             print("No execution history collected!")

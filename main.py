@@ -17,7 +17,7 @@ def decay_test(args):
     DataCollectionService.run_decay_test_experiments(args)
 
 
-def add_common_arguments(parser):
+def add_dataset_parser_arguments(parser):
     parser.add_argument(
         "-p",
         "--project-path",
@@ -29,6 +29,13 @@ def add_common_arguments(parser):
         "-s",
         "--project-slug",
         help="The project's GitHub slug, e.g., apache/commons.",
+        default=None,
+    )
+    parser.add_argument(
+        "-r",
+        "--rtp-path",
+        help="Path to RTP-Torrent's dataset root directory.",
+        type=Path,
         default=None,
     )
     parser.add_argument(
@@ -60,6 +67,13 @@ def add_common_arguments(parser):
         choices=list(Language),
         required=True,
     )
+    parser.add_argument(
+        "-n",
+        "--build-window",
+        help="Specifies the number of recent builds to consider for computing features.",
+        type=int,
+        required=True,
+    )
 
 
 def main():
@@ -78,15 +92,8 @@ def main():
         help="Perform ML ranking models decay test experiments on trained models.",
     )
 
-    add_common_arguments(dataset_parser)
+    add_dataset_parser_arguments(dataset_parser)
     dataset_parser.set_defaults(func=dataset)
-    dataset_parser.add_argument(
-        "-n",
-        "--build-window",
-        help="Specifies the number of recent builds to consider for computing features.",
-        type=int,
-        required=True,
-    )
 
     learn_parser.set_defaults(func=learn)
     learn_parser.add_argument(

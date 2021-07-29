@@ -62,11 +62,12 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
         builds_df = pd.read_csv(
             self.config.output_path / "full_builds.csv",
             sep=self.config.unique_separator,
+            parse_dates=["start_time"],
         )
         builds_df.sort_values(by=["id"], inplace=True, ignore_index=True)
         builds = []
         for i, row in builds_df.iterrows():
-            builds.append(Build(row["id"], [row["commit_hash"]]))
+            builds.append(Build(row["id"], [row["commit_hash"]], row["start_time"]))
         exe_df = pd.read_csv(test_exe_history_path, dtype={ExecutionRecord.JOB: str})
         exe_records = []
         full_exe_records = []

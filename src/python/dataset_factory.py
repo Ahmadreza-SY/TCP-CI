@@ -557,7 +557,7 @@ class DatasetFactory:
         return build_tc_features
 
     def select_valid_builds(self, builds, exe_df):
-        builds.sort(key=lambda e: e.id)
+        builds.sort(key=lambda e: e.started_at)
         valid_builds = []
         for build in builds:
             metadata_path = (
@@ -740,6 +740,7 @@ class DatasetFactory:
             )
         )
         builds = dataset_df[DatasetFactory.BUILD].unique()
+        # TODO: sort by date
         builds = np.sort(builds)
         decay_datasets_path = self.config.output_path / "decay_datasets"
         decay_datasets_path.mkdir(parents=True, exist_ok=True)

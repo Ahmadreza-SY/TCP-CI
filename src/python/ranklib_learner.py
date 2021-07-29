@@ -120,6 +120,7 @@ class RankLibLearner:
 
     def create_ranklib_training_sets(self, ranklib_ds, output_path):
         builds = ranklib_ds["i_build"].unique()
+        # TODO: sort by date
         builds = np.sort(builds)
         for i, build in tqdm(list(enumerate(builds)), desc="Creating training sets"):
             if i == 0:
@@ -247,6 +248,7 @@ class RankLibLearner:
             results["build"].append(int(build_ds_path.name))
             results[eval_metric].append(eval_score)
         results_df = pd.DataFrame(results)
+        # TODO: sort by date
         results_df.sort_values("build", ignore_index=True, inplace=True)
         return results_df
 
@@ -380,6 +382,7 @@ class RankLibLearner:
                 if len(set(pred_df["score"].values.tolist())) == 1 and len(pred_df) > 1:
                     eval_score = 0.5
                 results[eval_metric].append(eval_score)
+            # TODO: sort by date
             pd.DataFrame(results).sort_values("build", ignore_index=True).to_csv(
                 datasets_path / model_path.name / f"{eval_metric}_results.csv",
                 index=False,
