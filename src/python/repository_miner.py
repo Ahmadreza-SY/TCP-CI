@@ -16,6 +16,7 @@ from itertools import combinations
 import sys
 import re
 from .timer import tik, tok, tik_list, tok_list
+import os
 
 
 class RepositoryMiner:
@@ -297,6 +298,11 @@ class RepositoryMiner:
         if commit_msg and commit_msg != "":
             commit_cls = self.commit_clf.classify_commit(commit_msg)
         return commit_cls
+
+    def clean_analysis_path(self):
+        analysis_path = self.config.output_path / "analysis"
+        for udb_file in analysis_path.glob("*/*.udb"):
+            os.remove(str(udb_file))
 
 
 class FileRepositoryMiner(RepositoryMiner):
