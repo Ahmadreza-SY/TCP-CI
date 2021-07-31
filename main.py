@@ -72,7 +72,8 @@ def add_dataset_parser_arguments(parser):
         "--build-window",
         help="Specifies the number of recent builds to consider for computing features.",
         type=int,
-        required=True,
+        required=False,
+        default=6,
     )
 
 

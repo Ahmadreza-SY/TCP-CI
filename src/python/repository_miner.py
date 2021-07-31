@@ -36,7 +36,7 @@ class RepositoryMiner:
             self.max_id = 0
         self.id_mapper = IdMapper(config.output_path)
         self.git_repository = GitRepository(str(self.config.project_path))
-        self.commit_change_list_d = None
+        self.commit_change_list_d = {}
         self.commit_clf = CommitClassifier()
 
     def checkout_default_branch(self):
@@ -85,9 +85,10 @@ class RepositoryMiner:
 
     def compute_entity_change_history(self) -> List[EntityChange]:
         change_history = []
-        self.commit_change_list_d = {}
         commits = self.get_all_commits()
         for commit in tqdm(commits, desc="Mining entity change history"):
+            if commit.hash in self.commit_change_list_d:
+                continue
             tik_list(["TES_PRO_P", "COD_COV_PRO_P", "Total"], commit=commit.hash)
             entity_changes = self.compute_changed_entities(commit)
             change_history.extend(entity_changes)
@@ -99,12 +100,20 @@ class RepositoryMiner:
         return change_history
 
     def compute_and_save_entity_change_history(self) -> List[EntityChange]:
+        history_path = self.config.output_path / "entity_change_history.csv"
+        e_change_history_df = None
+        if history_path.exists():
+            e_change_history_df = self.load_entity_change_history()
         change_history = self.compute_entity_change_history()
         change_history_df = pd.DataFrame.from_records(
             [ch.to_dict() for ch in change_history]
         )
-        change_history_df.to_csv(
-            self.config.output_path / "entity_change_history.csv", index=False
+        if e_change_history_df is not None:
+            change_history_df = pd.concat(
+                [change_history_df, e_change_history_df], ignore_index=True
+            )
+        change_history_df.sort_values(EntityChange.COMMIT_DATE).to_csv(
+            history_path, index=False
         )
         return change_history_df
 
@@ -206,7 +215,7 @@ class RepositoryMiner:
         return graph
 
     def compute_co_changes(self, build, ent_ids_set):
-        if self.commit_change_list_d is None:
+        if not self.commit_change_list_d:
             self.compute_and_save_entity_change_history()
         build_commit = self.get_build_commits(build)[0]
         commit_date = build_commit.committer_date

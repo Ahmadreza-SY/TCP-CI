@@ -87,23 +87,45 @@ class DatasetFactory:
     # All Metrics
     all_metrics = complexity_metrics + process_metrics + change_metrics
     # REC Features
-    AVG_EXE_TIME = "AvgExeTime"
-    MAX_EXE_TIME = "MaxExeTime"
     AGE = "Age"
-    FAIL_RATE = "FailRate"
-    ASSERT_RATE = "AssertRate"
-    EXC_RATE = "ExcRate"
+    LAST_FAILURE_AGE = "LastFailureAge"
+    LAST_TRANSITION_AGE = "LastTransitionAge"
+    RECENT_AVG_EXE_TIME = "RecentAvgExeTime"
+    RECENT_MAX_EXE_TIME = "RecentMaxExeTime"
+    RECENT_FAIL_RATE = "RecentFailRate"
+    RECENT_ASSERT_RATE = "RecentAssertRate"
+    RECENT_EXC_RATE = "RecentExcRate"
+    RECENT_TRANSITION_RATE = "RecentTransitionRate"
+    TOTAL_AVG_EXE_TIME = "TotalAvgExeTime"
+    TOTAL_MAX_EXE_TIME = "TotalMaxExeTime"
+    TOTAL_FAIL_RATE = "TotalFailRate"
+    TOTAL_ASSERT_RATE = "TotalAssertRate"
+    TOTAL_EXC_RATE = "TotalExcRate"
+    TOTAL_TRANSITION_RATE = "TotalTransitionRate"
     LAST_VERDICT = "LastVerdict"
     LAST_EXE_TIME = "LastExeTime"
+    MAX_TEST_FILE_FAIL_RATE = "MaxTestFileFailRate"
+    MAX_TEST_FILE_TRANSITION_RATE = "MaxTestFileTransitionRate"
     rec_features = [
-        AVG_EXE_TIME,
-        MAX_EXE_TIME,
         AGE,
-        FAIL_RATE,
-        ASSERT_RATE,
-        EXC_RATE,
+        LAST_FAILURE_AGE,
+        LAST_TRANSITION_AGE,
+        RECENT_AVG_EXE_TIME,
+        RECENT_MAX_EXE_TIME,
+        RECENT_FAIL_RATE,
+        RECENT_ASSERT_RATE,
+        RECENT_EXC_RATE,
+        RECENT_TRANSITION_RATE,
+        TOTAL_AVG_EXE_TIME,
+        TOTAL_MAX_EXE_TIME,
+        TOTAL_FAIL_RATE,
+        TOTAL_ASSERT_RATE,
+        TOTAL_EXC_RATE,
+        TOTAL_TRANSITION_RATE,
         LAST_VERDICT,
         LAST_EXE_TIME,
+        MAX_TEST_FILE_FAIL_RATE,
+        MAX_TEST_FILE_TRANSITION_RATE,
     ]
     # COV Features
     CHN_SCORE_SUM = "ChnScoreSum"
@@ -296,27 +318,108 @@ class DatasetFactory:
                 build_tc_features[test_id][f"TES_{name}"] = value
         return build_tc_features
 
-    def compute_rec_features(self, test_entities, exe_df, build, build_tc_features):
-        exe_df.sort_values(by=[ExecutionRecord.BUILD], inplace=True, ignore_index=True)
+    def compute_max_test_file_rates(self, test_exe_history, build, change_history):
+        max_test_file_fail_rate = -1
+        max_test_file_transition_rate = -1
+        build_changed_ents = (
+            change_history[change_history["BuildId"] == build.id][EntityChange.ID]
+            .unique()
+            .tolist()
+        )
+        # Max Test File Fail Rate
+        test_failed_builds = (
+            test_exe_history[test_exe_history[ExecutionRecord.VERDICT] > 0][
+                ExecutionRecord.BUILD
+            ]
+            .unique()
+            .tolist()
+        )
+        if len(test_failed_builds) > 0:
+            test_file_fail_history = (
+                change_history[
+                    (change_history[EntityChange.ID].isin(build_changed_ents))
+                    & (change_history["BuildId"].isin(test_failed_builds))
+                ]
+                .groupby([EntityChange.ID, "BuildId"], as_index=False)
+                .first()
+            )
+            if len(test_file_fail_history) == 0:
+                max_test_file_fail_rate = 0.0
+            else:
+                max_fail_freq = (
+                    test_file_fail_history.groupby([EntityChange.ID], as_index=False)
+                    .count()["BuildId"]
+                    .max()
+                )
+                max_test_file_fail_rate = max_fail_freq / len(test_failed_builds)
+
+        # Max Test File Transition Rate
+        test_transition_builds = (
+            test_exe_history[test_exe_history["transition"] > 0][ExecutionRecord.BUILD]
+            .unique()
+            .tolist()
+        )
+        if len(test_transition_builds) > 0:
+            test_file_transition_history = (
+                change_history[
+                    (change_history[EntityChange.ID].isin(build_changed_ents))
+                    & (change_history["BuildId"].isin(test_transition_builds))
+                ]
+                .groupby([EntityChange.ID, "BuildId"], as_index=False)
+                .first()
+            )
+            if len(test_file_transition_history) == 0:
+                max_test_file_transition_rate = 0.0
+            else:
+                max_transition_freq = (
+                    test_file_transition_history.groupby(
+                        [EntityChange.ID], as_index=False
+                    )
+                    .count()["BuildId"]
+                    .max()
+                )
+                max_test_file_transition_rate = max_transition_freq / len(
+                    test_transition_builds
+                )
+
+        return max_test_file_fail_rate, max_test_file_transition_rate
+
+    def compute_rec_features(
+        self, test_entities, exe_df, build, build_change_history, build_tc_features
+    ):
         window = self.config.build_window
         builds = exe_df[ExecutionRecord.BUILD].unique().tolist()
 
         for test in test_entities.to_dict("records"):
             test_id = test[Entity.ID]
             build_tc_features.setdefault(test_id, {})
-            build_result = exe_df[
+
+            test_result = exe_df[
                 (exe_df[ExecutionRecord.BUILD] == build.id)
                 & (exe_df[ExecutionRecord.TEST] == test_id)
             ].iloc[0]
-            build_tc_features[test_id][DatasetFactory.VERDICT] = build_result[
+            test_exe_df = (
+                exe_df[exe_df[ExecutionRecord.TEST] == test_id]
+                .copy()
+                .reset_index(drop=True)
+            )
+            test_exe_history = (
+                test_exe_df[
+                    test_exe_df.index
+                    < test_exe_df[test_exe_df[ExecutionRecord.BUILD] == build.id].index[
+                        0
+                    ]
+                ]
+                .copy()
+                .reset_index(drop=True)
+            )
+            build_tc_features[test_id][DatasetFactory.VERDICT] = test_result[
                 ExecutionRecord.VERDICT
             ]
-            build_tc_features[test_id][DatasetFactory.DURATION] = build_result[
+            build_tc_features[test_id][DatasetFactory.DURATION] = test_result[
                 ExecutionRecord.DURATION
             ]
-            test_exe_df = exe_df[exe_df[ExecutionRecord.TEST] == test_id]
-            test_exe_window = test_exe_df[test_exe_df[ExecutionRecord.BUILD] < build.id]
-            if test_exe_window.empty:
+            if test_exe_history.empty:
                 for feature in DatasetFactory.rec_features:
                     build_tc_features[test_id][
                         f"REC_{feature}"
@@ -324,53 +427,127 @@ class DatasetFactory:
                 build_tc_features[test_id][f"REC_{DatasetFactory.AGE}"] = 0
                 continue
 
-            if len(test_exe_window) > window:
-                test_exe_window = test_exe_window.tail(window)
-            first_build_id = test_exe_df.iloc[0][ExecutionRecord.BUILD]
-            last_build_id = build_result[ExecutionRecord.BUILD]
+            test_exe_history["transition"] = (
+                test_exe_history[ExecutionRecord.VERDICT].diff().fillna(0) != 0
+            ).astype(int)
+            test_exe_recent = test_exe_history.tail(window)
 
-            avg_exe_time = test_exe_window[ExecutionRecord.DURATION].mean()
-            max_exe_time = test_exe_window[ExecutionRecord.DURATION].max()
+            first_build_id = test_exe_df.iloc[0][ExecutionRecord.BUILD]
+            last_build_id = test_result[ExecutionRecord.BUILD]
             age = builds.index(last_build_id) - builds.index(first_build_id)
-            fail_rate = len(
-                test_exe_window[
-                    test_exe_window[ExecutionRecord.VERDICT]
+            last_failure_age = -1
+            last_transition_age = -1
+            if len(test_exe_history[test_exe_history[ExecutionRecord.VERDICT] > 0]) > 0:
+                last_failure_age = (
+                    test_exe_history.index.max()
+                    - test_exe_history[
+                        test_exe_history[ExecutionRecord.VERDICT] > 0
+                    ].index[-1]
+                )
+            if len(test_exe_history[test_exe_history["transition"] > 0]) > 0:
+                last_transition_age = (
+                    test_exe_history.index.max()
+                    - test_exe_history[test_exe_history["transition"] > 0].index[-1]
+                )
+
+            # Recent
+            recent_avg_duration = test_exe_recent[ExecutionRecord.DURATION].mean()
+            recent_max_duration = test_exe_recent[ExecutionRecord.DURATION].max()
+            recent_fail_rate = len(
+                test_exe_recent[
+                    test_exe_recent[ExecutionRecord.VERDICT]
                     != TestVerdict.SUCCESS.value
                 ]
-            ) / len(test_exe_window)
-            assert_rate = len(
-                test_exe_window[
-                    test_exe_window[ExecutionRecord.VERDICT]
+            ) / len(test_exe_recent)
+            recent_assert_rate = len(
+                test_exe_recent[
+                    test_exe_recent[ExecutionRecord.VERDICT]
                     == TestVerdict.ASSERTION.value
                 ]
-            ) / len(test_exe_window)
-            exc_rate = len(
-                test_exe_window[
-                    test_exe_window[ExecutionRecord.VERDICT]
+            ) / len(test_exe_recent)
+            recent_exc_rate = len(
+                test_exe_recent[
+                    test_exe_recent[ExecutionRecord.VERDICT]
                     == TestVerdict.EXCEPTION.value
                 ]
-            ) / len(test_exe_window)
-            last_verdict = test_exe_window.tail(1)[ExecutionRecord.VERDICT].values[0]
-            last_exe_time = test_exe_window.tail(1)[ExecutionRecord.DURATION].values[0]
+            ) / len(test_exe_recent)
+            recent_transition_rate = len(
+                test_exe_recent[test_exe_recent["transition"] == 1]
+            ) / len(test_exe_recent)
+            # Total
+            total_avg_duration = test_exe_history[ExecutionRecord.DURATION].mean()
+            total_max_duration = test_exe_history[ExecutionRecord.DURATION].max()
+            total_fail_rate = len(
+                test_exe_history[
+                    test_exe_history[ExecutionRecord.VERDICT]
+                    != TestVerdict.SUCCESS.value
+                ]
+            ) / len(test_exe_history)
+            total_assert_rate = len(
+                test_exe_history[
+                    test_exe_history[ExecutionRecord.VERDICT]
+                    == TestVerdict.ASSERTION.value
+                ]
+            ) / len(test_exe_history)
+            total_exc_rate = len(
+                test_exe_history[
+                    test_exe_history[ExecutionRecord.VERDICT]
+                    == TestVerdict.EXCEPTION.value
+                ]
+            ) / len(test_exe_history)
+            total_transition_rate = len(
+                test_exe_history[test_exe_history["transition"] == 1]
+            ) / len(test_exe_history)
 
-            build_tc_features[test_id][
-                f"REC_{DatasetFactory.AVG_EXE_TIME}"
-            ] = avg_exe_time
-            build_tc_features[test_id][
-                f"REC_{DatasetFactory.MAX_EXE_TIME}"
-            ] = max_exe_time
-            build_tc_features[test_id][f"REC_{DatasetFactory.AGE}"] = age
-            build_tc_features[test_id][f"REC_{DatasetFactory.FAIL_RATE}"] = fail_rate
-            build_tc_features[test_id][
-                f"REC_{DatasetFactory.ASSERT_RATE}"
-            ] = assert_rate
-            build_tc_features[test_id][f"REC_{DatasetFactory.EXC_RATE}"] = exc_rate
-            build_tc_features[test_id][
-                f"REC_{DatasetFactory.LAST_VERDICT}"
-            ] = last_verdict
-            build_tc_features[test_id][
-                f"REC_{DatasetFactory.LAST_EXE_TIME}"
-            ] = last_exe_time
+            last_verdict = test_exe_recent.tail(1)[ExecutionRecord.VERDICT].values[0]
+            last_duration = test_exe_recent.tail(1)[ExecutionRecord.DURATION].values[0]
+
+            (
+                max_test_file_fail_rate,
+                max_test_file_transition_rate,
+            ) = self.compute_max_test_file_rates(
+                test_exe_history, build, build_change_history
+            )
+
+            features = [
+                # Age
+                (f"REC_{DatasetFactory.AGE}", age),
+                (f"REC_{DatasetFactory.LAST_FAILURE_AGE}", last_failure_age),
+                (f"REC_{DatasetFactory.LAST_TRANSITION_AGE}", last_transition_age),
+                # Recent
+                (f"REC_{DatasetFactory.RECENT_AVG_EXE_TIME}", recent_avg_duration),
+                (f"REC_{DatasetFactory.RECENT_MAX_EXE_TIME}", recent_max_duration),
+                (f"REC_{DatasetFactory.RECENT_FAIL_RATE}", recent_fail_rate),
+                (f"REC_{DatasetFactory.RECENT_ASSERT_RATE}", recent_assert_rate),
+                (f"REC_{DatasetFactory.RECENT_EXC_RATE}", recent_exc_rate),
+                (
+                    f"REC_{DatasetFactory.RECENT_TRANSITION_RATE}",
+                    recent_transition_rate,
+                ),
+                # Total
+                (f"REC_{DatasetFactory.TOTAL_AVG_EXE_TIME}", total_avg_duration),
+                (f"REC_{DatasetFactory.TOTAL_MAX_EXE_TIME}", total_max_duration),
+                (f"REC_{DatasetFactory.TOTAL_FAIL_RATE}", total_fail_rate),
+                (f"REC_{DatasetFactory.TOTAL_ASSERT_RATE}", total_assert_rate),
+                (f"REC_{DatasetFactory.TOTAL_EXC_RATE}", total_exc_rate),
+                (f"REC_{DatasetFactory.TOTAL_TRANSITION_RATE}", total_transition_rate),
+                # Last
+                (f"REC_{DatasetFactory.LAST_VERDICT}", last_verdict),
+                (f"REC_{DatasetFactory.LAST_EXE_TIME}", last_duration),
+                # Test File Rates
+                (
+                    f"REC_{DatasetFactory.MAX_TEST_FILE_FAIL_RATE}",
+                    max_test_file_fail_rate,
+                ),
+                (
+                    f"REC_{DatasetFactory.MAX_TEST_FILE_TRANSITION_RATE}",
+                    max_test_file_transition_rate,
+                ),
+            ]
+
+            for name, value in features:
+                build_tc_features[test_id][name] = value
+
         return build_tc_features
 
     def compute_test_coverage(self, build, test_ids, src_ids, chn_build=None):
@@ -573,12 +750,41 @@ class DatasetFactory:
             valid_builds.append(build)
         return valid_builds
 
+    def create_build_change_history(self, builds):
+        build_ids = []
+        commits = []
+        for b in builds:
+            for c in b.commits:
+                build_ids.append(b.id)
+                commits.append(c)
+        builds_df = pd.DataFrame({"BuildId": build_ids, EntityChange.COMMIT: commits})
+        build_change_history = self.change_history.merge(
+            builds_df, on=EntityChange.COMMIT, how="left"
+        )
+        build_change_history["BuildId"] = (
+            build_change_history["BuildId"].fillna(-1).astype(int)
+        )
+        return build_change_history
+
     def create_dataset(self, builds, exe_records):
         exe_df = pd.DataFrame.from_records([e.to_dict() for e in exe_records])
         dataset = []
         valid_builds = self.select_valid_builds(builds, exe_df)
+        build_time_dict = dict(
+            zip([b.id for b in valid_builds], [b.started_at for b in valid_builds])
+        )
         valid_build_ids = [b.id for b in valid_builds]
-        exe_df = exe_df[exe_df[ExecutionRecord.BUILD].isin(valid_build_ids)]
+        exe_df = (
+            exe_df[exe_df[ExecutionRecord.BUILD].isin(valid_build_ids)]
+            .copy()
+            .reset_index(drop=True)
+        )
+        exe_df["started_at"] = exe_df[ExecutionRecord.BUILD].apply(
+            lambda b: build_time_dict[b]
+        )
+        exe_df.sort_values("started_at", ignore_index=True, inplace=True)
+        exe_df.drop("started_at", inplace=True, axis=1)
+        build_change_history = self.create_build_change_history(builds)
 
         if len(valid_builds) == 0:
             print("No valid builds found. Aborting ...")
@@ -601,7 +807,9 @@ class DatasetFactory:
             build_tc_features = {}
             self.compute_tes_features(build, test_ids, entities_dict, build_tc_features)
             tik("REC_M", build.id)
-            self.compute_rec_features(tests_df, exe_df, build, build_tc_features)
+            self.compute_rec_features(
+                tests_df, exe_df, build, build_change_history, build_tc_features
+            )
             tok("REC_M", build.id)
 
             tik_list(
