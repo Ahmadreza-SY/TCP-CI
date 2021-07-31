@@ -1,6 +1,7 @@
 import pandas as pd
 from .entities.execution_record import ExecutionRecord
 from .dataset_factory import DatasetFactory
+from .feature_extractor.feature import Feature
 from .module_factory import ModuleFactory
 import sys
 from .timer import tik, tok, save_time_measures
@@ -134,10 +135,10 @@ class DataCollectionService:
             "Coverage": test_coverage_features,
         }
         non_feature_cols = [
-            DatasetFactory.BUILD,
-            DatasetFactory.TEST,
-            DatasetFactory.VERDICT,
-            DatasetFactory.DURATION,
+            Feature.BUILD,
+            Feature.TEST,
+            Feature.VERDICT,
+            Feature.DURATION,
         ]
         for feature_group, names in high_level_feature_groups.items():
             print(f"***** Running with {feature_group} feature set experiments *****")

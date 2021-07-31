@@ -2,7 +2,7 @@ from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
 import numpy as np
 import subprocess
-from .dataset_factory import DatasetFactory
+from .feature_extractor.feature import Feature
 from pathlib import Path
 from tqdm import tqdm
 import sys
@@ -51,10 +51,10 @@ class RankLibLearner:
 
     def normalize_dataset(self, dataset, scaler):
         non_feature_cols = [
-            DatasetFactory.BUILD,
-            DatasetFactory.TEST,
-            DatasetFactory.VERDICT,
-            DatasetFactory.DURATION,
+            Feature.BUILD,
+            Feature.TEST,
+            Feature.VERDICT,
+            Feature.DURATION,
         ]
         feature_dataset = dataset.drop(non_feature_cols, axis=1)
         if scaler == None:
@@ -73,19 +73,17 @@ class RankLibLearner:
         if dataset.empty:
             return None
         dataset = dataset.copy()
-        dataset[DatasetFactory.VERDICT] = dataset[DatasetFactory.VERDICT].apply(
-            lambda v: int(v > 0)
-        )
+        dataset[Feature.VERDICT] = dataset[Feature.VERDICT].apply(lambda v: int(v > 0))
         normalized_dataset, feature_dataset, _ = self.normalize_dataset(dataset, scaler)
-        builds = normalized_dataset[DatasetFactory.BUILD].unique()
+        builds = normalized_dataset[Feature.BUILD].unique()
         ranklib_ds_rows = []
         for i, build in list(enumerate(builds)):
             build_ds = normalized_dataset[
-                normalized_dataset[DatasetFactory.BUILD] == build
+                normalized_dataset[Feature.BUILD] == build
             ].copy()
-            build_ds["B_Verdict"] = (build_ds[DatasetFactory.VERDICT] > 0).astype(int)
+            build_ds["B_Verdict"] = (build_ds[Feature.VERDICT] > 0).astype(int)
             build_ds.sort_values(
-                ["B_Verdict", DatasetFactory.DURATION],
+                ["B_Verdict", Feature.DURATION],
                 ascending=[False, True],
                 inplace=True,
                 ignore_index=True,
@@ -104,9 +102,9 @@ class RankLibLearner:
                     [
                         "#",
                         int(record["Target"]),
-                        int(record[DatasetFactory.VERDICT]),
-                        int(record[DatasetFactory.TEST]),
-                        int(record[DatasetFactory.BUILD]),
+                        int(record[Feature.VERDICT]),
+                        int(record[Feature.TEST]),
+                        int(record[Feature.BUILD]),
                     ]
                 )
                 ranklib_ds_rows.append(row_items)
@@ -261,14 +259,12 @@ class RankLibLearner:
         nrpa_results.to_csv(traning_sets_path / "results.csv", index=False)
 
         failed_builds = (
-            dataset_df[dataset_df[DatasetFactory.VERDICT] > 0][DatasetFactory.BUILD]
-            .unique()
-            .tolist()
+            dataset_df[dataset_df[Feature.VERDICT] > 0][Feature.BUILD].unique().tolist()
         )
         if len(failed_builds) > 1:
             print("Starting APFD experiments")
             napfd_dataset = dataset_df[
-                dataset_df[DatasetFactory.BUILD].isin(failed_builds)
+                dataset_df[Feature.BUILD].isin(failed_builds)
             ].reset_index(drop=True)
             napfd_ranklib_ds = self.convert_to_ranklib_dataset(napfd_dataset)
             traning_sets_path = results_path / name / "napfd"
@@ -282,16 +278,14 @@ class RankLibLearner:
         original_ds_df = pd.read_csv(self.output_path / "dataset.csv")
         _, _, nrpa_scaler = self.normalize_dataset(original_ds_df, None)
         failed_builds = (
-            original_ds_df[original_ds_df[DatasetFactory.VERDICT] > 0][
-                DatasetFactory.BUILD
-            ]
+            original_ds_df[original_ds_df[Feature.VERDICT] > 0][Feature.BUILD]
             .unique()
             .tolist()
         )
         napfd_scaler = None
         if len(failed_builds) > 1:
             original_napfd_ds_df = original_ds_df[
-                original_ds_df[DatasetFactory.BUILD].isin(failed_builds)
+                original_ds_df[Feature.BUILD].isin(failed_builds)
             ].reset_index(drop=True)
             _, _, napfd_scaler = self.normalize_dataset(original_napfd_ds_df, None)
 
@@ -324,15 +318,13 @@ class RankLibLearner:
                 )
 
             failed_builds = (
-                decay_ds_df[decay_ds_df[DatasetFactory.VERDICT] > 0][
-                    DatasetFactory.BUILD
-                ]
+                decay_ds_df[decay_ds_df[Feature.VERDICT] > 0][Feature.BUILD]
                 .unique()
                 .tolist()
             )
             if len(failed_builds) > 0 and current_build_failed:
                 napfd_decay_ds = decay_ds_df[
-                    decay_ds_df[DatasetFactory.BUILD].isin(failed_builds)
+                    decay_ds_df[Feature.BUILD].isin(failed_builds)
                 ].reset_index(drop=True)
                 napfd_decay_ranklib_ds = self.convert_to_ranklib_dataset(
                     napfd_decay_ds, napfd_scaler

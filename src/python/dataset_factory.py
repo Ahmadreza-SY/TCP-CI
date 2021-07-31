@@ -1,8 +1,7 @@
-from pydriller.git_repository import GitRepository
 from pydriller.domain.commit import DMMProperty
 from .entities.entity import Entity
 from .entities.entity_change import EntityChange
-from .entities.execution_record import ExecutionRecord, TestVerdict, Build
+from .entities.execution_record import ExecutionRecord, Build
 from tqdm import tqdm
 import pandas as pd
 from scipy.stats.mstats import gmean
@@ -10,134 +9,11 @@ import numpy as np
 from .timer import tik, tok, tik_list, tok_list
 import sys
 from .constants import *
-
-pd.options.mode.chained_assignment = None
+from .feature_extractor.feature import Feature
+from .feature_extractor.rec_feature_extractor import RecFeatureExtractor
 
 
 class DatasetFactory:
-    DEFAULT_VALUE = -1
-    TEST = "Test"
-    BUILD = "Build"
-    # Complexity Metrics
-    complexity_metrics = [
-        "CountDeclFunction",
-        "CountLine",
-        "CountLineBlank",
-        "CountLineCode",
-        "CountLineCodeDecl",
-        "CountLineCodeExe",
-        "CountLineComment",
-        "CountStmt",
-        "CountStmtDecl",
-        "CountStmtExe",
-        "RatioCommentToCode",
-        "MaxCyclomatic",
-        "MaxCyclomaticModified",
-        "MaxCyclomaticStrict",
-        "MaxEssential",
-        "MaxNesting",
-        "SumCyclomatic",
-        "SumCyclomaticModified",
-        "SumCyclomaticStrict",
-        "SumEssential",
-        "CountDeclClass",
-        "CountDeclClassMethod",
-        "CountDeclClassVariable",
-        "CountDeclExecutableUnit",
-        "CountDeclInstanceMethod",
-        "CountDeclInstanceVariable",
-        "CountDeclMethod",
-        "CountDeclMethodDefault",
-        "CountDeclMethodPrivate",
-        "CountDeclMethodProtected",
-        "CountDeclMethodPublic",
-    ]
-    # Process Metrics
-    COMMIT_COUNT = "CommitCount"
-    D_DEV_COUNT = "DistinctDevCount"
-    OWNERS_CONTRIBUTION = "OwnersContribution"
-    MINOR_CONTRIBUTOR_COUNT = "MinorContributorCount"
-    OWNERS_EXPERIENCE = "OwnersExperience"
-    ALL_COMMITERS_EXPERIENCE = "AllCommitersExperience"
-    process_metrics = [
-        COMMIT_COUNT,
-        D_DEV_COUNT,
-        OWNERS_CONTRIBUTION,
-        MINOR_CONTRIBUTOR_COUNT,
-        OWNERS_EXPERIENCE,
-        ALL_COMMITERS_EXPERIENCE,
-    ]
-    # Change Metrics
-    LINES_ADDED = "LinesAdded"
-    LINES_DELETED = "LinesDeleted"
-    ADDED_CHANGE_SCATTERING = "AddedChangeScattering"
-    DELETED_CHANGE_SCATTERING = "DeletedChangeScattering"
-    DMM_SIZE = "DMMSize"
-    DMM_COMPLEXITY = "DMMComplexity"
-    DMM_INTERFACING = "DMMInterfacing"
-    change_metrics = [
-        LINES_ADDED,
-        LINES_DELETED,
-        ADDED_CHANGE_SCATTERING,
-        DELETED_CHANGE_SCATTERING,
-        DMM_SIZE,
-        DMM_COMPLEXITY,
-        DMM_INTERFACING,
-    ]
-    # All Metrics
-    all_metrics = complexity_metrics + process_metrics + change_metrics
-    # REC Features
-    AGE = "Age"
-    LAST_FAILURE_AGE = "LastFailureAge"
-    LAST_TRANSITION_AGE = "LastTransitionAge"
-    RECENT_AVG_EXE_TIME = "RecentAvgExeTime"
-    RECENT_MAX_EXE_TIME = "RecentMaxExeTime"
-    RECENT_FAIL_RATE = "RecentFailRate"
-    RECENT_ASSERT_RATE = "RecentAssertRate"
-    RECENT_EXC_RATE = "RecentExcRate"
-    RECENT_TRANSITION_RATE = "RecentTransitionRate"
-    TOTAL_AVG_EXE_TIME = "TotalAvgExeTime"
-    TOTAL_MAX_EXE_TIME = "TotalMaxExeTime"
-    TOTAL_FAIL_RATE = "TotalFailRate"
-    TOTAL_ASSERT_RATE = "TotalAssertRate"
-    TOTAL_EXC_RATE = "TotalExcRate"
-    TOTAL_TRANSITION_RATE = "TotalTransitionRate"
-    LAST_VERDICT = "LastVerdict"
-    LAST_EXE_TIME = "LastExeTime"
-    MAX_TEST_FILE_FAIL_RATE = "MaxTestFileFailRate"
-    MAX_TEST_FILE_TRANSITION_RATE = "MaxTestFileTransitionRate"
-    rec_features = [
-        AGE,
-        LAST_FAILURE_AGE,
-        LAST_TRANSITION_AGE,
-        RECENT_AVG_EXE_TIME,
-        RECENT_MAX_EXE_TIME,
-        RECENT_FAIL_RATE,
-        RECENT_ASSERT_RATE,
-        RECENT_EXC_RATE,
-        RECENT_TRANSITION_RATE,
-        TOTAL_AVG_EXE_TIME,
-        TOTAL_MAX_EXE_TIME,
-        TOTAL_FAIL_RATE,
-        TOTAL_ASSERT_RATE,
-        TOTAL_EXC_RATE,
-        TOTAL_TRANSITION_RATE,
-        LAST_VERDICT,
-        LAST_EXE_TIME,
-        MAX_TEST_FILE_FAIL_RATE,
-        MAX_TEST_FILE_TRANSITION_RATE,
-    ]
-    # COV Features
-    CHN_SCORE_SUM = "ChnScoreSum"
-    IMP_SCORE_SUM = "ImpScoreSum"
-    CHN_COUNT = "ChnCount"
-    IMP_COUNT = "ImpCount"
-    # DET Features
-    FAULTS = "Faults"
-    # Ground Truth
-    VERDICT = "Verdict"
-    DURATION = "Duration"
-
     def __init__(
         self,
         config,
@@ -167,7 +43,7 @@ class DatasetFactory:
         for ent_id in ent_ids:
             metrics.setdefault(ent_id, {})
             for name, value in ent_dict[ent_id].items():
-                if name in DatasetFactory.complexity_metrics:
+                if name in Feature.complexity_metrics:
                     metrics[ent_id][name] = value
         return metrics
 
@@ -194,10 +70,10 @@ class DatasetFactory:
 
             ent_mods = mod_map[ent_id]
             metrics.setdefault(ent_id, {})
-            metrics[ent_id][DatasetFactory.LINES_ADDED] = sum(
+            metrics[ent_id][Feature.LINES_ADDED] = sum(
                 [ent_mod.added for ent_mod in ent_mods]
             )
-            metrics[ent_id][DatasetFactory.LINES_DELETED] = sum(
+            metrics[ent_id][Feature.LINES_DELETED] = sum(
                 [ent_mod.removed for ent_mod in ent_mods]
             )
 
@@ -208,9 +84,7 @@ class DatasetFactory:
                 added_scatterings.append(
                     self.repository_miner.compute_scattering(added_lines)
                 )
-            metrics[ent_id][DatasetFactory.ADDED_CHANGE_SCATTERING] = max(
-                added_scatterings
-            )
+            metrics[ent_id][Feature.ADDED_CHANGE_SCATTERING] = max(added_scatterings)
 
             deleted_scatterings = []
             for ent_mod in ent_mods:
@@ -219,7 +93,7 @@ class DatasetFactory:
                 deleted_scatterings.append(
                     self.repository_miner.compute_scattering(deleted_lines)
                 )
-            metrics[ent_id][DatasetFactory.DELETED_CHANGE_SCATTERING] = max(
+            metrics[ent_id][Feature.DELETED_CHANGE_SCATTERING] = max(
                 deleted_scatterings
             )
 
@@ -233,11 +107,11 @@ class DatasetFactory:
                 ent_mods, DMMProperty.UNIT_INTERFACING
             )
             if dmm_size is not None:
-                metrics[ent_id][DatasetFactory.DMM_SIZE] = dmm_size
+                metrics[ent_id][Feature.DMM_SIZE] = dmm_size
             if dmm_complexity is not None:
-                metrics[ent_id][DatasetFactory.DMM_COMPLEXITY] = dmm_complexity
+                metrics[ent_id][Feature.DMM_COMPLEXITY] = dmm_complexity
             if dmm_interfacing is not None:
-                metrics[ent_id][DatasetFactory.DMM_INTERFACING] = dmm_interfacing
+                metrics[ent_id][Feature.DMM_INTERFACING] = dmm_interfacing
         return metrics
 
     def compute_process_metrics(self, build, ent_ids):
@@ -247,7 +121,7 @@ class DatasetFactory:
             (self.change_history[EntityChange.COMMIT_DATE] <= commit.committer_date)
             & (self.change_history[EntityChange.MERGE_COMMIT] == False)
         ]
-        project_devs = self.compute_contributions(build_change_history)
+        project_devs = self.compute_contributions(build_change_history.copy())
         for ent_id in ent_ids:
             metrics.setdefault(ent_id, {})
             ent_change_history = build_change_history[
@@ -261,29 +135,25 @@ class DatasetFactory:
                     )
                     & (self.change_history[EntityChange.ID] == ent_id)
                 ]
-            ent_devs = self.compute_contributions(ent_change_history)
+            ent_devs = self.compute_contributions(ent_change_history.copy())
             ent_devs_ids = ent_devs[EntityChange.CONTRIBUTOR].values
             ent_devs_exp = project_devs[
                 project_devs[EntityChange.CONTRIBUTOR].isin(ent_devs_ids)
             ]["Exp"].values
             owner_id = ent_devs.iloc[0][EntityChange.CONTRIBUTOR]
 
-            metrics[ent_id][DatasetFactory.COMMIT_COUNT] = len(ent_change_history)
-            metrics[ent_id][DatasetFactory.D_DEV_COUNT] = ent_change_history[
+            metrics[ent_id][Feature.COMMIT_COUNT] = len(ent_change_history)
+            metrics[ent_id][Feature.D_DEV_COUNT] = ent_change_history[
                 EntityChange.CONTRIBUTOR
             ].nunique()
-            metrics[ent_id][DatasetFactory.OWNERS_CONTRIBUTION] = ent_devs.iloc[0][
-                "Exp"
-            ]
-            metrics[ent_id][DatasetFactory.MINOR_CONTRIBUTOR_COUNT] = len(
+            metrics[ent_id][Feature.OWNERS_CONTRIBUTION] = ent_devs.iloc[0]["Exp"]
+            metrics[ent_id][Feature.MINOR_CONTRIBUTOR_COUNT] = len(
                 ent_devs[ent_devs["Exp"] < 5.0]
             )
-            metrics[ent_id][DatasetFactory.OWNERS_EXPERIENCE] = project_devs[
+            metrics[ent_id][Feature.OWNERS_EXPERIENCE] = project_devs[
                 project_devs[EntityChange.CONTRIBUTOR] == owner_id
             ]["Exp"].values[0]
-            metrics[ent_id][DatasetFactory.ALL_COMMITERS_EXPERIENCE] = gmean(
-                ent_devs_exp
-            )
+            metrics[ent_id][Feature.ALL_COMMITERS_EXPERIENCE] = gmean(ent_devs_exp)
         return metrics
 
     def compute_all_metrics(self, build, ent_ids, ent_dict, prefix="", chn_build=None):
@@ -310,244 +180,14 @@ class DatasetFactory:
         test_metrics = self.compute_all_metrics(build, test_ids, ent_dict, "TES_")
         for test_id in test_ids:
             build_tc_features.setdefault(test_id, {})
-            for metric in DatasetFactory.all_metrics:
+            for metric in Feature.all_metrics:
+                prefix = Feature.get_metric_prefix(metric)
                 build_tc_features[test_id][
-                    f"TES_{metric}"
-                ] = DatasetFactory.DEFAULT_VALUE
+                    f"TES_{prefix}_{metric}"
+                ] = Feature.DEFAULT_VALUE
             for name, value in test_metrics[test_id].items():
-                build_tc_features[test_id][f"TES_{name}"] = value
-        return build_tc_features
-
-    def compute_max_test_file_rates(self, test_exe_history, build, change_history):
-        max_test_file_fail_rate = -1
-        max_test_file_transition_rate = -1
-        build_changed_ents = (
-            change_history[change_history["BuildId"] == build.id][EntityChange.ID]
-            .unique()
-            .tolist()
-        )
-        # Max Test File Fail Rate
-        test_failed_builds = (
-            test_exe_history[test_exe_history[ExecutionRecord.VERDICT] > 0][
-                ExecutionRecord.BUILD
-            ]
-            .unique()
-            .tolist()
-        )
-        if len(test_failed_builds) > 0:
-            test_file_fail_history = (
-                change_history[
-                    (change_history[EntityChange.ID].isin(build_changed_ents))
-                    & (change_history["BuildId"].isin(test_failed_builds))
-                ]
-                .groupby([EntityChange.ID, "BuildId"], as_index=False)
-                .first()
-            )
-            if len(test_file_fail_history) == 0:
-                max_test_file_fail_rate = 0.0
-            else:
-                max_fail_freq = (
-                    test_file_fail_history.groupby([EntityChange.ID], as_index=False)
-                    .count()["BuildId"]
-                    .max()
-                )
-                max_test_file_fail_rate = max_fail_freq / len(test_failed_builds)
-
-        # Max Test File Transition Rate
-        test_transition_builds = (
-            test_exe_history[test_exe_history["transition"] > 0][ExecutionRecord.BUILD]
-            .unique()
-            .tolist()
-        )
-        if len(test_transition_builds) > 0:
-            test_file_transition_history = (
-                change_history[
-                    (change_history[EntityChange.ID].isin(build_changed_ents))
-                    & (change_history["BuildId"].isin(test_transition_builds))
-                ]
-                .groupby([EntityChange.ID, "BuildId"], as_index=False)
-                .first()
-            )
-            if len(test_file_transition_history) == 0:
-                max_test_file_transition_rate = 0.0
-            else:
-                max_transition_freq = (
-                    test_file_transition_history.groupby(
-                        [EntityChange.ID], as_index=False
-                    )
-                    .count()["BuildId"]
-                    .max()
-                )
-                max_test_file_transition_rate = max_transition_freq / len(
-                    test_transition_builds
-                )
-
-        return max_test_file_fail_rate, max_test_file_transition_rate
-
-    def compute_rec_features(
-        self, test_entities, exe_df, build, build_change_history, build_tc_features
-    ):
-        window = self.config.build_window
-        builds = exe_df[ExecutionRecord.BUILD].unique().tolist()
-
-        for test in test_entities.to_dict("records"):
-            test_id = test[Entity.ID]
-            build_tc_features.setdefault(test_id, {})
-
-            test_result = exe_df[
-                (exe_df[ExecutionRecord.BUILD] == build.id)
-                & (exe_df[ExecutionRecord.TEST] == test_id)
-            ].iloc[0]
-            test_exe_df = (
-                exe_df[exe_df[ExecutionRecord.TEST] == test_id]
-                .copy()
-                .reset_index(drop=True)
-            )
-            test_exe_history = (
-                test_exe_df[
-                    test_exe_df.index
-                    < test_exe_df[test_exe_df[ExecutionRecord.BUILD] == build.id].index[
-                        0
-                    ]
-                ]
-                .copy()
-                .reset_index(drop=True)
-            )
-            build_tc_features[test_id][DatasetFactory.VERDICT] = test_result[
-                ExecutionRecord.VERDICT
-            ]
-            build_tc_features[test_id][DatasetFactory.DURATION] = test_result[
-                ExecutionRecord.DURATION
-            ]
-            if test_exe_history.empty:
-                for feature in DatasetFactory.rec_features:
-                    build_tc_features[test_id][
-                        f"REC_{feature}"
-                    ] = DatasetFactory.DEFAULT_VALUE
-                build_tc_features[test_id][f"REC_{DatasetFactory.AGE}"] = 0
-                continue
-
-            test_exe_history["transition"] = (
-                test_exe_history[ExecutionRecord.VERDICT].diff().fillna(0) != 0
-            ).astype(int)
-            test_exe_recent = test_exe_history.tail(window)
-
-            first_build_id = test_exe_df.iloc[0][ExecutionRecord.BUILD]
-            last_build_id = test_result[ExecutionRecord.BUILD]
-            age = builds.index(last_build_id) - builds.index(first_build_id)
-            last_failure_age = -1
-            last_transition_age = -1
-            if len(test_exe_history[test_exe_history[ExecutionRecord.VERDICT] > 0]) > 0:
-                last_failure_age = (
-                    test_exe_history.index.max()
-                    - test_exe_history[
-                        test_exe_history[ExecutionRecord.VERDICT] > 0
-                    ].index[-1]
-                )
-            if len(test_exe_history[test_exe_history["transition"] > 0]) > 0:
-                last_transition_age = (
-                    test_exe_history.index.max()
-                    - test_exe_history[test_exe_history["transition"] > 0].index[-1]
-                )
-
-            # Recent
-            recent_avg_duration = test_exe_recent[ExecutionRecord.DURATION].mean()
-            recent_max_duration = test_exe_recent[ExecutionRecord.DURATION].max()
-            recent_fail_rate = len(
-                test_exe_recent[
-                    test_exe_recent[ExecutionRecord.VERDICT]
-                    != TestVerdict.SUCCESS.value
-                ]
-            ) / len(test_exe_recent)
-            recent_assert_rate = len(
-                test_exe_recent[
-                    test_exe_recent[ExecutionRecord.VERDICT]
-                    == TestVerdict.ASSERTION.value
-                ]
-            ) / len(test_exe_recent)
-            recent_exc_rate = len(
-                test_exe_recent[
-                    test_exe_recent[ExecutionRecord.VERDICT]
-                    == TestVerdict.EXCEPTION.value
-                ]
-            ) / len(test_exe_recent)
-            recent_transition_rate = len(
-                test_exe_recent[test_exe_recent["transition"] == 1]
-            ) / len(test_exe_recent)
-            # Total
-            total_avg_duration = test_exe_history[ExecutionRecord.DURATION].mean()
-            total_max_duration = test_exe_history[ExecutionRecord.DURATION].max()
-            total_fail_rate = len(
-                test_exe_history[
-                    test_exe_history[ExecutionRecord.VERDICT]
-                    != TestVerdict.SUCCESS.value
-                ]
-            ) / len(test_exe_history)
-            total_assert_rate = len(
-                test_exe_history[
-                    test_exe_history[ExecutionRecord.VERDICT]
-                    == TestVerdict.ASSERTION.value
-                ]
-            ) / len(test_exe_history)
-            total_exc_rate = len(
-                test_exe_history[
-                    test_exe_history[ExecutionRecord.VERDICT]
-                    == TestVerdict.EXCEPTION.value
-                ]
-            ) / len(test_exe_history)
-            total_transition_rate = len(
-                test_exe_history[test_exe_history["transition"] == 1]
-            ) / len(test_exe_history)
-
-            last_verdict = test_exe_recent.tail(1)[ExecutionRecord.VERDICT].values[0]
-            last_duration = test_exe_recent.tail(1)[ExecutionRecord.DURATION].values[0]
-
-            (
-                max_test_file_fail_rate,
-                max_test_file_transition_rate,
-            ) = self.compute_max_test_file_rates(
-                test_exe_history, build, build_change_history
-            )
-
-            features = [
-                # Age
-                (f"REC_{DatasetFactory.AGE}", age),
-                (f"REC_{DatasetFactory.LAST_FAILURE_AGE}", last_failure_age),
-                (f"REC_{DatasetFactory.LAST_TRANSITION_AGE}", last_transition_age),
-                # Recent
-                (f"REC_{DatasetFactory.RECENT_AVG_EXE_TIME}", recent_avg_duration),
-                (f"REC_{DatasetFactory.RECENT_MAX_EXE_TIME}", recent_max_duration),
-                (f"REC_{DatasetFactory.RECENT_FAIL_RATE}", recent_fail_rate),
-                (f"REC_{DatasetFactory.RECENT_ASSERT_RATE}", recent_assert_rate),
-                (f"REC_{DatasetFactory.RECENT_EXC_RATE}", recent_exc_rate),
-                (
-                    f"REC_{DatasetFactory.RECENT_TRANSITION_RATE}",
-                    recent_transition_rate,
-                ),
-                # Total
-                (f"REC_{DatasetFactory.TOTAL_AVG_EXE_TIME}", total_avg_duration),
-                (f"REC_{DatasetFactory.TOTAL_MAX_EXE_TIME}", total_max_duration),
-                (f"REC_{DatasetFactory.TOTAL_FAIL_RATE}", total_fail_rate),
-                (f"REC_{DatasetFactory.TOTAL_ASSERT_RATE}", total_assert_rate),
-                (f"REC_{DatasetFactory.TOTAL_EXC_RATE}", total_exc_rate),
-                (f"REC_{DatasetFactory.TOTAL_TRANSITION_RATE}", total_transition_rate),
-                # Last
-                (f"REC_{DatasetFactory.LAST_VERDICT}", last_verdict),
-                (f"REC_{DatasetFactory.LAST_EXE_TIME}", last_duration),
-                # Test File Rates
-                (
-                    f"REC_{DatasetFactory.MAX_TEST_FILE_FAIL_RATE}",
-                    max_test_file_fail_rate,
-                ),
-                (
-                    f"REC_{DatasetFactory.MAX_TEST_FILE_TRANSITION_RATE}",
-                    max_test_file_transition_rate,
-                ),
-            ]
-
-            for name, value in features:
-                build_tc_features[test_id][name] = value
-
+                prefix = Feature.get_metric_prefix(name)
+                build_tc_features[test_id][f"TES_{prefix}_{name}"] = value
         return build_tc_features
 
     def compute_test_coverage(self, build, test_ids, src_ids, chn_build=None):
@@ -594,16 +234,14 @@ class DatasetFactory:
             else:
                 changed_scores, impacted_scores = [], []
 
-            build_tc_features[test_id][f"COV_{DatasetFactory.CHN_SCORE_SUM}"] = sum(
+            build_tc_features[test_id][f"COV_{Feature.CHN_SCORE_SUM}"] = sum(
                 changed_scores
             )
-            build_tc_features[test_id][f"COV_{DatasetFactory.IMP_SCORE_SUM}"] = sum(
+            build_tc_features[test_id][f"COV_{Feature.IMP_SCORE_SUM}"] = sum(
                 impacted_scores
             )
-            build_tc_features[test_id][f"COV_{DatasetFactory.CHN_COUNT}"] = len(
-                changed_scores
-            )
-            build_tc_features[test_id][f"COV_{DatasetFactory.IMP_COUNT}"] = len(
+            build_tc_features[test_id][f"COV_{Feature.CHN_COUNT}"] = len(changed_scores)
+            build_tc_features[test_id][f"COV_{Feature.IMP_COUNT}"] = len(
                 impacted_scores
             )
         return build_tc_features
@@ -664,22 +302,24 @@ class DatasetFactory:
                 agg_impacted_metrics = {}
 
             build_tc_features.setdefault(test_id, {})
-            for metric in DatasetFactory.all_metrics:
+            for metric in Feature.all_metrics:
+                prefix = Feature.get_metric_prefix(metric)
                 build_tc_features[test_id][
-                    f"COD_COV_CHN_{metric}"
-                ] = DatasetFactory.DEFAULT_VALUE
+                    f"COD_COV_{prefix}_C_{metric}"
+                ] = Feature.DEFAULT_VALUE
             for name, value in agg_changed_metrics.items():
-                build_tc_features[test_id][f"COD_COV_CHN_{name}"] = value
+                prefix = Feature.get_metric_prefix(name)
+                build_tc_features[test_id][f"COD_COV_{prefix}_C_{name}"] = value
 
             tik("Impacted", build.id)
-            for metric in (
-                DatasetFactory.complexity_metrics + DatasetFactory.process_metrics
-            ):
+            for metric in Feature.complexity_metrics + Feature.process_metrics:
+                prefix = Feature.get_metric_prefix(metric)
                 build_tc_features[test_id][
-                    f"COD_COV_IMP_{metric}"
-                ] = DatasetFactory.DEFAULT_VALUE
+                    f"COD_COV_{prefix}_IMP_{metric}"
+                ] = Feature.DEFAULT_VALUE
             for name, value in agg_impacted_metrics.items():
-                build_tc_features[test_id][f"COD_COV_IMP_{name}"] = value
+                prefix = Feature.get_metric_prefix(name)
+                build_tc_features[test_id][f"COD_COV_{prefix}_IMP_{name}"] = value
             tok("Impacted", build.id)
 
         tok_list(["COD_COV_COM_M", "COD_COV_PRO_M", "COD_COV_CHN_M"], build.id)
@@ -698,7 +338,7 @@ class DatasetFactory:
                 build_change_history[EntityChange.ID] == ent_id
             ][EntityChange.BUG_FIX].sum()
             faults[ent_id] = {}
-            faults[ent_id][DatasetFactory.FAULTS] = ent_faults
+            faults[ent_id][Feature.FAULTS] = ent_faults
 
         for test_id in test_ids:
             if test_id in coverage:
@@ -718,15 +358,15 @@ class DatasetFactory:
 
             build_tc_features.setdefault(test_id, {})
             build_tc_features[test_id][
-                f"DET_COV_CHN_{DatasetFactory.FAULTS}"
-            ] = DatasetFactory.DEFAULT_VALUE
+                f"DET_COV_C_{Feature.FAULTS}"
+            ] = Feature.DEFAULT_VALUE
             for name, value in agg_changed_metrics.items():
-                build_tc_features[test_id][f"DET_COV_CHN_{name}"] = value
+                build_tc_features[test_id][f"DET_COV_C_{name}"] = value
 
             tik("Impacted", build.id)
             build_tc_features[test_id][
-                f"DET_COV_IMP_{DatasetFactory.FAULTS}"
-            ] = DatasetFactory.DEFAULT_VALUE
+                f"DET_COV_IMP_{Feature.FAULTS}"
+            ] = Feature.DEFAULT_VALUE
             for name, value in agg_impacted_metrics.items():
                 build_tc_features[test_id][f"DET_COV_IMP_{name}"] = value
             tok("Impacted", build.id)
@@ -785,6 +425,9 @@ class DatasetFactory:
         exe_df.sort_values("started_at", ignore_index=True, inplace=True)
         exe_df.drop("started_at", inplace=True, axis=1)
         build_change_history = self.create_build_change_history(builds)
+        rec_extractor = RecFeatureExtractor(
+            self.config.build_window, exe_df, build_change_history
+        )
 
         if len(valid_builds) == 0:
             print("No valid builds found. Aborting ...")
@@ -807,9 +450,7 @@ class DatasetFactory:
             build_tc_features = {}
             self.compute_tes_features(build, test_ids, entities_dict, build_tc_features)
             tik("REC_M", build.id)
-            self.compute_rec_features(
-                tests_df, exe_df, build, build_change_history, build_tc_features
-            )
+            rec_extractor.compute_rec_features(tests_df, build, build_tc_features)
             tok("REC_M", build.id)
 
             tik_list(
@@ -844,8 +485,8 @@ class DatasetFactory:
             tok("DET_COV_M", build.id)
 
             for test_id, features in build_tc_features.items():
-                features[DatasetFactory.BUILD] = build.id
-                features[DatasetFactory.TEST] = test_id
+                features[Feature.BUILD] = build.id
+                features[Feature.TEST] = test_id
                 dataset.append(features)
             tok("Total", build.id)
         return dataset
@@ -854,25 +495,24 @@ class DatasetFactory:
         dataset = self.create_dataset(builds, exe_records)
         dataset_df = pd.DataFrame.from_records(dataset)
         cols = dataset_df.columns.tolist()
-        cols.remove(DatasetFactory.BUILD)
-        cols.remove(DatasetFactory.TEST)
-        cols.insert(0, DatasetFactory.TEST)
-        cols.insert(0, DatasetFactory.BUILD)
+        cols.remove(Feature.BUILD)
+        cols.remove(Feature.TEST)
+        cols.insert(0, Feature.TEST)
+        cols.insert(0, Feature.BUILD)
         dataset_df = dataset_df[cols]
         dataset_df.to_csv(self.config.output_path / "dataset.csv", index=False)
         print(f'Saved dataset to {self.config.output_path / "dataset.csv"}')
 
+    # TODO: Consider new features
     def create_decay_dataset(self, dataset_df, og_build, test_builds):
-        og_build_dataset = dataset_df[
-            dataset_df[DatasetFactory.BUILD] == og_build.id
-        ].copy()
+        og_build_dataset = dataset_df[dataset_df[Feature.BUILD] == og_build.id].copy()
         og_build_tc_features = {}
         for _, row in og_build_dataset.iterrows():
-            test_id = row[DatasetFactory.TEST]
+            test_id = row[Feature.TEST]
             og_build_tc_features[test_id] = {}
             for f in TES_COM + TES_PRO:
                 og_build_tc_features[test_id][f] = row[f]
-        og_test_ids = og_build_dataset[DatasetFactory.TEST].values.tolist()
+        og_test_ids = og_build_dataset[Feature.TEST].values.tolist()
         og_metadata_path = (
             self.repository_miner.get_analysis_path(og_build) / "metadata.csv"
         )
@@ -885,9 +525,9 @@ class DatasetFactory:
         decay_dataset = []
         for test_build in test_builds:
             test_build_dataset = dataset_df[
-                dataset_df[DatasetFactory.BUILD] == test_build.id
+                dataset_df[Feature.BUILD] == test_build.id
             ].copy()
-            test_ids = test_build_dataset[DatasetFactory.TEST].values.tolist()
+            test_ids = test_build_dataset[Feature.TEST].values.tolist()
             og_coverage = self.compute_test_coverage(
                 og_build,
                 og_test_ids,
@@ -913,11 +553,11 @@ class DatasetFactory:
 
             for _, row in test_build_dataset.iterrows():
                 features = {}
-                test_id = row[DatasetFactory.TEST]
-                features[DatasetFactory.BUILD] = test_build.id
-                features[DatasetFactory.TEST] = test_id
-                features[DatasetFactory.VERDICT] = row[DatasetFactory.VERDICT]
-                features[DatasetFactory.DURATION] = row[DatasetFactory.DURATION]
+                test_id = row[Feature.TEST]
+                features[Feature.BUILD] = test_build.id
+                features[Feature.TEST] = test_id
+                features[Feature.VERDICT] = row[Feature.VERDICT]
+                features[Feature.DURATION] = row[Feature.DURATION]
                 for f in TES_COM + TES_PRO:
                     if test_id not in og_build_tc_features:
                         features[f] = None
@@ -947,7 +587,7 @@ class DatasetFactory:
                 all_builds_df["commit_hash"].values.tolist(),
             )
         )
-        builds = dataset_df[DatasetFactory.BUILD].unique()
+        builds = dataset_df[Feature.BUILD].unique()
         # TODO: sort by date
         builds = np.sort(builds)
         decay_datasets_path = self.config.output_path / "decay_datasets"

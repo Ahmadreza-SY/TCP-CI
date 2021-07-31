@@ -83,7 +83,11 @@ class TravisCIExtractor(ExecutionRecordExtractorInterface):
 
             tik_list(["REC_P", "Total"], build.id)
             entities_df = pd.read_csv(metadata_path)
-            build_exe_df = exe_df[(exe_df[ExecutionRecord.BUILD] == build.id)]
+            build_exe_df = (
+                exe_df[(exe_df[ExecutionRecord.BUILD] == build.id)]
+                .copy()
+                .reset_index(drop=True)
+            )
             if len(build_exe_df) == 0:
                 continue
 
