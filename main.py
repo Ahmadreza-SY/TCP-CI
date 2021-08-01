@@ -106,6 +106,13 @@ def main():
 
     tr_torrent_parser.set_defaults(func=tr_torrent)
     tr_torrent_parser.add_argument(
+        "-r",
+        "--repo",
+        help="The login and name of the repo seperated by @ (e.g., presto@prestodb)",
+        type=str,
+        required=True,
+    )
+    tr_torrent_parser.add_argument(
         "-i",
         "--input-path",
         help="Specifies the directory to of travis torrent raw data.",

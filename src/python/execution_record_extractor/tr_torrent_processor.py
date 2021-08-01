@@ -60,28 +60,23 @@ class TrTorrentProcessor:
         ).drop("build_id", axis=1)
         return builds_df
 
-    def process_tr_torrent_data(self, source_path, output_path):
-        all_repos = list(
-            p.name for p in (source_path / "build_logs").glob("*") if p.is_dir()
-        )
-        for repo in tqdm(
-            all_repos, desc="Processing Travis Torrent's data for all projects"
+    def process_tr_torrent_data(self, source_path, output_path, repo):
+        print(f"Processing {repo} data")
+        logs_path = source_path / "build_logs" / repo
+        data_path = source_path / "data" / repo
+        repo_output_path = output_path / repo
+        exe_output_file = repo_output_path / f"{repo}-full.csv"
+        builds_output_file = repo_output_path / f"{repo}-builds.csv"
+        if exe_output_file.exists() and builds_output_file.exists():
+            return
+        if not (
+            (data_path / "data.csv").exists()
+            and (logs_path / "repo-data-travis.json").exists()
         ):
-            print(f"Processing {repo} data")
-            logs_path = source_path / "build_logs" / repo
-            data_path = source_path / "data" / repo
-            repo_output_path = output_path / repo
-            exe_output_file = repo_output_path / f"{repo}-full.csv"
-            builds_output_file = repo_output_path / f"{repo}-builds.csv"
-            if exe_output_file.exists() and builds_output_file.exists():
-                continue
-            if not (
-                (data_path / "data.csv").exists()
-                and (logs_path / "repo-data-travis.json").exists()
-            ):
-                continue
-            exe_df = self.extract_exe_records(logs_path)
-            builds_df = self.extract_builds(logs_path, data_path)
-            repo_output_path.mkdir(parents=True, exist_ok=True)
-            exe_df.to_csv(exe_output_file, index=False)
-            builds_df.to_csv(builds_output_file, index=False)
+            return
+        exe_df = self.extract_exe_records(logs_path)
+        builds_df = self.extract_builds(logs_path, data_path)
+        repo_output_path.mkdir(parents=True, exist_ok=True)
+        exe_df.to_csv(exe_output_file, index=False)
+        builds_df.to_csv(builds_output_file, index=False)
+        print(f"Finished processing {repo} data")

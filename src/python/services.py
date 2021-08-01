@@ -94,7 +94,7 @@ class DataCollectionService:
     @staticmethod
     def process_tr_torrent(args):
         processor = TrTorrentProcessor()
-        processor.process_tr_torrent_data(args.input_path, args.output_path)
+        processor.process_tr_torrent_data(args.input_path, args.output_path, args.repo)
 
     @staticmethod
     def run_all_tsp_accuracy_experiments(args):
