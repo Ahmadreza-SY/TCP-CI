@@ -2,7 +2,7 @@ from .code_analyzer.code_analyzer import AnalysisLevel
 from .entities.entity import Language
 from .code_analyzer.understand.understand_analyzer import *
 from .execution_record_extractor.travis_ci_extractor import *
-from .execution_record_extractor.rtp_torrent_extractor import RTPTorrentExtractor
+from .execution_record_extractor.rtp_torrent_extractor import TorrentExtractor
 from .repository_miner import FileRepositoryMiner, FunctionRepositoryMiner
 
 
@@ -17,9 +17,9 @@ class ModuleFactory:
         return analyzer_class
 
     @staticmethod
-    def get_execution_record_extractor(language, rtp_path):
-        if rtp_path is not None:
-            return RTPTorrentExtractor
+    def get_execution_record_extractor(language, ci_data_path):
+        if ci_data_path is not None:
+            return TorrentExtractor
         extractor_class = None
         if language == Language.JAVA:
             extractor_class = TravisCIJavaExtractor

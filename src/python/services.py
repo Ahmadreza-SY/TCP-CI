@@ -9,6 +9,7 @@ from .ranklib_learner import RankLibLearner
 import subprocess
 from .constants import *
 from .code_analyzer.code_analyzer import AnalysisLevel
+from .execution_record_extractor.tr_torrent_processor import TrTorrentProcessor
 
 
 class DataCollectionService:
@@ -66,7 +67,7 @@ class DataCollectionService:
     @staticmethod
     def fetch_and_save_execution_history(args, repo_miner):
         execution_record_extractor = ModuleFactory.get_execution_record_extractor(
-            args.language, args.rtp_path
+            args.language, args.ci_data_path
         )(args, repo_miner)
         exe_path = args.output_path / "exe.csv"
         exe_records, builds = execution_record_extractor.fetch_execution_records()
@@ -89,6 +90,11 @@ class DataCollectionService:
         else:
             print("No execution history collected!")
             return [], []
+
+    @staticmethod
+    def process_tr_torrent(args):
+        processor = TrTorrentProcessor()
+        processor.process_tr_torrent_data(args.input_path, args.output_path)
 
     @staticmethod
     def run_all_tsp_accuracy_experiments(args):

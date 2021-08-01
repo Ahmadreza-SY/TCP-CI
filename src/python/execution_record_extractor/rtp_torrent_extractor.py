@@ -5,7 +5,7 @@ from tqdm import tqdm
 from ..timer import tik_list, tok_list
 
 
-class RTPTorrentExtractor(ExecutionRecordExtractorInterface):
+class TorrentExtractor(ExecutionRecordExtractorInterface):
     def __init__(self, config, repository_miner):
         self.config = config
         self.repository_miner = repository_miner
@@ -20,7 +20,7 @@ class RTPTorrentExtractor(ExecutionRecordExtractorInterface):
                 f"No project slug is provided, skipping test execution history retrival."
             )
             return [], []
-        if self.config.rtp_path is None:
+        if self.config.ci_data_path is None:
             print(
                 f"No path for RTP-Torrent data is provided, skipping test execution history retrival."
             )
@@ -29,7 +29,7 @@ class RTPTorrentExtractor(ExecutionRecordExtractorInterface):
         print("Reading RTP-Torrent execution records ...")
         user_login, project_name = self.config.project_slug.split("/")
         rtp_exe_df = pd.read_csv(
-            self.config.rtp_path
+            self.config.ci_data_path
             / f"{user_login}@{project_name}"
             / f"{user_login}@{project_name}-full.csv"
         )
@@ -48,7 +48,7 @@ class RTPTorrentExtractor(ExecutionRecordExtractorInterface):
             .reset_index(drop=True)
         )
         builds_df = pd.read_csv(
-            self.config.rtp_path
+            self.config.ci_data_path
             / f"{user_login}@{project_name}"
             / f"{user_login}@{project_name}-builds.csv",
             parse_dates=["gh_build_started_at"],

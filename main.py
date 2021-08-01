@@ -9,6 +9,10 @@ def dataset(args):
     DataCollectionService.create_dataset(args)
 
 
+def tr_torrent(args):
+    DataCollectionService.process_tr_torrent(args)
+
+
 def learn(args):
     DataCollectionService.run_all_tsp_accuracy_experiments(args)
 
@@ -32,9 +36,9 @@ def add_dataset_parser_arguments(parser):
         default=None,
     )
     parser.add_argument(
-        "-r",
-        "--rtp-path",
-        help="Path to RTP-Torrent's dataset root directory.",
+        "-c",
+        "--ci-data-path",
+        help="Path to CI datasource root directory, including RTP-Torrent and Travis Torrent.",
         type=Path,
         default=None,
     )
@@ -84,6 +88,10 @@ def main():
         "dataset",
         help="Create training dataset including all test case features for each CI cycle.",
     )
+    tr_torrent_parser = subparsers.add_parser(
+        "tr_torrent",
+        help="Process travis torrent logs and build info.",
+    )
     learn_parser = subparsers.add_parser(
         "learn",
         help="Perform learning experiments on collected features using RankLib.",
@@ -95,6 +103,22 @@ def main():
 
     add_dataset_parser_arguments(dataset_parser)
     dataset_parser.set_defaults(func=dataset)
+
+    tr_torrent_parser.set_defaults(func=tr_torrent)
+    tr_torrent_parser.add_argument(
+        "-i",
+        "--input-path",
+        help="Specifies the directory to of travis torrent raw data.",
+        type=Path,
+        required=True,
+    )
+    tr_torrent_parser.add_argument(
+        "-o",
+        "--output-path",
+        help="Specifies the directory to save resulting data.",
+        type=Path,
+        default=".",
+    )
 
     learn_parser.set_defaults(func=learn)
     learn_parser.add_argument(
