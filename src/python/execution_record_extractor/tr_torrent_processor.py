@@ -67,6 +67,7 @@ class TrTorrentProcessor:
         for repo in tqdm(
             all_repos, desc="Processing Travis Torrent's data for all projects"
         ):
+            print(f"Processing {repo} data")
             logs_path = source_path / "build_logs" / repo
             data_path = source_path / "data" / repo
             repo_output_path = output_path / repo
