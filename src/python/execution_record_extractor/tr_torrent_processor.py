@@ -69,9 +69,18 @@ class TrTorrentProcessor:
         ):
             logs_path = source_path / "build_logs" / repo
             data_path = source_path / "data" / repo
+            repo_output_path = output_path / repo
+            exe_output_file = repo_output_path / f"{repo}-full.csv"
+            builds_output_file = repo_output_path / f"{repo}-builds.csv"
+            if exe_output_file.exists() and builds_output_file.exists():
+                continue
+            if not (
+                (data_path / "data.csv").exists()
+                and (logs_path / "repo-data-travis.json").exists()
+            ):
+                continue
             exe_df = self.extract_exe_records(logs_path)
             builds_df = self.extract_builds(logs_path, data_path)
-            repo_output_path = output_path / repo
             repo_output_path.mkdir(parents=True, exist_ok=True)
-            exe_df.to_csv(repo_output_path / f"{repo}-full.csv", index=False)
-            builds_df.to_csv(repo_output_path / f"{repo}-builds.csv", index=False)
+            exe_df.to_csv(exe_output_file, index=False)
+            builds_df.to_csv(builds_output_file, index=False)
