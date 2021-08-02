@@ -9,6 +9,11 @@ class TrTorrentProcessor:
     def __init__(self):
         pass
 
+    def get_matched_number(self, matched_str):
+        if len(matched_str) == 0:
+            return 0
+        return int(matched_str)
+
     def extract_test_runs(self, log_path):
         log = ""
         with open(log_path) as f:
@@ -24,7 +29,7 @@ class TrTorrentProcessor:
             test_run["duration"] = float(match.group(8))
             test_run["count"] = int(match.group(4))
             test_run["failures"] = int(match.group(5))
-            test_run["errors"] = int(match.group(6))
+            test_run["errors"] = self.get_matched_number(match.group(6))
             test_run["skipped"] = int(match.group(7))
             test_runs.append(test_run)
         return test_runs
