@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 class TrTorrentProcessor:
     TEST_RUN_REGEX = r"Running (([A-Za-z]{1}[A-Za-z\d_]*\.)+[A-Za-z][A-Za-z\d_]*)(.*?)Tests run: (\d*), Failures: (\d*), Errors: (\d*), Skipped: (\d*), Time elapsed: ([+-]?([0-9]*[.])?[0-9]+)"
+    ANSI_COLOR_REGEX = r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])"
 
     def __init__(self):
         pass
@@ -20,8 +21,9 @@ class TrTorrentProcessor:
             log = f.read()
 
         test_runs = []
+        cleaned_log = re.compile(TrTorrentProcessor.ANSI_COLOR_REGEX).sub("", log)
         matches = re.finditer(
-            TrTorrentProcessor.TEST_RUN_REGEX, log, re.MULTILINE | re.DOTALL
+            TrTorrentProcessor.TEST_RUN_REGEX, cleaned_log, re.MULTILINE | re.DOTALL
         )
         for match in matches:
             test_run = {}
