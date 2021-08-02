@@ -33,18 +33,20 @@ class TorrentExtractor(ExecutionRecordExtractorInterface):
             / f"{user_login}@{project_name}"
             / f"{user_login}@{project_name}-full.csv"
         )
-        selected_jobs = (
-            rtp_exe_df.groupby(["travisBuildId", "travisJobId"], as_index=False)
-            .count()
-            .sort_values("testName", ignore_index=True, ascending=False)
-            .groupby("travisBuildId", as_index=False)
-            .first()["travisJobId"]
-            .unique()
-            .tolist()
-        )
         rtp_exe_df = (
-            rtp_exe_df[rtp_exe_df["travisJobId"].isin(selected_jobs)]
-            .copy()
+            rtp_exe_df.sort_values(
+                [
+                    "travisBuildId",
+                    "testName",
+                    "failures",
+                    "errors",
+                    "duration",
+                    "count",
+                ],
+                ascending=False,
+            )
+            .groupby(["travisBuildId", "testName"], as_index=False)
+            .first()
             .reset_index(drop=True)
         )
         builds_df = pd.read_csv(
@@ -92,23 +94,6 @@ class TorrentExtractor(ExecutionRecordExtractorInterface):
             build_exe_df[ExecutionRecord.TEST] = build_exe_df[
                 ExecutionRecord.TEST
             ].astype("int32")
-            build_exe_df = (
-                build_exe_df.groupby(
-                    ["travisBuildId", "travisJobId", ExecutionRecord.TEST],
-                    as_index=False,
-                )
-                .agg(
-                    {
-                        "testName": "first",
-                        "duration": sum,
-                        "count": sum,
-                        "failures": sum,
-                        "errors": sum,
-                        "skipped": sum,
-                    }
-                )
-                .reset_index(drop=True)
-            )
 
             for _, row in build_exe_df.iterrows():
                 test_verdict = TestVerdict.SUCCESS

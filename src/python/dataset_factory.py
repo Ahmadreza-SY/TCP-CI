@@ -407,23 +407,25 @@ class DatasetFactory:
         return build_change_history
 
     def create_dataset(self, builds, exe_records):
+        builds.sort(key=lambda b: b.started_at)
         exe_df = pd.DataFrame.from_records([e.to_dict() for e in exe_records])
-        dataset = []
-        valid_builds = self.select_valid_builds(builds, exe_df)
         build_time_dict = dict(
-            zip([b.id for b in valid_builds], [b.started_at for b in valid_builds])
-        )
-        valid_build_ids = [b.id for b in valid_builds]
-        exe_df = (
-            exe_df[exe_df[ExecutionRecord.BUILD].isin(valid_build_ids)]
-            .copy()
-            .reset_index(drop=True)
+            zip([b.id for b in builds], [b.started_at for b in builds])
         )
         exe_df["started_at"] = exe_df[ExecutionRecord.BUILD].apply(
             lambda b: build_time_dict[b]
         )
         exe_df.sort_values("started_at", ignore_index=True, inplace=True)
         exe_df.drop("started_at", inplace=True, axis=1)
+
+        dataset = []
+        valid_builds = self.select_valid_builds(builds, exe_df)
+        failed_builds = set(
+            exe_df[exe_df[ExecutionRecord.VERDICT] > 0][ExecutionRecord.BUILD]
+            .unique()
+            .tolist()
+        )
+        valid_builds = [b for b in valid_builds if b.id in failed_builds]
         build_change_history = self.create_build_change_history(builds)
         rec_extractor = RecFeatureExtractor(
             self.config.build_window, exe_df, build_change_history
