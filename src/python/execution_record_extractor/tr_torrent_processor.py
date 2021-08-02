@@ -32,7 +32,8 @@ class TrTorrentProcessor:
     def extract_exe_records(self, logs_path):
         records = []
         repo_data_df = pd.read_json(logs_path / "repo-data-travis.json")
-        for _, r in repo_data_df.iterrows():
+        rows = list(repo_data_df.iterrows())
+        for _, r in tqdm(rows, desc=f"Processing logs for {logs_path.name}"):
             build_id = r["build_id"]
             for job_id in r["jobs"]:
                 log_paths = list(
