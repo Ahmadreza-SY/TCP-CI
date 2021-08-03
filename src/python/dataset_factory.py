@@ -495,6 +495,9 @@ class DatasetFactory:
 
     def create_and_save_dataset(self, builds, exe_records):
         dataset = self.create_dataset(builds, exe_records)
+        if len(dataset) == 0:
+            print("No dataset created!")
+            return
         dataset_df = pd.DataFrame.from_records(dataset)
         cols = dataset_df.columns.tolist()
         cols.remove(Feature.BUILD)
