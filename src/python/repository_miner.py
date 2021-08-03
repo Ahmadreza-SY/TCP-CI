@@ -3,8 +3,8 @@ from .entities.entity import Language, Entity
 from .entities.dep_graph import DepGraph
 from .commit_classifier.commit_classifier import CommitClassifier, CommitType
 from typing import List
-from pydriller.domain.commit import ModificationType, DMMProperty
-from pydriller import RepositoryMining, GitRepository
+from pydriller.domain.commit import ModificationType
+from pydriller import GitRepository
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
@@ -39,17 +39,7 @@ class RepositoryMiner:
         self.git_repository = GitRepository(str(self.config.project_path))
         self.commit_change_list_d = {}
         self.commit_clf = CommitClassifier()
-
-    def checkout_default_branch(self):
-        g = Git(self.config.project_path)
-        remote = g.execute("git remote show".split())
-        if remote == "":
-            print("Git repository has no remote! Please set a remote.")
-            sys.exit()
-        result = g.execute(f"git remote show {remote}".split())
-        default_branch = re.search("HEAD branch: (.+)", result).groups()[0]
-        git_repository = GitRepository(self.config.project_path)
-        git_repository.repo.git.checkout(default_branch)
+        self.all_commits = self.get_all_commits()
 
     def get_contributor_id(self, commit):
         contributor = commit.author
@@ -71,9 +61,14 @@ class RepositoryMiner:
         contributors_df.to_csv(self.contributors_path, index=False)
 
     def get_all_commits(self):
-        self.checkout_default_branch()
-        repository = RepositoryMining(str(self.config.project_path))
-        return list(repository.traverse_commits())
+        g = Git(self.config.project_path)
+        all_commit_hashes = g.execute("git rev-list --all --remotes".split()).split(
+            "\n"
+        )
+        gr = GitRepository(self.config.project_path)
+        all_commits = [gr.get_commit(hash) for hash in all_commit_hashes]
+        all_commits.sort(key=lambda c: c.committer_date)
+        return all_commits
 
     def compute_modifications(self, commit):
         modifications = commit.modifications
@@ -86,8 +81,7 @@ class RepositoryMiner:
 
     def compute_entity_change_history(self) -> List[EntityChange]:
         change_history = []
-        commits = self.get_all_commits()
-        for commit in tqdm(commits, desc="Mining entity change history"):
+        for commit in tqdm(self.all_commits, desc="Mining entity change history"):
             if commit.hash in self.commit_change_list_d:
                 continue
             tik_list(["TES_PRO_P", "COD_COV_PRO_P", "Total"], commit=commit.hash)
@@ -219,11 +213,10 @@ class RepositoryMiner:
         if not self.commit_change_list_d:
             self.compute_and_save_entity_change_history()
         build_commit = self.get_build_commits(build)[0]
-        commit_date = build_commit.committer_date
-        self.checkout_default_branch()
-        repository = RepositoryMining(str(self.config.project_path), to=commit_date)
+        build_commit_date = build_commit.committer_date
+        commits = [c for c in self.all_commits if c.committer_date <= build_commit_date]
         co_changes = []
-        for commit in repository.traverse_commits():
+        for commit in commits:
             if commit.merge:
                 continue
             changes = self.get_changed_entities(commit)
