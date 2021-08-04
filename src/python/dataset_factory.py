@@ -1,14 +1,13 @@
 from pydriller.domain.commit import DMMProperty
 from .entities.entity import Entity
 from .entities.entity_change import EntityChange
-from .entities.execution_record import ExecutionRecord, Build
+from .entities.execution_record import ExecutionRecord
 from tqdm import tqdm
 import pandas as pd
 from scipy.stats.mstats import gmean
 import numpy as np
 from .timer import tik, tok, tik_list, tok_list
 import sys
-from .constants import *
 from .feature_extractor.feature import Feature
 from .feature_extractor.rec_feature_extractor import RecFeatureExtractor
 
@@ -508,113 +507,3 @@ class DatasetFactory:
         dataset_df.to_csv(self.config.output_path / "dataset.csv", index=False)
         self.repository_miner.clean_analysis_path()
         print(f'Saved dataset to {self.config.output_path / "dataset.csv"}')
-
-    # TODO: Consider new features
-    def create_decay_dataset(self, dataset_df, og_build, test_builds):
-        og_build_dataset = dataset_df[dataset_df[Feature.BUILD] == og_build.id].copy()
-        og_build_tc_features = {}
-        for _, row in og_build_dataset.iterrows():
-            test_id = row[Feature.TEST]
-            og_build_tc_features[test_id] = {}
-            for f in TES_COM + TES_PRO:
-                og_build_tc_features[test_id][f] = row[f]
-        og_test_ids = og_build_dataset[Feature.TEST].values.tolist()
-        og_metadata_path = (
-            self.repository_miner.get_analysis_path(og_build) / "metadata.csv"
-        )
-        og_entities_df = pd.read_csv(og_metadata_path)
-        og_entities_dict = {e[Entity.ID]: e for e in og_entities_df.to_dict("records")}
-        og_src_ids = list(
-            set(og_entities_df[Entity.ID].values.tolist()) - set(og_test_ids)
-        )
-
-        decay_dataset = []
-        for test_build in test_builds:
-            test_build_dataset = dataset_df[
-                dataset_df[Feature.BUILD] == test_build.id
-            ].copy()
-            test_ids = test_build_dataset[Feature.TEST].values.tolist()
-            og_coverage = self.compute_test_coverage(
-                og_build,
-                og_test_ids,
-                og_src_ids,
-                test_build,
-            )
-
-            test_build_tc_features = {}
-            self.compute_cov_features(
-                test_build, test_ids, og_coverage, test_build_tc_features
-            )
-            self.compute_cod_cov_features(
-                og_build,
-                test_ids,
-                og_coverage,
-                og_entities_dict,
-                test_build_tc_features,
-                test_build,
-            )
-            self.compute_det_features(
-                og_build, test_ids, og_coverage, test_build_tc_features
-            )
-
-            for _, row in test_build_dataset.iterrows():
-                features = {}
-                test_id = row[Feature.TEST]
-                features[Feature.BUILD] = test_build.id
-                features[Feature.TEST] = test_id
-                features[Feature.VERDICT] = row[Feature.VERDICT]
-                features[Feature.DURATION] = row[Feature.DURATION]
-                for f in TES_COM + TES_PRO:
-                    if test_id not in og_build_tc_features:
-                        features[f] = None
-                        continue
-                    features[f] = og_build_tc_features[test_id][f]
-                for f in TES_CHN + REC:
-                    features[f] = row[f]
-                for f in COV + COD_COV_COM + COD_COV_PRO + COD_COV_CHN + DET_COV:
-                    if test_id not in test_build_tc_features:
-                        features[f] = None
-                        continue
-                    features[f] = test_build_tc_features[test_id][f]
-                decay_dataset.append(features)
-
-        return decay_dataset
-
-    def create_decay_datasets(self, dataset_df):
-        # TODO: change to work with all CI extractors!
-        all_builds_df = pd.read_csv(
-            self.config.output_path / "full_builds.csv",
-            usecols=["id", "commit_hash"],
-            sep="\t",
-        )
-        build_to_commit = dict(
-            zip(
-                all_builds_df["id"].values.tolist(),
-                all_builds_df["commit_hash"].values.tolist(),
-            )
-        )
-        builds = dataset_df[Feature.BUILD].unique()
-        # TODO: sort by date
-        builds = np.sort(builds)
-        decay_datasets_path = self.config.output_path / "decay_datasets"
-        decay_datasets_path.mkdir(parents=True, exist_ok=True)
-        for i, build_id in tqdm(
-            enumerate(builds), desc="Creating decay datasets", total=len(builds)
-        ):
-            if i == 0:
-                continue
-
-            dataset_path = decay_datasets_path / str(build_id)
-            if (dataset_path / "dataset.csv").exists():
-                continue
-
-            og_build = Build(build_id, build_to_commit[build_id])
-            test_builds = [
-                Build(test_build_id, build_to_commit[test_build_id])
-                for test_build_id in builds[i:]
-            ]
-            decay_dataset = self.create_decay_dataset(dataset_df, og_build, test_builds)
-            decay_dataset_df = pd.DataFrame.from_records(decay_dataset)
-            decay_dataset_df = decay_dataset_df.fillna(decay_dataset_df.mean())
-            dataset_path.mkdir(parents=True, exist_ok=True)
-            decay_dataset_df.to_csv(dataset_path / "dataset.csv", index=False)

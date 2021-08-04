@@ -116,11 +116,35 @@ class Feature:
     IMP_SCORE_SUM = "ImpScoreSum"
     CHN_COUNT = "ChnCount"
     IMP_COUNT = "ImpCount"
+    cov_features = [CHN_SCORE_SUM, IMP_SCORE_SUM, CHN_COUNT, IMP_COUNT]
+    cov_impacted = [IMP_SCORE_SUM, IMP_COUNT]
     # DET Features
     FAULTS = "Faults"
+    det_features = [FAULTS]
     # Ground Truth
     VERDICT = "Verdict"
     DURATION = "Duration"
+
+    # Feature Groups' feature names
+    TES_COM = [f"TES_COM_{m}" for m in complexity_metrics]
+    TES_PRO = [f"TES_PRO_{m}" for m in process_metrics]
+    TES_CHN = [f"TES_CHN_{m}" for m in change_metrics]
+    REC = [f"REC_{m}" for m in rec_features]
+    COV = [f"COV_{m}" for m in cov_features]
+    COD_COV_COM = [f"COD_COV_COM_C_{m}" for m in complexity_metrics] + [
+        f"COD_COV_COM_IMP_{m}" for m in complexity_metrics
+    ]
+    COD_COV_PRO = [f"COD_COV_PRO_C_{m}" for m in process_metrics] + [
+        f"COD_COV_PRO_IMP_{m}" for m in process_metrics
+    ]
+    COD_COV_CHN = [f"COD_COV_CHN_C_{m}" for m in change_metrics]
+    DET_COV = [f"DET_COV_C_{m}" for m in det_features] + [
+        f"DET_COV_IMP_{m}" for m in det_features
+    ]
+    # Features' names which are related to impacted files
+    IMPACTED_FEATURES = [f for f in COV if "_Imp" in f] + [
+        f for f in COD_COV_COM + COD_COV_PRO + DET_COV if "_IMP_" in f
+    ]
 
     @staticmethod
     def get_metric_prefix(metric):

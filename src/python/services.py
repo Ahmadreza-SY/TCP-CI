@@ -1,4 +1,5 @@
 import pandas as pd
+from .decay_dataset_factory import DecayDatasetFactory
 from .entities.execution_record import ExecutionRecord
 from .dataset_factory import DatasetFactory
 from .feature_extractor.feature import Feature
@@ -7,7 +8,7 @@ import sys
 from .timer import tik, tok, save_time_measures
 from .ranklib_learner import RankLibLearner
 import subprocess
-from .constants import *
+from .feature_extractor.feature import Feature
 from .code_analyzer.code_analyzer import AnalysisLevel
 from .execution_record_extractor.tr_torrent_processor import TrTorrentProcessor
 
@@ -111,19 +112,21 @@ class DataCollectionService:
         print()
         print("***** Running w/o impacted feature set experiments *****")
         learner.run_accuracy_experiments(
-            dataset_df.drop(IMPACTED_FEATURES, axis=1), "wo-impacted", results_path
+            dataset_df.drop(Feature.IMPACTED_FEATURES, axis=1),
+            "wo-impacted",
+            results_path,
         )
         print()
         feature_groups_names = {
-            "TES_COM": TES_COM,
-            "TES_PRO": TES_PRO,
-            "TES_CHN": TES_CHN,
-            "REC": REC,
-            "COV": COV,
-            "COD_COV_COM": COD_COV_COM,
-            "COD_COV_PRO": COD_COV_PRO,
-            "COD_COV_CHN": COD_COV_CHN,
-            "DET_COV": DET_COV,
+            "TES_COM": Feature.TES_COM,
+            "TES_PRO": Feature.TES_PRO,
+            "TES_CHN": Feature.TES_CHN,
+            "REC": Feature.REC,
+            "COV": Feature.COV,
+            "COD_COV_COM": Feature.COD_COV_COM,
+            "COD_COV_PRO": Feature.COD_COV_PRO,
+            "COD_COV_CHN": Feature.COD_COV_CHN,
+            "DET_COV": Feature.DET_COV,
         }
         for feature_group, names in feature_groups_names.items():
             print(f"***** Running w/o {feature_group} feature set experiments *****")
@@ -132,9 +135,15 @@ class DataCollectionService:
             )
             print()
 
-        test_code_features = TES_COM + TES_PRO + TES_CHN
-        test_execution_features = REC
-        test_coverage_features = COV + COD_COV_COM + COD_COV_PRO + COD_COV_CHN + DET_COV
+        test_code_features = Feature.TES_COM + Feature.TES_PRO + Feature.TES_CHN
+        test_execution_features = Feature.REC
+        test_coverage_features = (
+            Feature.COV
+            + Feature.COD_COV_COM
+            + Feature.COD_COV_PRO
+            + Feature.COD_COV_CHN
+            + Feature.DET_COV
+        )
         high_level_feature_groups = {
             "Code": test_code_features,
             "Execution": test_execution_features,
@@ -165,7 +174,8 @@ class DataCollectionService:
             repo_miner,
         )
         dataset_df = pd.read_csv(args.output_path / "dataset.csv")
-        dataset_factory.create_decay_datasets(dataset_df)
+        decay_ds_factory = DecayDatasetFactory(dataset_factory, args)
+        decay_ds_factory.create_decay_datasets(dataset_df)
 
         learner = RankLibLearner(args)
         datasets_path = args.output_path / "decay_datasets"

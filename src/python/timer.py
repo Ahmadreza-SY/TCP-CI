@@ -175,10 +175,13 @@ def create_impacted_time_df(build_time_df, valid_builds):
 
 def save_time_measures(output_path, builds):
     time_df = create_time_measures_df()
-    time_df.to_csv(f"{output_path}/time_measure.csv", index=False)
+    time_df.to_csv(output_path / "time_measure.csv", index=False)
+
+    if not (output_path / "dataset.csv").exists():
+        return
 
     valid_builds = (
-        pd.read_csv(f"{output_path}/dataset.csv", usecols=["Build"])["Build"]
+        pd.read_csv(output_path / "dataset.csv", usecols=["Build"])["Build"]
         .unique()
         .tolist()
     )

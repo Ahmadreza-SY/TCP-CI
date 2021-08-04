@@ -36,6 +36,12 @@ class RankLibLearner:
         else:
             self.feature_id_map = {}
             self.next_fid = 1
+        builds_df = pd.read_csv(
+            config.output_path / "builds.csv", parse_dates=["started_at"]
+        )
+        self.build_time_d = dict(
+            zip(builds_df["id"].values.tolist(), builds_df["started_at"].values.tolist)
+        )
 
     def get_feature_id(self, feature_name):
         if feature_name not in self.feature_id_map:
@@ -117,9 +123,8 @@ class RankLibLearner:
         return pd.DataFrame(ranklib_ds_rows, columns=headers)
 
     def create_ranklib_training_sets(self, ranklib_ds, output_path):
-        builds = ranklib_ds["i_build"].unique()
-        # TODO: sort by date
-        builds = np.sort(builds)
+        builds = ranklib_ds["i_build"].unique().tolist()
+        builds.sort(key=lambda b: self.build_time_d[b])
         for i, build in tqdm(list(enumerate(builds)), desc="Creating training sets"):
             if i == 0:
                 continue
@@ -246,8 +251,11 @@ class RankLibLearner:
             results["build"].append(int(build_ds_path.name))
             results[eval_metric].append(eval_score)
         results_df = pd.DataFrame(results)
-        # TODO: sort by date
-        results_df.sort_values("build", ignore_index=True, inplace=True)
+        results_df["build_time"] = results_df["build"].apply(
+            lambda b: self.build_time_d[b]
+        )
+        results_df.sort_values("build_time", ignore_index=True, inplace=True)
+        results_df.drop("build_time", axis=1, inplace=True)
         return results_df
 
     def run_accuracy_experiments(self, dataset_df, name, results_path):
@@ -374,8 +382,13 @@ class RankLibLearner:
                 if len(set(pred_df["score"].values.tolist())) == 1 and len(pred_df) > 1:
                     eval_score = 0.5
                 results[eval_metric].append(eval_score)
-            # TODO: sort by date
-            pd.DataFrame(results).sort_values("build", ignore_index=True).to_csv(
+            results_df = pd.DataFrame(results)
+            results_df["build_time"] = results_df["build"].apply(
+                lambda b: self.build_time_d[b]
+            )
+            results_df.sort_values("build_time", ignore_index=True, inplace=True)
+            results_df.drop("build_time", axis=1, inplace=True)
+            results_df.to_csv(
                 datasets_path / model_path.name / f"{eval_metric}_results.csv",
                 index=False,
             )
