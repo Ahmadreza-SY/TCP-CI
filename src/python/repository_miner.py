@@ -13,8 +13,6 @@ from apyori import apriori
 from git import Git
 import more_itertools as mit
 from itertools import combinations
-import sys
-import re
 from .timer import tik, tok, tik_list, tok_list
 import os
 
@@ -143,7 +141,7 @@ class RepositoryMiner:
     def checkout_build_commit(self, build):
         for commit in build.commits:
             try:
-                self.git_repository.repo.git.checkout(commit)
+                self.git_repository.repo.git.checkout(commit, force=True)
                 return True
             except:
                 pass
