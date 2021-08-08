@@ -106,9 +106,16 @@ class DataCollectionService:
         print(f"##### Running experiments for {dataset_path.parent.name} #####")
         learner = RankLibLearner(args)
         dataset_df = pd.read_csv(dataset_path)
+        builds_count = dataset_df[Feature.BUILD].nunique()
+        if builds_count <= args.test_count:
+            print(
+                f"Not enough builds for training: require at least {args.test_count + 1}, found {builds_count}"
+            )
+            sys.exit()
         results_path = args.output_path / "tsp_accuracy_results"
         print("***** Running full feature set experiments *****")
         learner.run_accuracy_experiments(dataset_df, "full", results_path)
+        learner.test_heuristics(dataset_df, results_path / "full")
         print()
         print("***** Running w/o impacted feature set experiments *****")
         learner.run_accuracy_experiments(
@@ -175,11 +182,11 @@ class DataCollectionService:
         )
         dataset_df = pd.read_csv(args.output_path / "dataset.csv")
         decay_ds_factory = DecayDatasetFactory(dataset_factory, args)
-        decay_ds_factory.create_decay_datasets(dataset_df)
+        models_path = args.output_path / "tsp_accuracy_results" / "full"
+        decay_ds_factory.create_decay_datasets(dataset_df, models_path)
 
         learner = RankLibLearner(args)
         datasets_path = args.output_path / "decay_datasets"
-        models_path = args.output_path / "tsp_accuracy_results" / "full"
         learner.run_decay_test_experiments(datasets_path, models_path)
         print(f"All finished and results are saved at {datasets_path}")
         print()

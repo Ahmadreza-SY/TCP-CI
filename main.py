@@ -135,6 +135,13 @@ def main():
         type=Path,
         default=".",
     )
+    learn_parser.add_argument(
+        "-t",
+        "--test-count",
+        help="Specifies the number of recent builds to test the trained models on.",
+        type=int,
+        default=".",
+    )
 
     decay_test_parser.set_defaults(func=decay_test)
     decay_test_parser.add_argument(

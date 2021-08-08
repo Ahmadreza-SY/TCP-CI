@@ -13,18 +13,30 @@ class DecayDatasetFactory:
         self.config = config
 
     def update_test_file_features(
-        self, features, rec_extractor, test_build_changed_ents, og_build, test_exe_df
+        self,
+        features,
+        rec_extractor,
+        test_build_changed_ents,
+        og_build,
+        test_id,
+        exe_df,
     ):
         test_exe_history = (
-            test_exe_df[
-                test_exe_df.index
-                < test_exe_df[test_exe_df[ExecutionRecord.BUILD] == og_build.id].index[
-                    0
-                ]
+            exe_df[
+                (
+                    exe_df.index
+                    < exe_df[exe_df[ExecutionRecord.BUILD] == og_build.id].index[0]
+                )
+                & (exe_df[ExecutionRecord.TEST] == test_id)
             ]
             .copy()
             .reset_index(drop=True)
         )
+        if len(test_exe_history) == 0:
+            features[Feature.MAX_TEST_FILE_FAIL_RATE] = Feature.DEFAULT_VALUE
+            features[Feature.MAX_TEST_FILE_TRANSITION_RATE] = Feature.DEFAULT_VALUE
+            return
+
         test_exe_history["transition"] = (
             test_exe_history[ExecutionRecord.VERDICT].diff().fillna(0) != 0
         ).astype(int)
@@ -61,9 +73,7 @@ class DecayDatasetFactory:
         )
 
         build_change_history = self.ds_factory.create_build_change_history(all_builds)
-        rec_extractor = RecFeatureExtractor(
-            self.config.build_window, exe_df, build_change_history
-        )
+        rec_extractor = RecFeatureExtractor(None, exe_df, build_change_history)
 
         decay_dataset = []
         for test_build in test_builds:
@@ -103,11 +113,11 @@ class DecayDatasetFactory:
 
             for _, row in test_build_dataset.iterrows():
                 features = {}
-                test_id = row[Feature.TEST]
+                test_id = int(row[Feature.TEST])
                 features[Feature.BUILD] = test_build.id
                 features[Feature.TEST] = test_id
-                features[Feature.VERDICT] = row[Feature.VERDICT]
-                features[Feature.DURATION] = row[Feature.DURATION]
+                features[Feature.VERDICT] = int(row[Feature.VERDICT])
+                features[Feature.DURATION] = int(row[Feature.DURATION])
                 for f in Feature.TES_COM + Feature.TES_PRO:
                     if test_id not in og_build_tc_features:
                         features[f] = None
@@ -116,17 +126,13 @@ class DecayDatasetFactory:
                 for f in Feature.TES_CHN + Feature.REC:
                     features[f] = row[f]
 
-                test_exe_df = (
-                    exe_df[exe_df[ExecutionRecord.TEST] == test_id]
-                    .copy()
-                    .reset_index(drop=True)
-                )
                 self.update_test_file_features(
                     features,
                     rec_extractor,
                     test_build_changed_ents,
                     og_build,
-                    test_exe_df,
+                    test_id,
+                    exe_df,
                 )
 
                 for f in (
@@ -144,12 +150,15 @@ class DecayDatasetFactory:
 
         return decay_dataset
 
-    def create_decay_datasets(self, dataset_df):
+    def create_decay_datasets(self, dataset_df, models_path):
         all_builds_df = pd.read_csv(
             self.config.output_path / "builds.csv",
             parse_dates=["started_at"],
         )
-        all_builds = all_builds_df["id"].values.tolist()
+        all_builds = [
+            Build(int(r["id"]), r["commits"].split("#"), r["started_at"])
+            for _, r in all_builds_df.iterrows()
+        ]
         build_to_commits = dict(
             zip(
                 all_builds_df["id"].values.tolist(),
@@ -162,8 +171,8 @@ class DecayDatasetFactory:
                 all_builds_df["started_at"].values.tolist(),
             )
         )
-        builds = dataset_df[Feature.BUILD].unique().tolist()
-        builds.sort(key=lambda b: build_to_time[b])
+        tested_builds = [int(p.name) for p in models_path.glob("*") if p.is_dir()]
+        tested_builds.sort(key=lambda b: build_to_time[b])
 
         exe_df = pd.read_csv(self.config.output_path / "exe.csv")
         exe_df["started_at"] = exe_df[ExecutionRecord.BUILD].apply(
@@ -175,11 +184,10 @@ class DecayDatasetFactory:
         decay_datasets_path = self.config.output_path / "decay_datasets"
         decay_datasets_path.mkdir(parents=True, exist_ok=True)
         for i, build_id in tqdm(
-            enumerate(builds), desc="Creating decay datasets", total=len(builds)
+            enumerate(tested_builds),
+            desc="Creating decay datasets",
+            total=len(tested_builds),
         ):
-            if i == 0:
-                continue
-
             dataset_path = decay_datasets_path / str(build_id)
             if (dataset_path / "dataset.csv").exists():
                 continue
@@ -193,7 +201,7 @@ class DecayDatasetFactory:
                     build_to_commits[test_build_id],
                     build_to_time[test_build_id],
                 )
-                for test_build_id in builds[i:]
+                for test_build_id in tested_builds[i:]
             ]
             decay_dataset = self.create_decay_dataset(
                 dataset_df, og_build, test_builds, all_builds, exe_df
