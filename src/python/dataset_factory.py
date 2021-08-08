@@ -126,7 +126,11 @@ class DatasetFactory:
             ent_change_history = build_change_history[
                 build_change_history[EntityChange.ID] == ent_id
             ]
-            if ent_change_history.empty:
+            authored_lines_sum = (
+                ent_change_history[EntityChange.ADDED_LINES].sum()
+                + ent_change_history[EntityChange.DELETED_LINES].sum()
+            )
+            if ent_change_history.empty or authored_lines_sum == 0:
                 ent_change_history = self.change_history[
                     (
                         self.change_history[EntityChange.COMMIT_DATE]
