@@ -61,11 +61,11 @@ class ResultAnalyzer:
                     ds_path.name.replace("@", "/")
                 )
                 subject_stats.setdefault("SLOC", []).append(self.compute_sloc(ds_path))
-                subject_stats.setdefault("# Builds", []).append(
+                subject_stats.setdefault("\\# Builds", []).append(
                     exe_df[ExecutionRecord.BUILD].nunique()
                 )
-                subject_stats.setdefault("# Failed Builds", []).append(failed_builds)
-                subject_stats.setdefault("Avg. # TC/Build", []).append(round(avg_tc))
+                subject_stats.setdefault("\\# Failed Builds", []).append(failed_builds)
+                subject_stats.setdefault("Avg. \\# TC/Build", []).append(round(avg_tc))
                 subject_stats.setdefault("Avg. Test Time (min)", []).append(
                     avg_duration
                 )
@@ -86,7 +86,7 @@ class ResultAnalyzer:
             lambda s: f"$S_{{{self.subject_id_map[s]}}}$"
         )
         stats_df["SLOC"] = stats_df["SLOC"].apply(lambda n: f"{int(n/1000.0)}k")
-        stats_df["# Builds"] = stats_df["# Builds"].apply(lambda n: f"{n:,}")
+        stats_df["\\# Builds"] = stats_df["\\# Builds"].apply(lambda n: f"{n:,}")
         cols = stats_df.columns.tolist()
         cols = [cols.pop()] + cols
         stats_df = stats_df[cols]
