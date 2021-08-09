@@ -1,4 +1,3 @@
-from datetime import time
 import pandas as pd
 from ..feature_extractor.feature import Feature
 from ..entities.execution_record import ExecutionRecord
@@ -101,7 +100,9 @@ class ResultAnalyzer:
         )
         stats_df["SLOC"] = stats_df["SLOC"].apply(lambda n: f"{int(n/1000.0)}k")
         stats_df["\\# Builds"] = stats_df["\\# Builds"].apply(lambda n: f"{n:,}")
-        stats_df["\\# Commits"] = stats_df["\\# Commits"].apply(lambda n: f"{n:,}")
+        stats_df["\\# Commits"] = stats_df["\\# Commits"].apply(
+            lambda n: "{:.1f}".format(n / 1000.0) + "k"
+        )
         cols = stats_df.columns.tolist()
         cols = [cols.pop()] + cols
         stats_df = stats_df[cols]
