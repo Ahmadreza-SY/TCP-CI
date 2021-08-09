@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 class ResultAnalyzer:
     BUILD_THRESHOLD = 50
+    DURATION_THRESHOLD = 5
 
     def __init__(self, config):
         self.config = config
@@ -54,6 +55,8 @@ class ResultAnalyzer:
                     if avg_duration > 60000
                     else "{:.2f}".format(float(avg_duration) / 60000.0)
                 )
+                if avg_duration < ResultAnalyzer.DURATION_THRESHOLD:
+                    continue
                 subject_stats.setdefault("Subject", []).append(
                     ds_path.name.replace("@", "/")
                 )
