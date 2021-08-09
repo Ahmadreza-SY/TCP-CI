@@ -53,7 +53,7 @@ class ResultAnalyzer:
                 avg_duration = (
                     int(avg_duration / 60000.0)
                     if avg_duration > 60000
-                    else "{:.2f}".format(float(avg_duration) / 60000.0)
+                    else float("{:.2f}".format(float(avg_duration) / 60000.0))
                 )
                 if avg_duration < ResultAnalyzer.DURATION_THRESHOLD:
                     continue
