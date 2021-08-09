@@ -82,8 +82,8 @@ class ResultAnalyzer:
         self.subject_id_map = dict(
             zip(stats_df["Subject"].values.tolist(), (stats_df.index + 1).tolist())
         )
-        stats_df["$S_ID$"] = stats_df["Subject"].apply(
-            lambda s: f"$S_{self.subject_id_map[s]}$"
+        stats_df["$S_{ID}$"] = stats_df["Subject"].apply(
+            lambda s: f"$S_{{{self.subject_id_map[s]}}}$"
         )
         stats_df["SLOC"] = stats_df["SLOC"].apply(lambda n: f"{int(n/1000.0)}k")
         stats_df["# Builds"] = stats_df["# Builds"].apply(lambda n: f"{n:,}")
