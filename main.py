@@ -1,4 +1,5 @@
-from src.python.services import *
+from src.python.services.data_collection_service import DataCollectionService
+from src.python.services.experiments_service import ExperimentsService
 import argparse
 from src.python.code_analyzer.code_analyzer import AnalysisLevel
 from src.python.entities.entity import Language
@@ -14,11 +15,15 @@ def tr_torrent(args):
 
 
 def learn(args):
-    DataCollectionService.run_all_tsp_accuracy_experiments(args)
+    ExperimentsService.run_all_tsp_accuracy_experiments(args)
 
 
 def decay_test(args):
-    DataCollectionService.run_decay_test_experiments(args)
+    ExperimentsService.run_decay_test_experiments(args)
+
+
+def results(args):
+    ExperimentsService.analyze_results(args)
 
 
 def add_dataset_parser_arguments(parser):
@@ -100,6 +105,10 @@ def main():
         "decay_test",
         help="Perform ML ranking models decay test experiments on trained models.",
     )
+    results_parser = subparsers.add_parser(
+        "results",
+        help="Analyze the results from experiments and generate tables.",
+    )
 
     add_dataset_parser_arguments(dataset_parser)
     dataset_parser.set_defaults(func=dataset)
@@ -157,6 +166,22 @@ def main():
         help="Project's source code git repository path.",
         type=Path,
         default=None,
+    )
+
+    results_parser.set_defaults(func=results)
+    results_parser.add_argument(
+        "-d",
+        "--data-path",
+        help="Path to the root folder of all datasets.",
+        type=Path,
+        default=None,
+    )
+    results_parser.add_argument(
+        "-o",
+        "--output-path",
+        help="Specifies the directory to save resulting tables.",
+        type=Path,
+        default=".",
     )
 
     args = parser.parse_args()
