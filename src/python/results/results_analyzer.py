@@ -74,6 +74,9 @@ class ResultAnalyzer:
 
     def generate_subject_stats_table(self):
         stats_df = self.extract_subjects_stats(self.config.data_path)
+        if len(stats_df) == 0:
+            print("No valid subject available")
+            return
         stats_df.to_csv(self.config.output_path / "subject_stats.csv", index=False)
         stats_df.sort_values("SLOC", ascending=False, ignore_index=True, inplace=True)
         self.subject_id_map = dict(
@@ -88,4 +91,8 @@ class ResultAnalyzer:
         cols = [cols.pop()] + cols
         stats_df = stats_df[cols]
         with (self.config.output_path / "subject_stats.tex").open("w") as f:
-            f.write(stats_df.to_latex(index=False, caption="Subject statistics"))
+            f.write(
+                stats_df.to_latex(
+                    index=False, caption="Subject statistics", escape=False
+                )
+            )
