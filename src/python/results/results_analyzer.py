@@ -1,6 +1,8 @@
+from datetime import time
 import pandas as pd
 from ..feature_extractor.feature import Feature
 from ..entities.execution_record import ExecutionRecord
+from ..entities.entity_change import EntityChange
 import subprocess
 import shlex
 import os
@@ -57,10 +59,22 @@ class ResultAnalyzer:
                 )
                 if avg_duration < ResultAnalyzer.DURATION_THRESHOLD:
                     continue
+
+                change_history = pd.read_csv(ds_path / "entity_change_history.csv")
+                builds = pd.read_csv(ds_path / "builds.csv", parse_dates=["started_at"])
+                time_period = (
+                    builds["started_at"].max() - builds["started_at"].min()
+                ).days
+                time_period = round(float(time_period) / 30.0)
+
                 subject_stats.setdefault("Subject", []).append(
                     ds_path.name.replace("@", "/")
                 )
                 subject_stats.setdefault("SLOC", []).append(self.compute_sloc(ds_path))
+                subject_stats.setdefault("\\# Commits", []).append(
+                    change_history[EntityChange.COMMIT].nunique()
+                )
+                subject_stats.setdefault("Time period (months)", []).append(time_period)
                 subject_stats.setdefault("\\# Builds", []).append(
                     exe_df[ExecutionRecord.BUILD].nunique()
                 )
@@ -87,6 +101,7 @@ class ResultAnalyzer:
         )
         stats_df["SLOC"] = stats_df["SLOC"].apply(lambda n: f"{int(n/1000.0)}k")
         stats_df["\\# Builds"] = stats_df["\\# Builds"].apply(lambda n: f"{n:,}")
+        stats_df["\\# Commits"] = stats_df["\\# Commits"].apply(lambda n: f"{n:,}")
         cols = stats_df.columns.tolist()
         cols = [cols.pop()] + cols
         stats_df = stats_df[cols]
