@@ -20,6 +20,7 @@ class ResultAnalyzer:
     def analyze_results(self):
         self.generate_subject_stats_table()
         self.generate_data_collection_time_table()
+        self.generate_testing_vs_total_time_table()
 
     def compute_sloc(self, ds_path):
         source_path = ds_path / ds_path.name.split("@")[1]
@@ -191,3 +192,49 @@ class ResultAnalyzer:
         time_results = time_results[cols]
         with (self.config.output_path / "rq1_avg_time.tex").open("w") as f:
             f.write(time_results.to_latex(index=False, escape=False))
+
+    def compute_testing_vs_total_time(self):
+        results = {"s": [], "att": [], "adct": [], "ct": []}
+        for subject, sid in self.subject_id_map.items():
+            results["s"].append(sid)
+            output_path = self.config.data_path / subject
+            ds_df = pd.read_csv(output_path / "dataset.csv")
+            testing_time = (
+                ds_df[[Feature.BUILD, Feature.DURATION]]
+                .groupby(Feature.BUILD, as_index=False)
+                .sum()
+            )
+            avg_testing_time = testing_time[Feature.DURATION].mean() / 60000.0
+            results["att"].append(avg_testing_time)
+
+            imp_time_df = pd.read_csv(output_path / "impacted_time.csv")
+            total_time_avg = (
+                imp_time_df[imp_time_df["ProcessName"] == "Total"][
+                    Feature.DURATION
+                ].mean()
+                / 60.0
+            )
+            results["adct"].append(total_time_avg)
+
+            ct = round((total_time_avg * 100.0) / avg_testing_time)
+            results["ct"].append(ct)
+
+        results_df = pd.DataFrame(results)
+        return results_df
+
+    def generate_testing_vs_total_time_table(self):
+        time_df = self.compute_testing_vs_total_time()
+        time_df.to_csv(
+            self.config.output_path / "rq1_testing_vs_total_time.csv", index=False
+        )
+        time_df["s"] = time_df["s"].apply(lambda id: f"$S_{{{id}}}$")
+        time_df["att"] = time_df["att"].apply(lambda n: "{:.1f}".format(n))
+        time_df["adct"] = time_df["adct"].apply(lambda n: "{:.1f}".format(n))
+        time_df.columns = [
+            "$S_{ID}$",
+            "Avg. Testing Time",
+            "Avg. Data Collection Time",
+            "Collection/Testing (\\%)",
+        ]
+        with (self.config.output_path / "rq1_testing_vs_total_time.tex").open("w") as f:
+            f.write(time_df.to_latex(index=False, escape=False))
