@@ -183,7 +183,7 @@ class ResultAnalyzer:
                 continue
             time_results[col] = time_results[col].apply(lambda n: "{:.2f}".format(n))
         time_results["$S_{ID}$"] = time_results["S_ID"].apply(
-            lambda id: f"$S_{id}$" if id != "Avg" else id
+            lambda id: f"$S_{{{id}}}$" if id != "Avg" else id
         )
         time_results.drop("S_ID", axis=1, inplace=True)
         cols = time_results.columns.tolist()
