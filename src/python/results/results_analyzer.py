@@ -138,7 +138,9 @@ class ResultAnalyzer:
             summary[f"{fg}-T"] = []
         all_subjects_time_df = []
 
-        for subject, sid in self.subject_id_map.items():
+        for subject, sid in tqdm(
+            self.subject_id_map.items(), desc="Computing avg data collection times"
+        ):
             time_df = pd.read_csv(
                 self.config.data_path / subject / "feature_group_time.csv"
             )
@@ -195,16 +197,18 @@ class ResultAnalyzer:
 
     def compute_testing_vs_total_time(self):
         results = {"s": [], "att": [], "adct": [], "ct": []}
-        for subject, sid in self.subject_id_map.items():
+        for subject, sid in tqdm(
+            self.subject_id_map.items(), desc="Computing testing vs total times"
+        ):
             results["s"].append(sid)
             output_path = self.config.data_path / subject
-            ds_df = pd.read_csv(output_path / "dataset.csv")
-            testing_time = (
-                ds_df[[Feature.BUILD, Feature.DURATION]]
-                .groupby(Feature.BUILD, as_index=False)
-                .sum()
+            exe_df = pd.read_csv(output_path / "exe.csv")
+            avg_testing_time = (
+                exe_df.groupby(ExecutionRecord.BUILD)
+                .sum()[ExecutionRecord.DURATION]
+                .mean()
+                / 60000.0
             )
-            avg_testing_time = testing_time[Feature.DURATION].mean() / 60000.0
             results["att"].append(avg_testing_time)
 
             imp_time_df = pd.read_csv(output_path / "impacted_time.csv")
