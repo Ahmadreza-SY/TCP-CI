@@ -7,11 +7,24 @@ import shlex
 import os
 from tqdm import tqdm
 import numpy as np
+from scipy.stats import wilcoxon
+import pingouin as pg
 
 
 class ResultAnalyzer:
     BUILD_THRESHOLD = 50
     DURATION_THRESHOLD = 5
+    FEATURE_GROUPS = [
+        "COD_COV_COM",
+        "COD_COV_PRO",
+        "DET_COV",
+        "COD_COV_CHN",
+        "COV",
+        "TES_COM",
+        "TES_PRO",
+        "REC",
+        "TES_CHN",
+    ]
 
     def __init__(self, config):
         self.config = config
@@ -21,6 +34,7 @@ class ResultAnalyzer:
         self.generate_subject_stats_table()
         self.generate_data_collection_time_table()
         self.generate_testing_vs_total_time_table()
+        self.generate_time_tests_table()
 
     def compute_sloc(self, ds_path):
         source_path = ds_path / ds_path.name.split("@")[1]
@@ -119,20 +133,9 @@ class ResultAnalyzer:
             )
 
     def compute_data_collection_time(self):
-        feature_groups = [
-            "COD_COV_COM",
-            "COD_COV_PRO",
-            "DET_COV",
-            "COD_COV_CHN",
-            "COV",
-            "TES_COM",
-            "TES_PRO",
-            "REC",
-            "TES_CHN",
-        ]
         summary = {}
         summary["S_ID"] = []
-        for fg in feature_groups:
+        for fg in ResultAnalyzer.FEATURE_GROUPS:
             summary[f"{fg}-P"] = []
             summary[f"{fg}-M"] = []
             summary[f"{fg}-T"] = []
@@ -146,7 +149,7 @@ class ResultAnalyzer:
             )
             all_subjects_time_df.append(time_df)
             summary["S_ID"].append(sid)
-            for fg in feature_groups:
+            for fg in ResultAnalyzer.FEATURE_GROUPS:
                 p_time = time_df[time_df["FeatureGroup"] == fg][
                     "PreprocessingTime"
                 ].values.tolist()
@@ -162,7 +165,7 @@ class ResultAnalyzer:
 
         g_time_df = pd.concat(all_subjects_time_df)
         summary["S_ID"].append("Avg")
-        for fg in feature_groups:
+        for fg in ResultAnalyzer.FEATURE_GROUPS:
             p_time = g_time_df[g_time_df["FeatureGroup"] == fg][
                 "PreprocessingTime"
             ].values.tolist()
@@ -242,3 +245,53 @@ class ResultAnalyzer:
         ]
         with (self.config.output_path / "rq1_testing_vs_total_time.tex").open("w") as f:
             f.write(time_df.to_latex(index=False, escape=False))
+
+    def run_time_statistical_tests(self):
+        subjects_time_df_list = []
+        for subject, sid in self.subject_id_map.items():
+            time_df = pd.read_csv(
+                self.config.data_path / subject / "feature_group_time.csv"
+            )
+            time_df["Build"] = f"{sid}-" + time_df["Build"].astype(str)
+            subjects_time_df_list.append(time_df)
+
+        subjects_time_df = pd.concat(subjects_time_df_list, ignore_index=True)
+
+        fg_time_df = subjects_time_df.pivot_table(
+            index="Build", columns="FeatureGroup", values="TotalTime"
+        )
+        wilcoxon_res = {"A": [], "B": [], "p-value": [], "CL": []}
+        for i, f1 in enumerate(ResultAnalyzer.FEATURE_GROUPS):
+            for f2 in ResultAnalyzer.FEATURE_GROUPS[i + 1 :]:
+                x, y = fg_time_df[f1].values, fg_time_df[f2].values
+                z, p = wilcoxon(x, y)
+                wilcoxon_res["A"].append(f1.replace("_", "\\_"))
+                wilcoxon_res["B"].append(f2.replace("_", "\\_"))
+                wilcoxon_res["p-value"].append(p)
+                cl = pg.compute_effsize(x, y, paired=True, eftype="CLES")
+                wilcoxon_res["CL"].append(float("{:.2f}".format(cl)))
+        results = pd.DataFrame(wilcoxon_res).sort_values(
+            ["A", "B", "p-value"], ignore_index=True
+        )
+        fg_cnt = dict(results.groupby("A").count()["B"].items())
+        results["count"] = results["A"].apply(lambda a: fg_cnt[a])
+        results.sort_values(
+            ["count", "p-value", "CL"],
+            ascending=[False, True, False],
+            ignore_index=True,
+            inplace=True,
+        )
+        results.drop("count", axis=1, inplace=True)
+        return results
+
+    def generate_time_tests_table(self):
+        results = self.run_time_statistical_tests()
+        results.to_csv(self.config.output_path / "rq1_test_results.csv", index=False)
+        results["p-value"] = results["p-value"].apply(
+            lambda p: "{:.2f}".format(p) if p >= 0.01 else "$<0.01$"
+        )
+        index_tuples = results.apply(lambda r: (r["A"], r["B"]), axis=1).values.tolist()
+        results.set_index(pd.MultiIndex.from_tuples(index_tuples), inplace=True)
+        results.drop(["A", "B"], axis=1, inplace=True)
+        with (self.config.output_path / "rq1_test_results.tex").open("w") as f:
+            f.write(results.to_latex(index=True, escape=False, multirow=True))
