@@ -108,4 +108,4 @@ class ExperimentsService:
     @staticmethod
     def analyze_results(args):
         result_analyzer = ResultAnalyzer(args)
-        result_analyzer.generate_subject_stats_table()
+        result_analyzer.analyze_results()
