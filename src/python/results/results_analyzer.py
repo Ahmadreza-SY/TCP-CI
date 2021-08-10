@@ -181,7 +181,7 @@ class ResultAnalyzer:
         for col in time_results.columns.tolist():
             if col == "S_ID":
                 continue
-            time_results[col] = time_results[col].apply(lambda n: "{:.2f}".format(n))
+            time_results[col] = time_results[col].apply(lambda n: "{:.1f}".format(n))
         time_results["$S_{ID}$"] = time_results["S_ID"].apply(
             lambda id: f"$S_{{{id}}}$" if id != "Avg" else id
         )
