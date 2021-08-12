@@ -9,6 +9,7 @@ from tqdm import tqdm
 import numpy as np
 from scipy.stats import wilcoxon
 import pingouin as pg
+import matplotlib.pyplot as plt
 
 
 class ResultAnalyzer:
@@ -25,6 +26,7 @@ class ResultAnalyzer:
         "REC",
         "TES_CHN",
     ]
+    CORR_THRESHOLD = 0.8
 
     def __init__(self, config):
         self.config = config
@@ -35,7 +37,8 @@ class ResultAnalyzer:
         self.generate_data_collection_time_table()
         self.generate_testing_vs_total_time_table()
         self.generate_time_tests_table()
-        self.generate_testing_vs_impacted_time_table()
+        self.generate_total_vs_impacted_time_table()
+        self.generate_time_subject_corr()
 
     def compute_sloc(self, ds_path):
         source_path = ds_path / ds_path.name.split("@")[1]
@@ -46,9 +49,11 @@ class ResultAnalyzer:
             stdout=subprocess.DEVNULL,
         )
         df = pd.read_csv(f"{source_path.name}.csv")
-        loc = df[df["language"] == "Java"].code.iloc[0]
+        java_sloc = df[df["language"] == "Java"].code.iloc[0]
+        sum_row = df[df["language"] == "SUM"]
+        sloc = sum_row.code.iloc[0] + sum_row.comment.iloc[0]
         os.remove(f"{source_path.name}.csv")
-        return loc
+        return sloc, java_sloc
 
     def extract_subjects_stats(self, data_path):
         ds_paths = [p for p in data_path.glob("*") if p.is_dir()]
@@ -88,7 +93,9 @@ class ResultAnalyzer:
                 time_period = round(float(time_period) / 30.0)
 
                 subject_stats.setdefault("Subject", []).append(ds_path.name)
-                subject_stats.setdefault("SLOC", []).append(self.compute_sloc(ds_path))
+                sloc, java_sloc = self.compute_sloc(ds_path)
+                subject_stats.setdefault("SLOC", []).append(sloc)
+                subject_stats.setdefault("Java SLOC", []).append(java_sloc)
                 subject_stats.setdefault("\\# Commits", []).append(
                     change_history[EntityChange.COMMIT].nunique()
                 )
@@ -105,11 +112,15 @@ class ResultAnalyzer:
         return results_df
 
     def generate_subject_stats_table(self):
-        stats_df = self.extract_subjects_stats(self.config.data_path)
+        stats_path = self.config.output_path / "subject_stats.csv"
+        if stats_path.exists():
+            stats_df = pd.read_csv(stats_path)
+        else:
+            stats_df = self.extract_subjects_stats(self.config.data_path)
         if len(stats_df) == 0:
             print("No valid subject available")
             return
-        stats_df.to_csv(self.config.output_path / "subject_stats.csv", index=False)
+        stats_df.to_csv(stats_path, index=False)
         stats_df.sort_values("SLOC", ascending=False, ignore_index=True, inplace=True)
         self.subject_id_map = dict(
             zip(stats_df["Subject"].values.tolist(), (stats_df.index + 1).tolist())
@@ -118,6 +129,9 @@ class ResultAnalyzer:
             lambda s: f"$S_{{{self.subject_id_map[s]}}}$"
         )
         stats_df["SLOC"] = stats_df["SLOC"].apply(lambda n: f"{int(n/1000.0)}k")
+        stats_df["Java SLOC"] = stats_df["Java SLOC"].apply(
+            lambda n: f"{int(n/1000.0)}k"
+        )
         stats_df["\\# Builds"] = stats_df["\\# Builds"].apply(lambda n: f"{n:,}")
         stats_df["\\# Commits"] = stats_df["\\# Commits"].apply(
             lambda n: "{:.1f}".format(n / 1000.0) + "k"
@@ -297,10 +311,10 @@ class ResultAnalyzer:
         with (self.config.output_path / "rq1_test_results.tex").open("w") as f:
             f.write(results.to_latex(index=True, escape=False, multirow=True))
 
-    def compute_testing_vs_impacted_time(self):
+    def compute_total_vs_impacted_time(self):
         results = {"s": [], "adct": [], "aict": [], "ic": []}
         for subject, sid in tqdm(
-            self.subject_id_map.items(), desc="Computing testing vs impacted times"
+            self.subject_id_map.items(), desc="Computing total vs impacted times"
         ):
             results["s"].append(sid)
             output_path = self.config.data_path / subject
@@ -326,10 +340,10 @@ class ResultAnalyzer:
         results_df = pd.DataFrame(results)
         return results_df
 
-    def generate_testing_vs_impacted_time_table(self):
-        time_df = self.compute_testing_vs_impacted_time()
+    def generate_total_vs_impacted_time_table(self):
+        time_df = self.compute_total_vs_impacted_time()
         time_df.to_csv(
-            self.config.output_path / "rq1_testing_vs_impacted_time.csv", index=False
+            self.config.output_path / "rq1_total_vs_impacted_time.csv", index=False
         )
         time_df["s"] = time_df["s"].apply(lambda id: f"$S_{{{id}}}$")
         time_df["aict"] = time_df["aict"].apply(lambda n: "{:.1f}".format(n))
@@ -340,7 +354,91 @@ class ResultAnalyzer:
             "Avg. Impacted Collection Time",
             "Impacted/Total (\\%)",
         ]
-        with (self.config.output_path / "rq1_testing_vs_impacted_time.tex").open(
+        with (self.config.output_path / "rq1_total_vs_impacted_time.tex").open(
             "w"
         ) as f:
             f.write(time_df.to_latex(index=False, escape=False))
+
+    def compute_time_subject_corr(self):
+        stats_cols = [
+            "SLOC",
+            "Java SLOC",
+            "\\# Commits",
+            "\\# Builds",
+            "\\# Failed Builds",
+            "Avg. \\# TC/Build",
+            "Avg. Test Time (min)",
+        ]
+        fg_time_df = pd.read_csv(self.config.output_path / "rq1_avg_time.csv")
+        fg_time_df = fg_time_df[fg_time_df["S_ID"] != "Avg"]
+        fg_time_df["S_ID"] = fg_time_df["S_ID"].astype(int)
+        total_time_df = pd.read_csv(
+            self.config.output_path / "rq1_total_vs_impacted_time.csv"
+        )
+        total_time_df["S_ID"] = total_time_df["s"]
+        total_time_df["Total"] = total_time_df["adct"]
+        fg_time_df = fg_time_df.merge(total_time_df[["S_ID", "Total"]], on="S_ID")
+        for fg in ResultAnalyzer.FEATURE_GROUPS:
+            col = f"{fg}-T"
+            fg_time_df[fg] = fg_time_df[col]
+        fg_time_df = fg_time_df[["S_ID"] + ResultAnalyzer.FEATURE_GROUPS + ["Total"]]
+        stats_df = pd.read_csv(self.config.output_path / "subject_stats.csv")
+        stats_df["S_ID"] = stats_df["Subject"].apply(lambda s: self.subject_id_map[s])
+        data = stats_df.merge(fg_time_df, on="S_ID")
+        data.drop(["Subject", "S_ID"], axis=1, inplace=True)
+        corr_df = data.corr(method="pearson")
+        corr_results = {"s": []}
+        for col in stats_cols:
+            corr_results["s"].append(col)
+            selected_corr = (
+                corr_df[col][ResultAnalyzer.FEATURE_GROUPS + ["Total"]]
+                .abs()
+                .sort_values(ascending=False)
+            )
+            for fg, corr_val in selected_corr.iteritems():
+                corr_results.setdefault(fg, []).append(corr_val)
+
+        return pd.DataFrame(corr_results), data
+
+    def generate_time_subject_corr(self):
+        corr_results, data = self.compute_time_subject_corr()
+        corr_results.to_csv(
+            self.config.output_path / "rq1_size_time_corr.csv", index=False
+        )
+        corr_results["Charac."] = corr_results["s"]
+        corr_results = corr_results[
+            ["Charac."] + ResultAnalyzer.FEATURE_GROUPS + ["Total"]
+        ]
+
+        for col in ResultAnalyzer.FEATURE_GROUPS + ["Total"]:
+            corr_results[col] = corr_results[col].apply(
+                lambda n: "\\textbf{{{:.2f}}}".format(n)
+                if n > ResultAnalyzer.CORR_THRESHOLD
+                else "{:.2f}".format(n)
+            )
+        corr_results.columns = list(
+            map(lambda c: c.replace("_", "\\_"), list(corr_results.columns))
+        )
+
+        with (self.config.output_path / "rq1_size_time_corr.tex").open("w") as f:
+            f.write(corr_results.to_latex(index=False, escape=False))
+
+        def plot_corr(f1, f2, ax):
+            x = data[f1].values
+            y = data[f2].values
+            z = np.polyfit(x, y, 1)
+            p = np.poly1d(z)
+            ax.plot(x, y, "bo")
+            ax.plot([min(x), max(x)], [p(min(x)), p(max(x))], "r--")
+            ax.set(xlabel=f1, ylabel=f2 + " (sec.)")
+
+        fig, axs = plt.subplots(2, 3, figsize=(24, 9))
+        plot_corr("SLOC", "Total", axs[0, 0])
+        plot_corr("SLOC", "COV", axs[0, 1])
+        plot_corr("SLOC", "COD_COV_COM", axs[0, 2])
+        plot_corr("Avg. \\# TC/Build", "Total", axs[1, 0])
+        plot_corr("Avg. \\# TC/Build", "COV", axs[1, 1])
+        plot_corr("Avg. \\# TC/Build", "REC", axs[1, 2])
+        plt.savefig(
+            self.config.output_path / "rq1_corr_analysis.png", bbox_inches="tight"
+        )
