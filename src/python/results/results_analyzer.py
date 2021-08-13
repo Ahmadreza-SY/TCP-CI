@@ -10,6 +10,9 @@ import numpy as np
 from scipy.stats import wilcoxon
 import pingouin as pg
 import matplotlib.pyplot as plt
+import re
+from git import Git
+from pydriller import GitRepository
 
 
 class ResultAnalyzer:
@@ -40,7 +43,20 @@ class ResultAnalyzer:
         self.generate_total_vs_impacted_time_table()
         self.generate_time_subject_corr()
 
+    def checkout_default_branch(self, ds_path):
+        source_path = ds_path / ds_path.name.split("@")[1]
+        g = Git(source_path)
+        remote = g.execute("git remote show".split())
+        if remote == "":
+            print("Git repository has no remote! Please set a remote.")
+            return
+        result = g.execute(f"git remote show {remote}".split())
+        default_branch = re.search("HEAD branch: (.+)", result).groups()[0]
+        git_repository = GitRepository(source_path)
+        git_repository.repo.git.checkout(default_branch, force=True)
+
     def compute_sloc(self, ds_path):
+        self.checkout_default_branch(ds_path)
         source_path = ds_path / ds_path.name.split("@")[1]
         subprocess.call(
             shlex.split(
