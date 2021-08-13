@@ -322,7 +322,7 @@ class ResultAnalyzer:
         results = self.run_time_statistical_tests()
         results.to_csv(self.config.output_path / "rq1_test_results.csv", index=False)
         results["p-value"] = results["p-value"].apply(
-            lambda p: "{:.2f}".format(p) if p >= 0.01 else "$<0.01$"
+            lambda p: "$<0.01$" if 0.0 < p < 0.01 else "{:.2f}".format(p)
         )
         index_tuples = results.apply(lambda r: (r["A"], r["B"]), axis=1).values.tolist()
         results.set_index(pd.MultiIndex.from_tuples(index_tuples), inplace=True)
