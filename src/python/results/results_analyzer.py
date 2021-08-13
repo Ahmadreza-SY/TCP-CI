@@ -43,20 +43,23 @@ class ResultAnalyzer:
         self.generate_total_vs_impacted_time_table()
         self.generate_time_subject_corr()
 
-    def checkout_default_branch(self, ds_path):
+    def checkout_latest_build(self, ds_path):
         source_path = ds_path / ds_path.name.split("@")[1]
-        g = Git(source_path)
-        remote = g.execute("git remote show".split())
-        if remote == "":
-            print("Git repository has no remote! Please set a remote.")
-            return
-        result = g.execute(f"git remote show {remote}".split())
-        default_branch = re.search("HEAD branch: (.+)", result).groups()[0]
         git_repository = GitRepository(source_path)
-        git_repository.repo.git.checkout(default_branch, force=True)
+        builds_df = pd.read_csv(ds_path / "builds.csv", parse_dates=["started_at"])
+        builds_df = builds_df.sort_values(
+            "started_at", ascending=False, ignore_index=True
+        )
+        for _, r in builds_df.iterrows():
+            for last_build_commit in r["commits"].split("#"):
+                try:
+                    git_repository.repo.git.checkout(last_build_commit, force=True)
+                    return
+                except:
+                    continue
 
     def compute_sloc(self, ds_path):
-        self.checkout_default_branch(ds_path)
+        self.checkout_latest_build(ds_path)
         source_path = ds_path / ds_path.name.split("@")[1]
         subprocess.call(
             shlex.split(
