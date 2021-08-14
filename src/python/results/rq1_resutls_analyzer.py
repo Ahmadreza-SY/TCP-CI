@@ -26,6 +26,11 @@ class RQ1ResultAnalyzer:
         self.config = config
         self.subject_id_map = subject_id_map
 
+    def get_output_path(self):
+        output_path = self.config.output_path / "RQ1"
+        output_path.mkdir(parents=True, exist_ok=True)
+        return output_path
+
     def analyze_results(self):
         self.generate_data_collection_time_table()
         self.generate_testing_vs_total_time_table()
@@ -42,9 +47,7 @@ class RQ1ResultAnalyzer:
             summary[f"{fg}-T"] = []
         all_subjects_time_df = []
 
-        for subject, sid in tqdm(
-            self.subject_id_map.items(), desc="Computing avg data collection times"
-        ):
+        for subject, sid in self.subject_id_map.items():
             time_df = pd.read_csv(
                 self.config.data_path / subject / "feature_group_time.csv"
             )
@@ -84,7 +87,7 @@ class RQ1ResultAnalyzer:
 
     def generate_data_collection_time_table(self):
         time_results = self.compute_data_collection_time()
-        time_results.to_csv(self.config.output_path / "rq1_avg_time.csv", index=False)
+        time_results.to_csv(self.get_output_path() / "rq1_avg_time.csv", index=False)
         for col in time_results.columns.tolist():
             if col == "S_ID":
                 continue
@@ -96,14 +99,12 @@ class RQ1ResultAnalyzer:
         cols = time_results.columns.tolist()
         cols = [cols.pop()] + cols
         time_results = time_results[cols]
-        with (self.config.output_path / "rq1_avg_time.tex").open("w") as f:
+        with (self.get_output_path() / "rq1_avg_time.tex").open("w") as f:
             f.write(time_results.to_latex(index=False, escape=False))
 
     def compute_testing_vs_total_time(self):
         results = {"s": [], "att": [], "adct": [], "ct": []}
-        for subject, sid in tqdm(
-            self.subject_id_map.items(), desc="Computing testing vs total times"
-        ):
+        for subject, sid in self.subject_id_map.items():
             results["s"].append(sid)
             output_path = self.config.data_path / subject
             exe_df = pd.read_csv(output_path / "exe.csv")
@@ -133,7 +134,7 @@ class RQ1ResultAnalyzer:
     def generate_testing_vs_total_time_table(self):
         time_df = self.compute_testing_vs_total_time()
         time_df.to_csv(
-            self.config.output_path / "rq1_testing_vs_total_time.csv", index=False
+            self.get_output_path() / "rq1_testing_vs_total_time.csv", index=False
         )
         time_df["s"] = time_df["s"].apply(lambda id: f"$S_{{{id}}}$")
         time_df["att"] = time_df["att"].apply(lambda n: "{:.1f}".format(n))
@@ -144,7 +145,7 @@ class RQ1ResultAnalyzer:
             "Avg. Data Collection Time",
             "Collection/Testing (\\%)",
         ]
-        with (self.config.output_path / "rq1_testing_vs_total_time.tex").open("w") as f:
+        with (self.get_output_path() / "rq1_testing_vs_total_time.tex").open("w") as f:
             f.write(time_df.to_latex(index=False, escape=False))
 
     def run_time_statistical_tests(self):
@@ -187,21 +188,19 @@ class RQ1ResultAnalyzer:
 
     def generate_time_tests_table(self):
         results = self.run_time_statistical_tests()
-        results.to_csv(self.config.output_path / "rq1_test_results.csv", index=False)
+        results.to_csv(self.get_output_path() / "rq1_test_results.csv", index=False)
         results["p-value"] = results["p-value"].apply(
             lambda p: "$<0.01$" if 0.0 < p < 0.01 else "{:.2f}".format(p)
         )
         index_tuples = results.apply(lambda r: (r["A"], r["B"]), axis=1).values.tolist()
         results.set_index(pd.MultiIndex.from_tuples(index_tuples), inplace=True)
         results.drop(["A", "B"], axis=1, inplace=True)
-        with (self.config.output_path / "rq1_test_results.tex").open("w") as f:
+        with (self.get_output_path() / "rq1_test_results.tex").open("w") as f:
             f.write(results.to_latex(index=True, escape=False, multirow=True))
 
     def compute_total_vs_impacted_time(self):
         results = {"s": [], "adct": [], "aict": [], "ic": []}
-        for subject, sid in tqdm(
-            self.subject_id_map.items(), desc="Computing total vs impacted times"
-        ):
+        for subject, sid in self.subject_id_map.items():
             results["s"].append(sid)
             output_path = self.config.data_path / subject
             imp_time_df = pd.read_csv(output_path / "impacted_time.csv")
@@ -229,7 +228,7 @@ class RQ1ResultAnalyzer:
     def generate_total_vs_impacted_time_table(self):
         time_df = self.compute_total_vs_impacted_time()
         time_df.to_csv(
-            self.config.output_path / "rq1_total_vs_impacted_time.csv", index=False
+            self.get_output_path() / "rq1_total_vs_impacted_time.csv", index=False
         )
         time_df["s"] = time_df["s"].apply(lambda id: f"$S_{{{id}}}$")
         time_df["aict"] = time_df["aict"].apply(lambda n: "{:.1f}".format(n))
@@ -240,9 +239,7 @@ class RQ1ResultAnalyzer:
             "Avg. Impacted Collection Time",
             "Impacted/Total (\\%)",
         ]
-        with (self.config.output_path / "rq1_total_vs_impacted_time.tex").open(
-            "w"
-        ) as f:
+        with (self.get_output_path() / "rq1_total_vs_impacted_time.tex").open("w") as f:
             f.write(time_df.to_latex(index=False, escape=False))
 
     def compute_time_subject_corr(self):
@@ -255,11 +252,11 @@ class RQ1ResultAnalyzer:
             "Avg. \\# TC/Build",
             "Avg. Test Time (min)",
         ]
-        fg_time_df = pd.read_csv(self.config.output_path / "rq1_avg_time.csv")
+        fg_time_df = pd.read_csv(self.get_output_path() / "rq1_avg_time.csv")
         fg_time_df = fg_time_df[fg_time_df["S_ID"] != "Avg"]
         fg_time_df["S_ID"] = fg_time_df["S_ID"].astype(int)
         total_time_df = pd.read_csv(
-            self.config.output_path / "rq1_total_vs_impacted_time.csv"
+            self.get_output_path() / "rq1_total_vs_impacted_time.csv"
         )
         total_time_df["S_ID"] = total_time_df["s"]
         total_time_df["Total"] = total_time_df["adct"]
@@ -289,7 +286,7 @@ class RQ1ResultAnalyzer:
     def generate_time_subject_corr(self):
         corr_results, data = self.compute_time_subject_corr()
         corr_results.to_csv(
-            self.config.output_path / "rq1_size_time_corr.csv", index=False
+            self.get_output_path() / "rq1_size_time_corr.csv", index=False
         )
         corr_results["Charac."] = corr_results["s"]
         corr_results = corr_results[
@@ -306,7 +303,7 @@ class RQ1ResultAnalyzer:
             map(lambda c: c.replace("_", "\\_"), list(corr_results.columns))
         )
 
-        with (self.config.output_path / "rq1_size_time_corr.tex").open("w") as f:
+        with (self.get_output_path() / "rq1_size_time_corr.tex").open("w") as f:
             f.write(corr_results.to_latex(index=False, escape=False))
 
         def plot_corr(f1, f2, ax):
@@ -326,5 +323,5 @@ class RQ1ResultAnalyzer:
         plot_corr("Avg. \\# TC/Build", "COV", axs[1, 1])
         plot_corr("Avg. \\# TC/Build", "REC", axs[1, 2])
         plt.savefig(
-            self.config.output_path / "rq1_corr_analysis.png", bbox_inches="tight"
+            self.get_output_path() / "rq1_corr_analysis.png", bbox_inches="tight"
         )

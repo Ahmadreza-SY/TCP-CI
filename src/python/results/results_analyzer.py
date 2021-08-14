@@ -8,6 +8,7 @@ import os
 from tqdm import tqdm
 from pydriller import GitRepository
 from .rq1_resutls_analyzer import RQ1ResultAnalyzer
+from .rq2_resutls_analyzer import RQ2ResultAnalyzer
 
 
 class ResultAnalyzer:
@@ -22,6 +23,8 @@ class ResultAnalyzer:
         self.generate_subject_stats_table()
         rq1_analyzer = RQ1ResultAnalyzer(self.config, self.subject_id_map)
         rq1_analyzer.analyze_results()
+        rq2_analyzer = RQ2ResultAnalyzer(self.config, self.subject_id_map)
+        rq2_analyzer.analyze_results()
 
     def checkout_latest_build(self, ds_path):
         source_path = ds_path / ds_path.name.split("@")[1]

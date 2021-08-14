@@ -141,6 +141,28 @@ class Feature:
     DET_COV = [f"DET_COV_C_{m}" for m in det_features] + [
         f"DET_COV_IMP_{m}" for m in det_features
     ]
+    FEATURE_TO_GROUP = dict(
+        zip(
+            TES_COM
+            + TES_PRO
+            + TES_CHN
+            + REC
+            + COV
+            + COD_COV_COM
+            + COD_COV_PRO
+            + COD_COV_CHN
+            + DET_COV,
+            ["TES_COM"] * len(TES_COM)
+            + ["TES_PRO"] * len(TES_PRO)
+            + ["TES_CHN"] * len(TES_CHN)
+            + ["REC"] * len(REC)
+            + ["COV"] * len(COV)
+            + ["COD_COV_COM"] * len(COD_COV_COM)
+            + ["COD_COV_PRO"] * len(COD_COV_PRO)
+            + ["COD_COV_CHN"] * len(COD_COV_CHN)
+            + ["DET_COV"] * len(DET_COV),
+        )
+    )
     # Features' names which are related to impacted files
     IMPACTED_FEATURES = [f for f in COV if "_Imp" in f] + [
         f for f in COD_COV_COM + COD_COV_PRO + DET_COV if "_IMP_" in f
@@ -156,3 +178,7 @@ class Feature:
         elif metric in Feature.change_metrics:
             prefix = "CHN"
         return prefix
+
+    @staticmethod
+    def get_feature_group(feature_name):
+        return Feature.FEATURE_TO_GROUP[feature_name]
