@@ -197,6 +197,7 @@ class RQ2ResultAnalyzer:
 
     def generate_feature_usage_freq_table(self):
         avg_usage_freq = self.compute_avg_feature_usage_freq()
+        avg_usage_freq.sort(key=lambda t: t[1], reverse=True)
         avg_usage_freq_df = pd.DataFrame(
             {
                 "feature_name": [t[0] for t in avg_usage_freq],
@@ -207,7 +208,6 @@ class RQ2ResultAnalyzer:
             self.get_output_path() / f"rq2_avg_usage_freq.csv", index=False
         )
         avg_usage_freq = avg_usage_freq[:10]
-        avg_usage_freq.sort(key=lambda t: t[1], reverse=True)
         result = {
             "Feature Group": [
                 Feature.get_feature_group(name).replace("_", "\\_")
