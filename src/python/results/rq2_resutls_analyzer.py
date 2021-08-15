@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from .rq1_resutls_analyzer import RQ1ResultAnalyzer
 from ..feature_extractor.feature import Feature
 import seaborn as sns
+from tqdm import tqdm
 
 
 class RQ2ResultAnalyzer:
@@ -169,9 +170,17 @@ class RQ2ResultAnalyzer:
         with_experiments = ["W-Code", "W-Execution", "W-Coverage"]
         self.generate_feature_group_acc_test_table(with_experiments, "with")
 
+        impacted_experiment = ["wo-impacted"]
+        apfd = self.run_feature_group_acc_tests("apfd", impacted_experiment)
+        apfdc = self.run_feature_group_acc_tests("apfdc", impacted_experiment)
+        apfd.to_csv(self.get_output_path() / f"rq2_apfd_imp_test.csv", index=False)
+        apfdc.to_csv(self.get_output_path() / f"rq2_apfdc_imp_test.csv", index=False)
+
     def compute_avg_feature_usage_freq(self):
         freq_samples = {}
-        for subject, _ in self.subject_id_map.items():
+        for subject, _ in tqdm(
+            self.subject_id_map.items(), desc="Computing usage frequencies"
+        ):
             fid_map_df = pd.read_csv(
                 self.config.data_path / subject / "feature_id_map.csv"
             )
