@@ -38,7 +38,7 @@ class RQ2ResultAnalyzer:
 
     def generate_accuracy_avg_table(self, results):
         results = results.sort_values("full", ascending=False, ignore_index=True)
-        results["S_{ID}"] = results["S_ID"].apply(lambda id: f"$S_{{{id}}}$")
+        results["$S_{ID}$"] = results["S_ID"].apply(lambda id: f"$S_{{{id}}}$")
         results["Full-inc"] = results.apply(
             lambda r: "${:.2f} {{\pm}} {:.2f}$".format(r["full"], r["full-std"]), axis=1
         )
@@ -48,17 +48,17 @@ class RQ2ResultAnalyzer:
             ),
             axis=1,
         )
-        results["\\texit{TES\\_M}"] = results.apply(
+        results["\\textit{TES\\_M}"] = results.apply(
             lambda r: "${:.2f} {{\pm}} {:.2f}$".format(r["W-Code"], r["W-Code-std"]),
             axis=1,
         )
-        results["\\texit{REC\\_M}"] = results.apply(
+        results["\\textit{REC\\_M}"] = results.apply(
             lambda r: "${:.2f} {{\pm}} {:.2f}$".format(
                 r["W-Execution"], r["W-Execution-std"]
             ),
             axis=1,
         )
-        results["\\texit{COV\\_M}"] = results.apply(
+        results["\\textit{COV\\_M}"] = results.apply(
             lambda r: "${:.2f} {{\pm}} {:.2f}$".format(
                 r["W-Coverage"], r["W-Coverage-std"]
             ),
@@ -66,12 +66,12 @@ class RQ2ResultAnalyzer:
         )
         return results[
             [
-                "S_{ID}",
+                "$S_{ID}$",
                 "Full-inc",
                 "Impacted-ex",
-                "\\texit{TES\\_M}",
-                "\\texit{REC\\_M}",
-                "\\texit{COV\\_M}",
+                "\\textit{TES\\_M}",
+                "\\textit{REC\\_M}",
+                "\\textit{COV\\_M}",
             ]
         ]
 
