@@ -294,7 +294,7 @@ class RQ2ResultAnalyzer:
             cl = pg.compute_effsize(x, y, paired=True, eftype="CLES")
             results.setdefault("p-value", []).append(p)
             results.setdefault("CL", []).append(cl)
-        return pd.DataFrame(results)
+        return pd.DataFrame(results).sort_values("p-value", ignore_index=True)
 
     def generate_heuristic_comparison_table(self):
         apfd = self.run_heuristic_tests("apfd")
