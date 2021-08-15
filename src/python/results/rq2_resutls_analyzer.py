@@ -216,7 +216,7 @@ class RQ2ResultAnalyzer:
         avg_usage_freq_df.to_csv(
             self.get_output_path() / f"rq2_avg_usage_freq.csv", index=False
         )
-        avg_usage_freq = avg_usage_freq[:10]
+        avg_usage_freq = avg_usage_freq[:15]
         result = {
             "Feature Group": [
                 Feature.get_feature_group(name).replace("_", "\\_")
