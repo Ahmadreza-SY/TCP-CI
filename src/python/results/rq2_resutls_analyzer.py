@@ -18,6 +18,7 @@ class RQ2ResultAnalyzer:
         self.generate_feature_group_acc_test_tables()
         self.generate_feature_usage_freq_table()
         self.generate_tc_age_histogram()
+        self.generate_heuristic_comparison_table()
 
     def get_output_path(self):
         output_path = self.config.output_path / "RQ2"
@@ -231,7 +232,9 @@ class RQ2ResultAnalyzer:
 
     def generate_tc_age_histogram(self):
         x = []
-        for subject, _ in self.subject_id_map.items():
+        for subject, _ in tqdm(
+            self.subject_id_map.items(), desc="Computing age historgram"
+        ):
             ds_df = pd.read_csv(self.config.data_path / subject / "dataset.csv")
             max_age = {}
             for test in ds_df["Test"].unique():
@@ -251,3 +254,93 @@ class RQ2ResultAnalyzer:
         ax.set(xlabel="Normalized Age", ylabel="Failure Count")
         sns.histplot(x, ax=ax, kde=False, bins=10, color="blue")
         plt.savefig(self.get_output_path() / "rq2_tc_age_hist.png", bbox_inches="tight")
+
+    def run_heuristic_tests(self, metric):
+        results = {}
+        for subject, sid in self.subject_id_map.items():
+            results.setdefault("S_ID", []).append(sid)
+            fid_map_df = pd.read_csv(
+                self.config.data_path / subject / "feature_id_map.csv"
+            )
+            fid_map = dict(
+                zip(
+                    fid_map_df["value"].values.tolist(),
+                    fid_map_df["key"].values.tolist(),
+                )
+            )
+            h_df = pd.read_csv(
+                self.config.data_path
+                / subject
+                / "tsp_accuracy_results"
+                / "full"
+                / f"heuristic_{metric}_results.csv"
+            ).sort_values("build", ignore_index=True)
+            full_df = pd.read_csv(
+                self.config.data_path
+                / subject
+                / "tsp_accuracy_results"
+                / "full"
+                / "results.csv"
+            ).sort_values("build", ignore_index=True)
+            best_fid = h_df.drop("build", axis=1).mean().idxmax()
+            best_fname = fid_map[int(best_fid)]
+            results.setdefault("feature", []).append(best_fname)
+            results.setdefault("h_avg", []).append(h_df[best_fid].mean())
+            results.setdefault("h_std", []).append(h_df[best_fid].std())
+            results.setdefault("full_avg", []).append(full_df[metric].mean())
+            results.setdefault("full_std", []).append(full_df[metric].std())
+            x, y = h_df[best_fid].values, full_df[metric].values
+            z, p = wilcoxon(x, y)
+            cl = pg.compute_effsize(x, y, paired=True, eftype="CLES")
+            results.setdefault("p-value", []).append(p)
+            results.setdefault("CL", []).append(cl)
+        return pd.DataFrame(results)
+
+    def generate_heuristic_comparison_table(self):
+        apfd = self.run_heuristic_tests("apfd")
+        apfdc = self.run_heuristic_tests("apfdc")
+        apfd.to_csv(
+            self.get_output_path() / f"rq2_apfd_heuristic_comp.csv", index=False
+        )
+        apfdc.to_csv(
+            self.get_output_path() / f"rq2_apfdc_heuristic_comp.csv", index=False
+        )
+
+        def format_columns(df):
+            df["$S_{ID}$"] = df["S_ID"].apply(lambda id: f"$S_{{{id}}}$")
+            df["Best H Feature"] = df["feature"].apply(lambda f: f.replace("_", "\\_"))
+            df["Best H"] = df.apply(
+                lambda r: "${:.2f} {{\pm}} {:.2f}$".format(r["h_avg"], r["h_std"]),
+                axis=1,
+            )
+            df["\\textit{Full\\_M}"] = df.apply(
+                lambda r: "${:.2f} {{\pm}} {:.2f}$".format(
+                    r["full_avg"], r["full_std"]
+                ),
+                axis=1,
+            )
+            df["p-value"] = df["p-value"].apply(
+                lambda p: "$<0.01$"
+                if 0.0 < p < 0.01
+                else (
+                    "{:.3f}".format(p)
+                    if float("{:.2f}".format(p)) == 0.05
+                    else "{:.2f}".format(p)
+                )
+            )
+            df["CL"] = df["CL"].apply(lambda cl: "{:.2f}".format(cl))
+            return df[
+                [
+                    "$S_{ID}$",
+                    "Best H Feature",
+                    "Best H",
+                    "\\textit{Full\\_M}",
+                    "p-value",
+                    "CL",
+                ]
+            ]
+
+        with (self.get_output_path() / f"rq2_apfd_heuristic_comp.tex").open("w") as f:
+            f.write(format_columns(apfd).to_latex(index=False, escape=False))
+        with (self.get_output_path() / f"rq2_apfdc_heuristic_comp.tex").open("w") as f:
+            f.write(format_columns(apfdc).to_latex(index=False, escape=False))
