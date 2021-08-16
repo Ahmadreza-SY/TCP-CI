@@ -9,6 +9,7 @@ from tqdm import tqdm
 from pydriller import GitRepository
 from .rq1_resutls_analyzer import RQ1ResultAnalyzer
 from .rq2_resutls_analyzer import RQ2ResultAnalyzer
+from .rq3_resutls_analyzer import RQ3ResultAnalyzer
 
 
 class ResultAnalyzer:
@@ -25,6 +26,8 @@ class ResultAnalyzer:
         rq1_analyzer.analyze_results()
         rq2_analyzer = RQ2ResultAnalyzer(self.config, self.subject_id_map)
         rq2_analyzer.analyze_results()
+        rq3_analyzer = RQ3ResultAnalyzer(self.config, self.subject_id_map)
+        rq3_analyzer.analyze_results()
 
     def checkout_latest_build(self, ds_path):
         source_path = ds_path / ds_path.name.split("@")[1]
