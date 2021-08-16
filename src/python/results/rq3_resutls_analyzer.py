@@ -32,14 +32,15 @@ class RQ3ResultAnalyzer:
         return pd.concat(decay_results, ignore_index=True)
 
     def plot_decay_graphs(self, metric):
-        fig, axs = plt.subplots(4, 4, figsize=(18, 12))
-        fig.suptitle(f"Subject {metric} Decay")
+        rows, cols = 2, 8
+        fig, axs = plt.subplots(rows, cols, figsize=(28, 4))
         fig.subplots_adjust(hspace=0.4, wspace=0.25)
         i = 0
         for subject, sid in self.subject_id_map.items():
             subject_path = self.config.data_path / subject
-            ax = axs[int(i / 4), i % 4]
-            ax.set(xlabel="Window", ylabel=metric)
+            ax = axs[int(i / rows), i % cols]
+            formatted_metric = metric.upper() if metric == "apfd" else "$APFD_C$"
+            ax.set(xlabel="Window", ylabel=formatted_metric)
             decay_results_df = self.compute_accuracy_decay(subject_path)
             decay_results_df = decay_results_df[
                 decay_results_df["window"] <= RQ3ResultAnalyzer.WINDOW_THRESHOLD
