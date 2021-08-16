@@ -33,7 +33,7 @@ class RQ3ResultAnalyzer:
 
     def plot_decay_graphs(self, metric):
         rows, cols = 2, 8
-        fig, axs = plt.subplots(rows, cols, figsize=(28, 4))
+        fig, axs = plt.subplots(rows, cols, figsize=(32, 6))
         fig.subplots_adjust(hspace=0.4, wspace=0.25)
         i = 0
         for subject, sid in self.subject_id_map.items():
@@ -54,5 +54,7 @@ class RQ3ResultAnalyzer:
             ax.set_title(f"$S_{{{sid}}}$")
             i += 1
         plt.savefig(
-            self.get_output_path() / f"rq3_{metric}_decay.png", bbox_inches="tight"
+            self.get_output_path() / f"rq3_{metric}_decay.png",
+            bbox_inches="tight",
+            dpi=300,
         )
