@@ -38,7 +38,7 @@ class RQ3ResultAnalyzer:
         i = 0
         for subject, sid in self.subject_id_map.items():
             subject_path = self.config.data_path / subject
-            ax = axs[int(i / rows), i % cols]
+            ax = axs[int(i / cols), i % cols]
             formatted_metric = metric.upper() if metric == "apfd" else "$APFD_C$"
             ax.set(xlabel="Window", ylabel=formatted_metric)
             decay_results_df = self.compute_accuracy_decay(subject_path)
