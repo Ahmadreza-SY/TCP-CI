@@ -35,6 +35,7 @@ class RQ3ResultAnalyzer:
         rows, cols = 2, 8
         fig, axs = plt.subplots(rows, cols, figsize=(34, 6))
         fig.subplots_adjust(hspace=0.4, wspace=0.3)
+        slopes = {}
         i = 0
         for subject, sid in self.subject_id_map.items():
             subject_path = self.config.data_path / subject
@@ -50,11 +51,19 @@ class RQ3ResultAnalyzer:
                 .groupby("window", as_index=False)
                 .mean()
             )
-            ax.plot(win_avg_df["window"].values, win_avg_df[metric].values)
+            windows = win_avg_df["window"].values
+            accuracies = win_avg_df[metric].values
+            slopes.setdefault("S_ID", []).append(sid)
+            slope = (accuracies[10] - accuracies[0]) / (windows[10] - windows[0])
+            slopes.setdefault("slope", []).append(slope)
+            ax.plot(windows, accuracies)
             ax.set_title(f"$S_{{{sid}}}$")
             i += 1
         plt.savefig(
             self.get_output_path() / f"rq3_{metric}_decay.png",
             bbox_inches="tight",
             dpi=300,
+        )
+        pd.DataFrame(slopes).sort_values("slope").to_csv(
+            self.get_output_path() / "rq3_decay_slopes.csv", index=False
         )
