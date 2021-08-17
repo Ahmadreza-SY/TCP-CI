@@ -65,5 +65,5 @@ class RQ3ResultAnalyzer:
             dpi=300,
         )
         pd.DataFrame(slopes).sort_values("slope").to_csv(
-            self.get_output_path() / "rq3_decay_slopes.csv", index=False
+            self.get_output_path() / f"rq3_{metric}_decay_slopes.csv", index=False
         )
