@@ -283,7 +283,7 @@ class RankLibLearner:
         apfd_dsc = self.compute_apfd(dsc_pred)
         apfdc_dsc = self.compute_apfdc(dsc_pred)
 
-        return max(apfd_asc, apfd_dsc), max(apfdc_asc, apfdc_dsc)
+        return apfd_asc, apfd_dsc, apfdc_asc, apfdc_dsc
 
     def test_heuristics(self, dataset_df, results_path):
         apfd_results = {"build": []}
@@ -296,9 +296,13 @@ class RankLibLearner:
             apfd_results["build"].append(build)
             apfdc_results["build"].append(build)
             for fname, fid in self.feature_id_map.items():
-                apfd, apfdc = self.evaluate_heuristic(fname, suite_ds)
-                apfd_results.setdefault(fid, []).append(apfd)
-                apfdc_results.setdefault(fid, []).append(apfdc)
+                apfd_asc, apfd_dsc, apfdc_asc, apfdc_dsc = self.evaluate_heuristic(
+                    fname, suite_ds
+                )
+                apfd_results.setdefault(f"{fid}-asc", []).append(apfd_asc)
+                apfd_results.setdefault(f"{fid}-dsc", []).append(apfd_dsc)
+                apfdc_results.setdefault(f"{fid}-asc", []).append(apfdc_asc)
+                apfdc_results.setdefault(f"{fid}-dsc", []).append(apfdc_dsc)
         pd.DataFrame(apfd_results).to_csv(
             results_path / "heuristic_apfd_results.csv", index=False
         )

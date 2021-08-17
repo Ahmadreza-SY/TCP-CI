@@ -283,7 +283,7 @@ class RQ2ResultAnalyzer:
                 / "results.csv"
             ).sort_values("build", ignore_index=True)
             best_fid = h_df.drop("build", axis=1).mean().idxmax()
-            best_fname = fid_map[int(best_fid)]
+            best_fname = fid_map[int(best_fid.split("-")[0])]
             results.setdefault("feature", []).append(best_fname)
             results.setdefault("h_avg", []).append(h_df[best_fid].mean())
             results.setdefault("h_std", []).append(h_df[best_fid].std())
