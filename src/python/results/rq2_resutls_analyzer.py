@@ -9,6 +9,8 @@ from tqdm import tqdm
 
 
 class RQ2ResultAnalyzer:
+    SELECTED_HEURISTIC = "56-dsc"
+
     def __init__(self, config, subject_id_map):
         self.config = config
         self.subject_id_map = subject_id_map
@@ -255,7 +257,7 @@ class RQ2ResultAnalyzer:
         sns.histplot(x, ax=ax, kde=False, bins=10, color="blue")
         plt.savefig(self.get_output_path() / "rq2_tc_age_hist.png", bbox_inches="tight")
 
-    def run_heuristic_tests(self, metric):
+    def run_heuristic_tests(self, metric, heuristic=None):
         results = {}
         for subject, sid in self.subject_id_map.items():
             results.setdefault("S_ID", []).append(sid)
@@ -282,14 +284,17 @@ class RQ2ResultAnalyzer:
                 / "full"
                 / "results.csv"
             ).sort_values("build", ignore_index=True)
-            best_fid = h_df.drop("build", axis=1).mean().idxmax()
-            best_fname = fid_map[int(best_fid.split("-")[0])]
-            results.setdefault("feature", []).append(best_fname)
-            results.setdefault("h_avg", []).append(h_df[best_fid].mean())
-            results.setdefault("h_std", []).append(h_df[best_fid].std())
+            if heuristic is not None:
+                sel_fid = heuristic
+            else:
+                sel_fid = h_df.drop("build", axis=1).mean().idxmax()
+            sel_fname = fid_map[int(sel_fid.split("-")[0])]
+            results.setdefault("feature", []).append(sel_fname)
+            results.setdefault("h_avg", []).append(h_df[sel_fid].mean())
+            results.setdefault("h_std", []).append(h_df[sel_fid].std())
             results.setdefault("full_avg", []).append(full_df[metric].mean())
             results.setdefault("full_std", []).append(full_df[metric].std())
-            x, y = h_df[best_fid].values, full_df[metric].values
+            x, y = h_df[sel_fid].values, full_df[metric].values
             z, p = wilcoxon(x, y)
             cl = pg.compute_effsize(x, y, paired=True, eftype="CLES")
             results.setdefault("p-value", []).append(p)
@@ -304,6 +309,15 @@ class RQ2ResultAnalyzer:
         )
         apfdc.to_csv(
             self.get_output_path() / f"rq2_apfdc_heuristic_comp.csv", index=False
+        )
+
+        apfd = self.run_heuristic_tests("apfd", heuristic="56-dsc")
+        apfdc = self.run_heuristic_tests("apfdc", heuristic="56-dsc")
+        apfd.to_csv(
+            self.get_output_path() / f"rq2_apfd_56dsc_heuristic.csv", index=False
+        )
+        apfdc.to_csv(
+            self.get_output_path() / f"rq2_apfdc_56dsc_heuristic.csv", index=False
         )
 
         def format_columns(df):
