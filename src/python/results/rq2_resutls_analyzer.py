@@ -363,13 +363,22 @@ class RQ2ResultAnalyzer:
         with (self.get_output_path() / f"rq2_apfdc_heuristic_comp.tex").open("w") as f:
             f.write(format_columns(apfdc).to_latex(index=False, escape=False))
 
+        def customize_cols(df):
+            df["\\textit{H\\_M}"] = df["Best H"]
+            df.drop(["Best H Feature", "Best H"], axis=1, inplace=True)
+            return df[
+                [
+                    "$S_{ID}$",
+                    "\\textit{H\\_M}",
+                    "\\textit{Full\\_M}",
+                    "p-value",
+                    "CL",
+                ]
+            ]
+
         with (self.get_output_path() / f"rq2_apfd_56dsc_heuristic.tex").open("w") as f:
             res = format_columns(apfd_custom)
-            res["\\textit{H\\_M}"] = res["Best H"]
-            res.drop(["Best H Feature", "Best H"], axis=1, inplace=True)
-            f.write(res.to_latex(index=False, escape=False))
+            f.write(customize_cols(res).to_latex(index=False, escape=False))
         with (self.get_output_path() / f"rq2_apfdc_56dsc_heuristic.tex").open("w") as f:
             res = format_columns(apfdc_custom)
-            res["\\textit{H\\_M}"] = res["Best H"]
-            res.drop(["Best H Feature", "Best H"], axis=1, inplace=True)
-            f.write(res.to_latex(index=False, escape=False))
+            f.write(customize_cols(res).to_latex(index=False, escape=False))
