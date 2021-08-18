@@ -343,16 +343,20 @@ class RQ2ResultAnalyzer:
                 )
             )
             df["CL"] = df["CL"].apply(lambda cl: "{:.2f}".format(cl))
-            return df[
-                [
-                    "$S_{ID}$",
-                    "Best H Feature",
-                    "Best H",
-                    "\\textit{Full\\_M}",
-                    "p-value",
-                    "CL",
+            return (
+                df[
+                    [
+                        "$S_{ID}$",
+                        "Best H Feature",
+                        "Best H",
+                        "\\textit{Full\\_M}",
+                        "p-value",
+                        "CL",
+                    ]
                 ]
-            ]
+                .copy()
+                .reset_index(drop=True)
+            )
 
         with (self.get_output_path() / f"rq2_apfd_heuristic_comp.tex").open("w") as f:
             f.write(format_columns(apfd).to_latex(index=False, escape=False))
