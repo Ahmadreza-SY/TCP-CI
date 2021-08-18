@@ -311,12 +311,12 @@ class RQ2ResultAnalyzer:
             self.get_output_path() / f"rq2_apfdc_heuristic_comp.csv", index=False
         )
 
-        apfd = self.run_heuristic_tests("apfd", heuristic="56-dsc")
-        apfdc = self.run_heuristic_tests("apfdc", heuristic="56-dsc")
-        apfd.to_csv(
+        apfd_custom = self.run_heuristic_tests("apfd", heuristic="56-dsc")
+        apfdc_custom = self.run_heuristic_tests("apfdc", heuristic="56-dsc")
+        apfd_custom.to_csv(
             self.get_output_path() / f"rq2_apfd_56dsc_heuristic.csv", index=False
         )
-        apfdc.to_csv(
+        apfdc_custom.to_csv(
             self.get_output_path() / f"rq2_apfdc_56dsc_heuristic.csv", index=False
         )
 
@@ -358,3 +358,14 @@ class RQ2ResultAnalyzer:
             f.write(format_columns(apfd).to_latex(index=False, escape=False))
         with (self.get_output_path() / f"rq2_apfdc_heuristic_comp.tex").open("w") as f:
             f.write(format_columns(apfdc).to_latex(index=False, escape=False))
+
+        with (self.get_output_path() / f"rq2_apfd_56dsc_heuristic.tex").open("w") as f:
+            res = format_columns(apfd_custom)
+            res["\\textit{H\\_M}"] = res["Best H"]
+            res.drop(["Best H Feature", "Best H"], axis=1, inplace=True)
+            f.write(res.to_latex(index=False, escape=False))
+        with (self.get_output_path() / f"rq2_apfdc_56dsc_heuristic.tex").open("w") as f:
+            res = format_columns(apfdc_custom)
+            res["\\textit{H\\_M}"] = res["Best H"]
+            res.drop(["Best H Feature", "Best H"], axis=1, inplace=True)
+            f.write(res.to_latex(index=False, escape=False))
