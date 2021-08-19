@@ -162,9 +162,9 @@ class RQ2ResultAnalyzer:
 
         apfd = format_columns(apfd)
         apfdc = format_columns(apfdc)
-        tests_df = apfd.merge(apfdc, on=["A", "B"], suffixes=["-apfd", "-apfdc"])
+        # tests_df = apfd.merge(apfdc, on=["A", "B"], suffixes=["-apfd", "-apfdc"])
         with (self.get_output_path() / f"rq2_{name}_tests.tex").open("w") as f:
-            f.write(tests_df.to_latex(index=False, escape=False))
+            f.write(apfdc.to_latex(index=False, escape=False))
 
     def generate_feature_group_acc_test_tables(self):
         without_experiments = [f"wo-{fg}" for fg in RQ1ResultAnalyzer.FEATURE_GROUPS]
