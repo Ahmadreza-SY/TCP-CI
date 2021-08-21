@@ -210,7 +210,7 @@ class RankLibLearner:
             pred_path = build_ds_path / "pred.txt"
 
             if not model_path.exists():
-                train_command = f"java -jar {ranklib_path} -train {train_path} -ranker 0 -save {model_path} -metric2t NDCG@10 -silent"
+                train_command = f"java -jar {ranklib_path} -train {train_path} -ranker 0 -save {model_path} -tree 30 -silent"
                 train_out = subprocess.run(
                     train_command, shell=True, capture_output=True
                 )
