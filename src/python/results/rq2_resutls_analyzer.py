@@ -284,17 +284,27 @@ class RQ2ResultAnalyzer:
                 / "full"
                 / "results.csv"
             ).sort_values("build", ignore_index=True)
+            test_builds = full_df["build"].values.tolist()
+            test_h_df = (
+                h_df[h_df["build"].isin(test_builds)]
+                .copy()
+                .reset_index(drop=True)
+                .sort_values("build", ignore_index=True)
+            )
             if heuristic is not None:
                 sel_fid = heuristic
             else:
-                sel_fid = h_df.drop("build", axis=1).mean().idxmax()
+                train_h_df = (
+                    h_df[~h_df["build"].isin(test_builds)].copy().reset_index(drop=True)
+                )
+                sel_fid = train_h_df.drop("build", axis=1).mean().idxmax()
             sel_fname = fid_map[int(sel_fid.split("-")[0])]
             results.setdefault("feature", []).append(sel_fname)
-            results.setdefault("h_avg", []).append(h_df[sel_fid].mean())
-            results.setdefault("h_std", []).append(h_df[sel_fid].std())
+            results.setdefault("h_avg", []).append(test_h_df[sel_fid].mean())
+            results.setdefault("h_std", []).append(test_h_df[sel_fid].std())
             results.setdefault("full_avg", []).append(full_df[metric].mean())
             results.setdefault("full_std", []).append(full_df[metric].std())
-            x, y = h_df[sel_fid].values, full_df[metric].values
+            x, y = test_h_df[sel_fid].values, full_df[metric].values
             z, p = wilcoxon(x, y)
             cl = pg.compute_effsize(x, y, paired=True, eftype="CLES")
             results.setdefault("p-value", []).append(p)

@@ -288,10 +288,9 @@ class RankLibLearner:
     def test_heuristics(self, dataset_df, results_path):
         apfd_results = {"build": []}
         apfdc_results = {"build": []}
-        test_builds = dataset_df[Feature.BUILD].unique().tolist()
-        test_builds.sort(key=lambda b: self.build_time_d[b])
-        test_builds = test_builds[-self.config.test_count :]
-        for build in tqdm(test_builds, desc="Testing heuristics"):
+        all_builds = dataset_df[Feature.BUILD].unique().tolist()
+        all_builds.sort(key=lambda b: self.build_time_d[b])
+        for build in tqdm(all_builds, desc="Testing heuristics"):
             suite_ds = dataset_df[dataset_df[Feature.BUILD] == build]
             apfd_results["build"].append(build)
             apfdc_results["build"].append(build)
