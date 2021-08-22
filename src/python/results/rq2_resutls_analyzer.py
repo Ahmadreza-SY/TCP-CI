@@ -257,7 +257,7 @@ class RQ2ResultAnalyzer:
         sns.histplot(x, ax=ax, kde=False, bins=10, color="blue")
         plt.savefig(self.get_output_path() / "rq2_tc_age_hist.png", bbox_inches="tight")
 
-    def run_heuristic_tests(self, metric, heuristic=None):
+    def run_heuristic_tests(self, metric, experiment, heuristic=None):
         results = {}
         for subject, sid in self.subject_id_map.items():
             results.setdefault("S_ID", []).append(sid)
@@ -274,14 +274,14 @@ class RQ2ResultAnalyzer:
                 self.config.data_path
                 / subject
                 / "tsp_accuracy_results"
-                / "full"
+                / experiment
                 / f"heuristic_{metric}_results.csv"
             ).sort_values("build", ignore_index=True)
             full_df = pd.read_csv(
                 self.config.data_path
                 / subject
                 / "tsp_accuracy_results"
-                / "full"
+                / experiment
                 / "results.csv"
             ).sort_values("build", ignore_index=True)
             test_builds = full_df["build"].values.tolist()
@@ -312,8 +312,8 @@ class RQ2ResultAnalyzer:
         return pd.DataFrame(results).sort_values("p-value", ignore_index=True)
 
     def generate_heuristic_comparison_table(self):
-        apfd = self.run_heuristic_tests("apfd")
-        apfdc = self.run_heuristic_tests("apfdc")
+        apfd = self.run_heuristic_tests("apfd", "full")
+        apfdc = self.run_heuristic_tests("apfdc", "full")
         apfd.to_csv(
             self.get_output_path() / f"rq2_apfd_heuristic_comp.csv", index=False
         )
@@ -321,13 +321,32 @@ class RQ2ResultAnalyzer:
             self.get_output_path() / f"rq2_apfdc_heuristic_comp.csv", index=False
         )
 
-        apfd_custom = self.run_heuristic_tests("apfd", heuristic="56-dsc")
-        apfdc_custom = self.run_heuristic_tests("apfdc", heuristic="56-dsc")
+        apfd_custom = self.run_heuristic_tests(
+            "apfd", "full", heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC
+        )
+        apfdc_custom = self.run_heuristic_tests(
+            "apfdc", "full", heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC
+        )
         apfd_custom.to_csv(
             self.get_output_path() / f"rq2_apfd_56dsc_heuristic.csv", index=False
         )
         apfdc_custom.to_csv(
             self.get_output_path() / f"rq2_apfdc_56dsc_heuristic.csv", index=False
+        )
+
+        apfd_outlier = self.run_heuristic_tests(
+            "apfd", "full-outliers", heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC
+        )
+        apfdc_outlier = self.run_heuristic_tests(
+            "apfdc", "full-outliers", heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC
+        )
+        apfd_outlier.to_csv(
+            self.get_output_path() / f"rq2_apfd_56dsc_outlier_heuristic.csv",
+            index=False,
+        )
+        apfdc_outlier.to_csv(
+            self.get_output_path() / f"rq2_apfdc_56dsc_outlier_heuristic.csv",
+            index=False,
         )
 
         def format_columns(df):
@@ -368,8 +387,6 @@ class RQ2ResultAnalyzer:
                 .reset_index(drop=True)
             )
 
-        with (self.get_output_path() / f"rq2_apfd_heuristic_comp.tex").open("w") as f:
-            f.write(format_columns(apfd).to_latex(index=False, escape=False))
         with (self.get_output_path() / f"rq2_apfdc_heuristic_comp.tex").open("w") as f:
             f.write(format_columns(apfdc).to_latex(index=False, escape=False))
 
@@ -386,9 +403,12 @@ class RQ2ResultAnalyzer:
                 ]
             ]
 
-        with (self.get_output_path() / f"rq2_apfd_56dsc_heuristic.tex").open("w") as f:
-            res = format_columns(apfd_custom)
-            f.write(customize_cols(res).to_latex(index=False, escape=False))
         with (self.get_output_path() / f"rq2_apfdc_56dsc_heuristic.tex").open("w") as f:
             res = format_columns(apfdc_custom)
+            f.write(customize_cols(res).to_latex(index=False, escape=False))
+
+        with (self.get_output_path() / f"rq2_apfdc_56dsc_outlier_heuristic.tex").open(
+            "w"
+        ) as f:
+            res = format_columns(apfdc_outlier)
             f.write(customize_cols(res).to_latex(index=False, escape=False))
