@@ -133,9 +133,15 @@ class ResultAnalyzer:
         stats_df["$S_{ID}$"] = stats_df["Subject"].apply(
             lambda s: f"$S_{{{self.subject_id_map[s]}}}$"
         )
-        stats_df["SLOC"] = stats_df["SLOC"].apply(lambda n: f"{int(n/1000.0)}k")
+        stats_df["SLOC"] = stats_df["SLOC"].apply(
+            lambda n: f"{int(n/1000.0)}k"
+            if n < 1000000
+            else f'{float("{:.2f}".format(n/1000000.0))}M'
+        )
         stats_df["Java SLOC"] = stats_df["Java SLOC"].apply(
             lambda n: f"{int(n/1000.0)}k"
+            if n < 1000000
+            else f'{float("{:.2f}".format(n/1000000.0))}M'
         )
         stats_df["\\# Builds"] = stats_df["\\# Builds"].apply(lambda n: f"{n:,}")
         stats_df["\\# Commits"] = stats_df["\\# Commits"].apply(
