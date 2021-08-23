@@ -134,6 +134,8 @@ class RankLibLearner:
             if build not in test_builds:
                 continue
             train_ds = ranklib_ds[ranklib_ds["i_build"].isin(builds[:i])]
+            if len(train_ds) == 0:
+                continue
             test_ds = ranklib_ds[ranklib_ds["i_build"] == build]
             build_out_path = output_path / str(build)
             build_out_path.mkdir(parents=True, exist_ok=True)
