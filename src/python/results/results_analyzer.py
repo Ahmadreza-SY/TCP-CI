@@ -15,6 +15,7 @@ from .rq3_resutls_analyzer import RQ3ResultAnalyzer
 class ResultAnalyzer:
     BUILD_THRESHOLD = 50
     DURATION_THRESHOLD = 5
+    TC_THRESHOLD = 10
 
     def __init__(self, config):
         self.config = config
@@ -88,6 +89,9 @@ class ResultAnalyzer:
                     else float("{:.2f}".format(float(avg_duration) / 60000.0))
                 )
                 if avg_duration < ResultAnalyzer.DURATION_THRESHOLD:
+                    continue
+
+                if round(avg_tc) < ResultAnalyzer.TC_THRESHOLD:
                     continue
 
                 change_history = pd.read_csv(ds_path / "entity_change_history.csv")
