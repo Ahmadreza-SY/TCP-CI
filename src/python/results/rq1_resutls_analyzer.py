@@ -318,7 +318,7 @@ class RQ1ResultAnalyzer:
         fig, axs = plt.subplots(2, 3, figsize=(24, 9))
         plot_corr("SLOC", "Total", axs[0, 0])
         plot_corr("SLOC", "COV", axs[0, 1])
-        plot_corr("SLOC", "COD_COV_COM", axs[0, 2])
+        plot_corr("SLOC", "REC", axs[0, 2])
         plot_corr("Avg. \\# TC/Build", "Total", axs[1, 0])
         plot_corr("Avg. \\# TC/Build", "COV", axs[1, 1])
         plot_corr("Avg. \\# TC/Build", "REC", axs[1, 2])
