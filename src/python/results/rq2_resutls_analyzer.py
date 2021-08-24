@@ -21,6 +21,7 @@ class RQ2ResultAnalyzer:
         self.generate_feature_usage_freq_table()
         self.generate_tc_age_histogram()
         self.generate_heuristic_comparison_table()
+        self.generate_apfdc_corr_table()
 
     def get_output_path(self):
         output_path = self.config.output_path / "RQ2"
