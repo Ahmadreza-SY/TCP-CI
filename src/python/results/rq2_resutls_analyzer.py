@@ -412,3 +412,35 @@ class RQ2ResultAnalyzer:
         ) as f:
             res = format_columns(apfdc_outlier)
             f.write(customize_cols(res).to_latex(index=False, escape=False))
+
+    def compute_apfdc_subject_corr(self):
+        stats_cols = [
+            "SLOC",
+            "Java SLOC",
+            "\\# Commits",
+            "\\# Builds",
+            "\\# Failed Builds",
+            "Avg. \\# TC/Build",
+            "Avg. Test Time (min)",
+        ]
+        avg_apfdc_df = pd.read_csv(self.get_output_path() / "rq2_apfdc_avg.csv")
+        avg_apfdc_df["S_ID"] = avg_apfdc_df["S_ID"].astype(int)
+        stats_df = pd.read_csv(self.config.output_path / "subject_stats.csv")
+        stats_df["S_ID"] = stats_df["Subject"].apply(lambda s: self.subject_id_map[s])
+        data = stats_df.merge(avg_apfdc_df, on="S_ID")
+        data = data[["full"] + stats_cols]
+        corr_df = data.corr(method="pearson")
+        corr_results = {"s": []}
+        for col in stats_cols:
+            corr_results["s"].append(col)
+            selected_corr = corr_df[col][["full"]].abs().sort_values(ascending=False)
+            for fg, corr_val in selected_corr.iteritems():
+                corr_results.setdefault(fg, []).append(corr_val)
+
+        return pd.DataFrame(corr_results), data
+
+    def generate_apfdc_corr_table(self):
+        corr_results, data = self.compute_apfdc_subject_corr()
+        corr_results.to_csv(
+            self.get_output_path() / "rq2_size_apfdc_corr.csv", index=False
+        )
