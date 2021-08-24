@@ -259,7 +259,7 @@ class RQ1ResultAnalyzer:
             self.get_output_path() / "rq1_total_vs_impacted_time.csv"
         )
         total_time_df["S_ID"] = total_time_df["s"]
-        total_time_df["Total"] = total_time_df["adct"]
+        total_time_df["Total"] = total_time_df["adct"] * 60.0
         fg_time_df = fg_time_df.merge(total_time_df[["S_ID", "Total"]], on="S_ID")
         for fg in RQ1ResultAnalyzer.FEATURE_GROUPS:
             col = f"{fg}-T"
