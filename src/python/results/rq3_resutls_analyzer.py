@@ -32,8 +32,8 @@ class RQ3ResultAnalyzer:
         return pd.concat(decay_results, ignore_index=True)
 
     def plot_decay_graphs(self, metric):
-        rows, cols = 2, 8
-        fig, axs = plt.subplots(rows, cols, figsize=(34, 6))
+        rows, cols = 5, 5
+        fig, axs = plt.subplots(rows, cols, figsize=(34, 15))
         fig.subplots_adjust(hspace=0.4, wspace=0.3)
         slopes = {}
         i = 0

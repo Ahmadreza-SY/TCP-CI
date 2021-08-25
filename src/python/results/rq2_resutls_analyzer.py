@@ -6,6 +6,7 @@ from .rq1_resutls_analyzer import RQ1ResultAnalyzer
 from ..feature_extractor.feature import Feature
 import seaborn as sns
 from tqdm import tqdm
+import numpy as np
 
 
 class RQ2ResultAnalyzer:
@@ -258,8 +259,10 @@ class RQ2ResultAnalyzer:
         sns.histplot(x, ax=ax, kde=False, bins=10, color="blue")
         plt.savefig(self.get_output_path() / "rq2_tc_age_hist.png", bbox_inches="tight")
 
-    def run_heuristic_tests(self, metric, experiment, heuristic=None):
+    def run_heuristic_tests(self, metric, experiment, heuristic=None, run_all=False):
         results = {}
+        all_h_acc = []
+        all_full_acc = []
         for subject, sid in self.subject_id_map.items():
             results.setdefault("S_ID", []).append(sid)
             fid_map_df = pd.read_csv(
@@ -301,16 +304,37 @@ class RQ2ResultAnalyzer:
                 sel_fid = train_h_df.drop("build", axis=1).mean().idxmax()
             sel_fname = fid_map[int(sel_fid.split("-")[0])]
             results.setdefault("feature", []).append(sel_fname)
-            results.setdefault("h_avg", []).append(test_h_df[sel_fid].mean())
-            results.setdefault("h_std", []).append(test_h_df[sel_fid].std())
             results.setdefault("full_avg", []).append(full_df[metric].mean())
             results.setdefault("full_std", []).append(full_df[metric].std())
-            x, y = test_h_df[sel_fid].values, full_df[metric].values
+            results.setdefault("h_avg", []).append(test_h_df[sel_fid].mean())
+            results.setdefault("h_std", []).append(test_h_df[sel_fid].std())
+            x, y = full_df[metric].values, test_h_df[sel_fid].values
+            all_full_acc.extend(x)
+            all_h_acc.extend(y)
             z, p = wilcoxon(x, y)
             cl = pg.compute_effsize(x, y, paired=True, eftype="CLES")
             results.setdefault("p-value", []).append(p)
             results.setdefault("CL", []).append(cl)
-        return pd.DataFrame(results).sort_values("CL", ignore_index=True)
+
+        results = pd.DataFrame(results).sort_values(
+            "CL", ascending=False, ignore_index=True
+        )
+        if run_all:
+            z, p = wilcoxon(all_full_acc, all_h_acc)
+            cl = pg.compute_effsize(x, y, paired=True, eftype="CLES")
+            all_results = pd.DataFrame(
+                {
+                    "full_avg": [np.mean(all_full_acc)],
+                    "full_std": [np.std(all_full_acc)],
+                    "h_avg": [np.mean(all_h_acc)],
+                    "h_std": [np.std(all_h_acc)],
+                    "p-value": [p],
+                    "CL": [cl],
+                }
+            )
+            return results, all_results
+
+        return results
 
     def generate_heuristic_comparison_table(self):
         apfd = self.run_heuristic_tests("apfd", "full")
@@ -325,8 +349,11 @@ class RQ2ResultAnalyzer:
         apfd_custom = self.run_heuristic_tests(
             "apfd", "full", heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC
         )
-        apfdc_custom = self.run_heuristic_tests(
-            "apfdc", "full", heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC
+        apfdc_custom, apfdc_custom_all = self.run_heuristic_tests(
+            "apfdc",
+            "full",
+            heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC,
+            run_all=True,
         )
         apfd_custom.to_csv(
             self.get_output_path() / f"rq2_apfd_56dsc_heuristic.csv", index=False
@@ -334,12 +361,18 @@ class RQ2ResultAnalyzer:
         apfdc_custom.to_csv(
             self.get_output_path() / f"rq2_apfdc_56dsc_heuristic.csv", index=False
         )
+        apfdc_custom_all.to_csv(
+            self.get_output_path() / f"rq2_apfdc_all_56dsc_heuristic.csv", index=False
+        )
 
         apfd_outlier = self.run_heuristic_tests(
             "apfd", "full-outliers", heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC
         )
-        apfdc_outlier = self.run_heuristic_tests(
-            "apfdc", "full-outliers", heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC
+        apfdc_outlier, apfdc_outlier_all = self.run_heuristic_tests(
+            "apfdc",
+            "full-outliers",
+            heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC,
+            run_all=True,
         )
         apfd_outlier.to_csv(
             self.get_output_path() / f"rq2_apfd_56dsc_outlier_heuristic.csv",
@@ -347,6 +380,10 @@ class RQ2ResultAnalyzer:
         )
         apfdc_outlier.to_csv(
             self.get_output_path() / f"rq2_apfdc_56dsc_outlier_heuristic.csv",
+            index=False,
+        )
+        apfdc_outlier_all.to_csv(
+            self.get_output_path() / f"rq2_apfdc_all_56dsc_outlier_heuristic.csv",
             index=False,
         )
 
