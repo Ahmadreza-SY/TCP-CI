@@ -414,9 +414,9 @@ class RQ2ResultAnalyzer:
                 df[
                     [
                         "$S_{ID}$",
+                        "\\textit{Full\\_M}",
                         "Best H Feature",
                         "Best H",
-                        "\\textit{Full\\_M}",
                         "p-value",
                         "CL",
                     ]
@@ -434,8 +434,8 @@ class RQ2ResultAnalyzer:
             return df[
                 [
                     "$S_{ID}$",
-                    "\\textit{H\\_M}",
                     "\\textit{Full\\_M}",
+                    "\\textit{H\\_M}",
                     "p-value",
                     "CL",
                 ]
