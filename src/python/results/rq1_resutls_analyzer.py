@@ -249,6 +249,7 @@ class RQ1ResultAnalyzer:
             "\\# Commits",
             "\\# Builds",
             "\\# Failed Builds",
+            "Failure Rate (%)",
             "Avg. \\# TC/Build",
             "Avg. Test Time (min)",
         ]
