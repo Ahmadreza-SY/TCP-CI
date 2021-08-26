@@ -68,8 +68,8 @@ class ResultAnalyzer:
             features_path = ds_path / "dataset.csv"
             if features_path.exists():
                 ds_df = pd.read_csv(features_path)
-                failed_builds = ds_df[Feature.BUILD].nunique()
-                if failed_builds < ResultAnalyzer.BUILD_THRESHOLD:
+                failed_builds_count = ds_df[Feature.BUILD].nunique()
+                if failed_builds_count < ResultAnalyzer.BUILD_THRESHOLD:
                     continue
 
                 exe_df = pd.read_csv(ds_path / "exe.csv")
@@ -109,10 +109,16 @@ class ResultAnalyzer:
                     change_history[EntityChange.COMMIT].nunique()
                 )
                 subject_stats.setdefault("Time period (months)", []).append(time_period)
+                builds_count = exe_df[ExecutionRecord.BUILD].nunique()
                 subject_stats.setdefault("\\# Builds", []).append(
                     exe_df[ExecutionRecord.BUILD].nunique()
                 )
-                subject_stats.setdefault("\\# Failed Builds", []).append(failed_builds)
+                subject_stats.setdefault("\\# Failed Builds", []).append(
+                    failed_builds_count
+                )
+                subject_stats.setdefault("Failure Rate (%)", []).append(
+                    int((failed_builds_count * 100.0) / builds_count)
+                )
                 subject_stats.setdefault("Avg. \\# TC/Build", []).append(round(avg_tc))
                 subject_stats.setdefault("Avg. Test Time (min)", []).append(
                     avg_duration
