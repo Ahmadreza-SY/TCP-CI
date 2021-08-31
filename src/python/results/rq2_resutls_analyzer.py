@@ -442,14 +442,13 @@ class RQ2ResultAnalyzer:
             ]
 
         with (self.get_output_path() / f"rq2_apfdc_56dsc_heuristic.tex").open("w") as f:
-            res = format_columns(apfdc_custom)
-            f.write(customize_cols(res).to_latex(index=False, escape=False))
-
-        with (self.get_output_path() / f"rq2_apfdc_56dsc_outlier_heuristic.tex").open(
-            "w"
-        ) as f:
-            res = format_columns(apfdc_outlier)
-            f.write(customize_cols(res).to_latex(index=False, escape=False))
+            apfdc_custom_res = customize_cols(format_columns(apfdc_custom))
+            apfdc_outlier_res = customize_cols(format_columns(apfdc_outlier))
+            res = apfdc_custom_res.merge(
+                apfdc_outlier_res, on="$S_{ID}$", suffixes=["-n", "-o"]
+            )
+            res.sort_values("CL-o", ascending=False, ignore_index=True, inplace=True)
+            f.write(res.to_latex(index=False, escape=False))
 
     def compute_subject_corr(self, target_df, target_cols):
         stats_cols = [
