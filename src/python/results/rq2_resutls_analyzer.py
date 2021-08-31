@@ -469,7 +469,7 @@ class RQ2ResultAnalyzer:
         corr_results = {"s": []}
         for col in stats_cols:
             corr_results["s"].append(col)
-            selected_corr = corr_df[col][target_cols].abs().sort_values(ascending=False)
+            selected_corr = corr_df[col][target_cols].sort_values(ascending=False)
             for tr, corr_val in selected_corr.iteritems():
                 corr_results.setdefault(tr, []).append(corr_val)
 
