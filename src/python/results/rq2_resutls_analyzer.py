@@ -486,7 +486,8 @@ class RQ2ResultAnalyzer:
         h_df = pd.read_csv(self.get_output_path() / "rq2_apfdc_56dsc_heuristic.csv")
         h_df["S_ID"] = h_df["S_ID"].astype(int)
         h_df["ind"] = h_df.index
-        corr_results, data = self.compute_subject_corr(h_df, ["ind"])
+        h_df["avg_diff"] = h_df["full_avg"] - h_df["h_avg"]
+        corr_results, data = self.compute_subject_corr(h_df, ["ind", "avg_diff"])
         corr_results.to_csv(
             self.get_output_path() / "rq2_size_heurisitc_corr.csv", index=False
         )
@@ -496,7 +497,8 @@ class RQ2ResultAnalyzer:
         )
         h_df["S_ID"] = h_df["S_ID"].astype(int)
         h_df["ind"] = h_df.index
-        corr_results, data = self.compute_subject_corr(h_df, ["ind"])
+        h_df["avg_diff"] = h_df["full_avg"] - h_df["h_avg"]
+        corr_results, data = self.compute_subject_corr(h_df, ["ind", "avg_diff"])
         corr_results.to_csv(
             self.get_output_path() / "rq2_size_outlier_heurisitc_corr.csv", index=False
         )
