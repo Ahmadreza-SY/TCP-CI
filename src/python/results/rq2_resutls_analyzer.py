@@ -22,7 +22,7 @@ class RQ2ResultAnalyzer:
         self.generate_feature_usage_freq_table()
         self.generate_tc_age_histogram()
         self.generate_heuristic_comparison_table()
-        self.generate_apfdc_corr_table()
+        self.generate_apfdc_corr_tables()
 
     def get_output_path(self):
         output_path = self.config.output_path / "RQ2"
@@ -451,7 +451,7 @@ class RQ2ResultAnalyzer:
             res = format_columns(apfdc_outlier)
             f.write(customize_cols(res).to_latex(index=False, escape=False))
 
-    def compute_apfdc_subject_corr(self):
+    def compute_subject_corr(self, target_df, target_cols):
         stats_cols = [
             "SLOC",
             "Java SLOC",
@@ -462,24 +462,42 @@ class RQ2ResultAnalyzer:
             "Avg. \\# TC/Build",
             "Avg. Test Time (min)",
         ]
-        avg_apfdc_df = pd.read_csv(self.get_output_path() / "rq2_apfdc_avg.csv")
-        avg_apfdc_df["S_ID"] = avg_apfdc_df["S_ID"].astype(int)
         stats_df = pd.read_csv(self.config.output_path / "subject_stats.csv")
         stats_df["S_ID"] = stats_df["Subject"].apply(lambda s: self.subject_id_map[s])
-        data = stats_df.merge(avg_apfdc_df, on="S_ID")
-        data = data[["full"] + stats_cols]
+        data = stats_df.merge(target_df, on="S_ID")
+        data = data[target_cols + stats_cols]
         corr_df = data.corr(method="pearson")
         corr_results = {"s": []}
         for col in stats_cols:
             corr_results["s"].append(col)
-            selected_corr = corr_df[col][["full"]].abs().sort_values(ascending=False)
-            for fg, corr_val in selected_corr.iteritems():
-                corr_results.setdefault(fg, []).append(corr_val)
+            selected_corr = corr_df[col][target_cols].abs().sort_values(ascending=False)
+            for tr, corr_val in selected_corr.iteritems():
+                corr_results.setdefault(tr, []).append(corr_val)
 
         return pd.DataFrame(corr_results), data
 
-    def generate_apfdc_corr_table(self):
-        corr_results, data = self.compute_apfdc_subject_corr()
+    def generate_apfdc_corr_tables(self):
+        avg_apfdc_df = pd.read_csv(self.get_output_path() / "rq2_apfdc_avg.csv")
+        avg_apfdc_df["S_ID"] = avg_apfdc_df["S_ID"].astype(int)
+        corr_results, data = self.compute_subject_corr(avg_apfdc_df, ["full"])
         corr_results.to_csv(
             self.get_output_path() / "rq2_size_apfdc_corr.csv", index=False
+        )
+
+        h_df = pd.read_csv(self.get_output_path() / "rq2_apfdc_56dsc_heuristic.csv")
+        h_df["S_ID"] = h_df["S_ID"].astype(int)
+        h_df["ind"] = h_df.index
+        corr_results, data = self.compute_subject_corr(h_df, ["ind"])
+        corr_results.to_csv(
+            self.get_output_path() / "rq2_size_heurisitc_corr.csv", index=False
+        )
+
+        h_df = pd.read_csv(
+            self.get_output_path() / "rq2_apfdc_56dsc_outlier_heuristic.csv"
+        )
+        h_df["S_ID"] = h_df["S_ID"].astype(int)
+        h_df["ind"] = h_df.index
+        corr_results, data = self.compute_subject_corr(h_df, ["ind"])
+        corr_results.to_csv(
+            self.get_output_path() / "rq2_size_outlier_heurisitc_corr.csv", index=False
         )
