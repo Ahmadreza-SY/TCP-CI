@@ -274,11 +274,9 @@ class RQ1ResultAnalyzer:
         corr_results = {"s": []}
         for col in stats_cols:
             corr_results["s"].append(col)
-            selected_corr = (
-                corr_df[col][RQ1ResultAnalyzer.FEATURE_GROUPS + ["Total"]]
-                .abs()
-                .sort_values(ascending=False)
-            )
+            selected_corr = corr_df[col][
+                RQ1ResultAnalyzer.FEATURE_GROUPS + ["Total"]
+            ].sort_values(ascending=False, key=abs)
             for fg, corr_val in selected_corr.iteritems():
                 corr_results.setdefault(fg, []).append(corr_val)
 
@@ -297,7 +295,7 @@ class RQ1ResultAnalyzer:
         for col in RQ1ResultAnalyzer.FEATURE_GROUPS + ["Total"]:
             corr_results[col] = corr_results[col].apply(
                 lambda n: "\\textbf{{{:.2f}}}".format(n)
-                if n > RQ1ResultAnalyzer.CORR_THRESHOLD
+                if abs(n) > RQ1ResultAnalyzer.CORR_THRESHOLD
                 else "{:.2f}".format(n)
             )
         corr_results.columns = list(

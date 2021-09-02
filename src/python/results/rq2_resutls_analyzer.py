@@ -465,7 +465,7 @@ class RQ2ResultAnalyzer:
         stats_df["S_ID"] = stats_df["Subject"].apply(lambda s: self.subject_id_map[s])
         data = stats_df.merge(target_df, on="S_ID")
         data = data[target_cols + stats_cols]
-        corr_df = data.corr(method="pearson")
+        corr_df = data.corr(method="spearman")
         corr_results = {"s": []}
         for col in stats_cols:
             corr_results["s"].append(col)
