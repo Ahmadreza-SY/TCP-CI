@@ -259,7 +259,9 @@ class RQ2ResultAnalyzer:
         sns.histplot(x, ax=ax, kde=False, bins=10, color="blue")
         plt.savefig(self.get_output_path() / "rq2_tc_age_hist.png", bbox_inches="tight")
 
-    def run_heuristic_tests(self, metric, experiment, heuristic=None, run_all=False):
+    def run_heuristic_tests(
+        self, metric, experiment, heuristic=None, run_all=False, ml_experiment=None
+    ):
         results = {}
         all_h_acc = []
         all_full_acc = []
@@ -281,11 +283,12 @@ class RQ2ResultAnalyzer:
                 / experiment
                 / f"heuristic_{metric}_results.csv"
             ).sort_values("build", ignore_index=True)
+            ml_experiment = experiment if ml_experiment is None else ml_experiment
             full_df = pd.read_csv(
                 self.config.data_path
                 / subject
                 / "tsp_accuracy_results"
-                / experiment
+                / ml_experiment
                 / "results.csv"
             ).sort_values("build", ignore_index=True)
             test_builds = full_df["build"].values.tolist()
@@ -389,9 +392,10 @@ class RQ2ResultAnalyzer:
 
         apfdc_rec, apfdc_rec_all = self.run_heuristic_tests(
             "apfdc",
-            "W-Execution",
+            "full",
             heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC,
             run_all=True,
+            ml_experiment="W-Execution",
         )
 
         apfdc_rec_all.to_csv(
