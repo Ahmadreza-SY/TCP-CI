@@ -403,6 +403,19 @@ class RQ2ResultAnalyzer:
             index=False,
         )
 
+        apfdc_tes, apfdc_tes_all = self.run_heuristic_tests(
+            "apfdc",
+            "full",
+            heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC,
+            run_all=True,
+            ml_experiment="W-Code",
+        )
+
+        apfdc_tes_all.to_csv(
+            self.get_output_path() / f"rq2_apfdc_all_56dsc_tes_heuristic.csv",
+            index=False,
+        )
+
         def format_columns(df):
             df["$S_{ID}$"] = df["S_ID"].apply(lambda id: f"$S_{{{id}}}$")
             df["Best H Feature"] = df["feature"].apply(lambda f: f.replace("_", "\\_"))
