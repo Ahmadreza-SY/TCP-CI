@@ -282,6 +282,31 @@ class RQ1ResultAnalyzer:
 
         return pd.DataFrame(corr_results), data
 
+    def compute_subject_corr(self, target_df, target_cols):
+        stats_cols = [
+            "SLOC",
+            "Java SLOC",
+            "\\# Commits",
+            "\\# Builds",
+            "\\# Failed Builds",
+            "Failure Rate (%)",
+            "Avg. \\# TC/Build",
+            "Avg. Test Time (min)",
+        ]
+        stats_df = pd.read_csv(self.config.output_path / "subject_stats.csv")
+        stats_df["S_ID"] = stats_df["Subject"].apply(lambda s: self.subject_id_map[s])
+        data = stats_df.merge(target_df, on="S_ID")
+        data = data[target_cols + stats_cols]
+        corr_df = data.corr(method="spearman")
+        corr_results = {"s": []}
+        for col in stats_cols:
+            corr_results["s"].append(col)
+            selected_corr = corr_df[col][target_cols].sort_values(ascending=False)
+            for tr, corr_val in selected_corr.iteritems():
+                corr_results.setdefault(tr, []).append(corr_val)
+
+        return pd.DataFrame(corr_results), data
+
     def generate_time_subject_corr(self):
         corr_results, data = self.compute_time_subject_corr()
         corr_results.to_csv(
@@ -323,4 +348,10 @@ class RQ1ResultAnalyzer:
         plot_corr("Avg. \\# TC/Build", "REC", axs[1, 2])
         plt.savefig(
             self.get_output_path() / "rq1_corr_analysis.png", bbox_inches="tight"
+        )
+
+        tp_df = pd.read_csv(self.get_output_path() / "rq1_testing_vs_total_time.csv")
+        corr_results, data = self.compute_subject_corr(tp_df, ["ct"])
+        corr_results.to_csv(
+            self.get_output_path() / "rq1_tp_corr_analysis.csv", index=False
         )
