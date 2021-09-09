@@ -351,6 +351,7 @@ class RQ1ResultAnalyzer:
         )
 
         tp_df = pd.read_csv(self.get_output_path() / "rq1_testing_vs_total_time.csv")
+        tp_df["S_ID"] = tp_df["s"]
         corr_results, data = self.compute_subject_corr(tp_df, ["ct"])
         corr_results.to_csv(
             self.get_output_path() / "rq1_tp_corr_analysis.csv", index=False
