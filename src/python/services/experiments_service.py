@@ -77,6 +77,12 @@ class ExperimentsService:
             "wo-impacted",
             results_path,
         )
+        print("***** Running w/o impacted feature set Outliers experiments *****")
+        learner.run_accuracy_experiments(
+            outliers_dataset_df.drop(Feature.IMPACTED_FEATURES, axis=1),
+            "wo-impacted-outliers",
+            results_path,
+        )
         print()
         feature_groups_names = {
             "TES_COM": Feature.TES_COM,
@@ -93,6 +99,14 @@ class ExperimentsService:
             print(f"***** Running w/o {feature_group} feature set experiments *****")
             learner.run_accuracy_experiments(
                 dataset_df.drop(names, axis=1), f"wo-{feature_group}", results_path
+            )
+            print(
+                f"***** Running w/o {feature_group} feature set Outliers experiments *****"
+            )
+            learner.run_accuracy_experiments(
+                outliers_dataset_df.drop(names, axis=1),
+                f"wo-{feature_group}-outliers",
+                results_path,
             )
             print()
 
@@ -120,6 +134,12 @@ class ExperimentsService:
             print(f"***** Running with {feature_group} feature set experiments *****")
             learner.run_accuracy_experiments(
                 dataset_df[non_feature_cols + names], f"W-{feature_group}", results_path
+            )
+            print(f"***** Running with {feature_group} feature set experiments *****")
+            learner.run_accuracy_experiments(
+                outliers_dataset_df[non_feature_cols + names],
+                f"W-{feature_group}-outliers",
+                results_path,
             )
             print()
 

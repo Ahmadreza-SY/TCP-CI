@@ -356,3 +356,10 @@ class RQ1ResultAnalyzer:
         corr_results.to_csv(
             self.get_output_path() / "rq1_tp_corr_analysis.csv", index=False
         )
+
+        ip_df = pd.read_csv(self.get_output_path() / "rq1_total_vs_impacted_time.csv")
+        ip_df["S_ID"] = ip_df["s"]
+        corr_results, data = self.compute_subject_corr(ip_df, ["ic"])
+        corr_results.to_csv(
+            self.get_output_path() / "rq1_ip_corr_analysis.csv", index=False
+        )

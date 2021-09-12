@@ -15,6 +15,7 @@ class RQ2ResultAnalyzer:
     def __init__(self, config, subject_id_map):
         self.config = config
         self.subject_id_map = subject_id_map
+        self.outliers = True
 
     def analyze_results(self):
         self.generate_accuracy_avg_tables()
@@ -43,30 +44,39 @@ class RQ2ResultAnalyzer:
         return pd.DataFrame(results)
 
     def generate_accuracy_avg_table(self, results):
-        results = results.sort_values("full", ascending=False, ignore_index=True)
+        col_suffix = "-outliers" if self.outliers else ""
+
+        results = results.sort_values(
+            "full" + col_suffix, ascending=False, ignore_index=True
+        )
         results["$S_{ID}$"] = results["S_ID"].apply(lambda id: f"$S_{{{id}}}$")
         results["Full-inc"] = results.apply(
-            lambda r: "${:.2f} {{\pm}} {:.2f}$".format(r["full"], r["full-std"]), axis=1
+            lambda r: "${:.2f} {{\pm}} {:.2f}$".format(
+                r["full" + col_suffix], r[f'{"full" + col_suffix}-std']
+            ),
+            axis=1,
         )
         results["Impacted-ex"] = results.apply(
             lambda r: "${:.2f} {{\pm}} {:.2f}$".format(
-                r["wo-impacted"], r["wo-impacted-std"]
+                r["wo-impacted" + col_suffix], r[f'{"wo-impacted" + col_suffix}-std']
             ),
             axis=1,
         )
         results["\\textit{TES\\_M}"] = results.apply(
-            lambda r: "${:.2f} {{\pm}} {:.2f}$".format(r["W-Code"], r["W-Code-std"]),
+            lambda r: "${:.2f} {{\pm}} {:.2f}$".format(
+                r["W-Code" + col_suffix], r[f"{'W-Code' + col_suffix}-std"]
+            ),
             axis=1,
         )
         results["\\textit{REC\\_M}"] = results.apply(
             lambda r: "${:.2f} {{\pm}} {:.2f}$".format(
-                r["W-Execution"], r["W-Execution-std"]
+                r["W-Execution" + col_suffix], r[f"{'W-Execution' + col_suffix}-std"]
             ),
             axis=1,
         )
         results["\\textit{COV\\_M}"] = results.apply(
             lambda r: "${:.2f} {{\pm}} {:.2f}$".format(
-                r["W-Coverage"], r["W-Coverage-std"]
+                r["W-Coverage" + col_suffix], r[f"{'W-Coverage' + col_suffix}-std"]
             ),
             axis=1,
         )
@@ -100,17 +110,20 @@ class RQ2ResultAnalyzer:
             )
 
     def run_feature_group_acc_tests(self, metric, experiments):
+        col_suffix = "-outliers" if self.outliers else ""
         samples = {}
         for subject, _ in self.subject_id_map.items():
             results_df = pd.read_csv(
                 self.config.data_path
                 / subject
                 / "tsp_accuracy_results"
-                / "full"
+                / ("full" + col_suffix)
                 / "results.csv"
             ).sort_values("build", ignore_index=True)
             samples.setdefault("build", []).extend(results_df["build"].values.tolist())
-            samples.setdefault("full", []).extend(results_df[metric].values.tolist())
+            samples.setdefault("full" + col_suffix, []).extend(
+                results_df[metric].values.tolist()
+            )
             for exp in experiments:
                 results_df = pd.read_csv(
                     self.config.data_path
@@ -124,9 +137,9 @@ class RQ2ResultAnalyzer:
 
         wilcoxon_res = {"A": [], "B": [], "p-value": [], "CL": []}
         for exp in experiments:
-            x, y = samples_df["full"].values, samples_df[exp].values
+            x, y = samples_df["full" + col_suffix].values, samples_df[exp].values
             z, p = wilcoxon(x, y)
-            wilcoxon_res["A"].append("full")
+            wilcoxon_res["A"].append("full" + col_suffix)
             wilcoxon_res["B"].append(exp)
             wilcoxon_res["p-value"].append(p)
             cl = pg.compute_effsize(x, y, paired=True, eftype="CLES")
@@ -134,6 +147,7 @@ class RQ2ResultAnalyzer:
         return pd.DataFrame(wilcoxon_res).sort_values("p-value", ignore_index=True)
 
     def generate_feature_group_acc_test_table(self, experiments, name):
+        col_suffix = "-outliers" if self.outliers else ""
         apfd = self.run_feature_group_acc_tests("apfd", experiments)
         apfdc = self.run_feature_group_acc_tests("apfdc", experiments)
         apfd.to_csv(self.get_output_path() / f"rq2_apfd_{name}_tests.csv", index=False)
@@ -143,13 +157,13 @@ class RQ2ResultAnalyzer:
 
         def format_columns(df):
             name_dict = {
-                "W-Code": "TES_M",
-                "W-Execution": "REC_M",
-                "W-Coverage": "COV_M",
+                ("W-Code" + col_suffix): "TES_M",
+                ("W-Execution" + col_suffix): "REC_M",
+                ("W-Coverage" + col_suffix): "COV_M",
             }
             df["B"] = df["B"].apply(lambda v: name_dict[v] if v in name_dict else v)
             df["B"] = df["B"].apply(lambda v: v.replace("_", "\\_").replace("wo-", ""))
-            df["A"] = df["A"].apply(lambda v: v.title())
+            df["A"] = df["A"].apply(lambda v: v.replace(col_suffix, "").title())
             df["p-value"] = df["p-value"].apply(
                 lambda p: "$<0.01$"
                 if 0.0 < p < 0.01
@@ -169,19 +183,27 @@ class RQ2ResultAnalyzer:
             f.write(apfdc.to_latex(index=False, escape=False))
 
     def generate_feature_group_acc_test_tables(self):
-        without_experiments = [f"wo-{fg}" for fg in RQ1ResultAnalyzer.FEATURE_GROUPS]
+        col_suffix = "-outliers" if self.outliers else ""
+        without_experiments = [
+            f"wo-{fg}" + col_suffix for fg in RQ1ResultAnalyzer.FEATURE_GROUPS
+        ]
         self.generate_feature_group_acc_test_table(without_experiments, "without")
 
-        with_experiments = ["W-Code", "W-Execution", "W-Coverage"]
+        with_experiments = [
+            "W-Code" + col_suffix,
+            "W-Execution" + col_suffix,
+            "W-Coverage" + col_suffix,
+        ]
         self.generate_feature_group_acc_test_table(with_experiments, "with")
 
-        impacted_experiment = ["wo-impacted"]
+        impacted_experiment = ["wo-impacted" + col_suffix]
         apfd = self.run_feature_group_acc_tests("apfd", impacted_experiment)
         apfdc = self.run_feature_group_acc_tests("apfdc", impacted_experiment)
         apfd.to_csv(self.get_output_path() / f"rq2_apfd_imp_test.csv", index=False)
         apfdc.to_csv(self.get_output_path() / f"rq2_apfdc_imp_test.csv", index=False)
 
     def compute_avg_feature_usage_freq(self):
+        col_suffix = "-outliers" if self.outliers else ""
         freq_samples = {}
         for subject, _ in tqdm(
             self.subject_id_map.items(), desc="Computing usage frequencies"
@@ -198,7 +220,10 @@ class RQ2ResultAnalyzer:
             results_path = [
                 p
                 for p in (
-                    self.config.data_path / subject / "tsp_accuracy_results" / "full"
+                    self.config.data_path
+                    / subject
+                    / "tsp_accuracy_results"
+                    / ("full" + col_suffix)
                 ).glob("*")
                 if p.is_dir()
             ]
@@ -340,8 +365,9 @@ class RQ2ResultAnalyzer:
         return results
 
     def generate_heuristic_comparison_table(self):
-        apfd = self.run_heuristic_tests("apfd", "full")
-        apfdc = self.run_heuristic_tests("apfdc", "full")
+        col_suffix = "-outliers" if self.outliers else ""
+        apfd = self.run_heuristic_tests("apfd", "full" + col_suffix)
+        apfdc = self.run_heuristic_tests("apfdc", "full" + col_suffix)
         apfd.to_csv(
             self.get_output_path() / f"rq2_apfd_heuristic_comp.csv", index=False
         )
@@ -350,11 +376,11 @@ class RQ2ResultAnalyzer:
         )
 
         apfd_custom = self.run_heuristic_tests(
-            "apfd", "full", heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC
+            "apfd", "full" + col_suffix, heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC
         )
         apfdc_custom, apfdc_custom_all = self.run_heuristic_tests(
             "apfdc",
-            "full",
+            "full" + col_suffix,
             heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC,
             run_all=True,
         )
@@ -368,34 +394,12 @@ class RQ2ResultAnalyzer:
             self.get_output_path() / f"rq2_apfdc_all_56dsc_heuristic.csv", index=False
         )
 
-        apfd_outlier = self.run_heuristic_tests(
-            "apfd", "full-outliers", heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC
-        )
-        apfdc_outlier, apfdc_outlier_all = self.run_heuristic_tests(
-            "apfdc",
-            "full-outliers",
-            heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC,
-            run_all=True,
-        )
-        apfd_outlier.to_csv(
-            self.get_output_path() / f"rq2_apfd_56dsc_outlier_heuristic.csv",
-            index=False,
-        )
-        apfdc_outlier.to_csv(
-            self.get_output_path() / f"rq2_apfdc_56dsc_outlier_heuristic.csv",
-            index=False,
-        )
-        apfdc_outlier_all.to_csv(
-            self.get_output_path() / f"rq2_apfdc_all_56dsc_outlier_heuristic.csv",
-            index=False,
-        )
-
         apfdc_rec, apfdc_rec_all = self.run_heuristic_tests(
             "apfdc",
-            "full",
+            "full" + col_suffix,
             heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC,
             run_all=True,
-            ml_experiment="W-Execution",
+            ml_experiment="W-Execution" + col_suffix,
         )
 
         apfdc_rec_all.to_csv(
@@ -405,10 +409,10 @@ class RQ2ResultAnalyzer:
 
         apfdc_tes, apfdc_tes_all = self.run_heuristic_tests(
             "apfdc",
-            "full",
+            "full" + col_suffix,
             heuristic=RQ2ResultAnalyzer.SELECTED_HEURISTIC,
             run_all=True,
-            ml_experiment="W-Code",
+            ml_experiment="W-Code" + col_suffix,
         )
 
         apfdc_tes_all.to_csv(
@@ -472,12 +476,10 @@ class RQ2ResultAnalyzer:
 
         with (self.get_output_path() / f"rq2_apfdc_56dsc_heuristic.tex").open("w") as f:
             apfdc_custom_res = customize_cols(format_columns(apfdc_custom))
-            apfdc_outlier_res = customize_cols(format_columns(apfdc_outlier))
-            res = apfdc_custom_res.merge(
-                apfdc_outlier_res, on="$S_{ID}$", suffixes=["-n", "-o"]
+            apfdc_custom_res.sort_values(
+                "CL", ascending=False, ignore_index=True, inplace=True
             )
-            res.sort_values("CL-o", ascending=False, ignore_index=True, inplace=True)
-            f.write(res.to_latex(index=False, escape=False))
+            f.write(apfdc_custom_res.to_latex(index=False, escape=False))
 
     def compute_subject_corr(self, target_df, target_cols):
         stats_cols = [
@@ -505,9 +507,12 @@ class RQ2ResultAnalyzer:
         return pd.DataFrame(corr_results), data
 
     def generate_apfdc_corr_tables(self):
+        col_suffix = "-outliers" if self.outliers else ""
         avg_apfdc_df = pd.read_csv(self.get_output_path() / "rq2_apfdc_avg.csv")
         avg_apfdc_df["S_ID"] = avg_apfdc_df["S_ID"].astype(int)
-        corr_results, data = self.compute_subject_corr(avg_apfdc_df, ["full"])
+        corr_results, data = self.compute_subject_corr(
+            avg_apfdc_df, ["full" + col_suffix]
+        )
         corr_results.to_csv(
             self.get_output_path() / "rq2_size_apfdc_corr.csv", index=False
         )
@@ -519,15 +524,4 @@ class RQ2ResultAnalyzer:
         corr_results, data = self.compute_subject_corr(h_df, ["ind", "avg_diff"])
         corr_results.to_csv(
             self.get_output_path() / "rq2_size_heurisitc_corr.csv", index=False
-        )
-
-        h_df = pd.read_csv(
-            self.get_output_path() / "rq2_apfdc_56dsc_outlier_heuristic.csv"
-        )
-        h_df["S_ID"] = h_df["S_ID"].astype(int)
-        h_df["ind"] = h_df.index
-        h_df["avg_diff"] = h_df["full_avg"] - h_df["h_avg"]
-        corr_results, data = self.compute_subject_corr(h_df, ["ind", "avg_diff"])
-        corr_results.to_csv(
-            self.get_output_path() / "rq2_size_outlier_heurisitc_corr.csv", index=False
         )
