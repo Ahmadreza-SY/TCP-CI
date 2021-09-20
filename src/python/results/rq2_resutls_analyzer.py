@@ -24,6 +24,7 @@ class RQ2ResultAnalyzer:
         self.generate_tc_age_histogram()
         self.generate_heuristic_comparison_table()
         self.generate_apfdc_corr_tables()
+        self.generate_outliers_stats()
 
     def get_output_path(self):
         output_path = self.config.output_path / "RQ2"
@@ -524,4 +525,83 @@ class RQ2ResultAnalyzer:
         corr_results, data = self.compute_subject_corr(h_df, ["ind", "avg_diff"])
         corr_results.to_csv(
             self.get_output_path() / "rq2_size_heurisitc_corr.csv", index=False
+        )
+
+    def generate_outliers_stats(self):
+        sids = []
+        outlier_count = []
+        for subject, sid in self.subject_id_map.items():
+            outliers_df = pd.read_csv(
+                self.config.data_path
+                / subject
+                / "tsp_accuracy_results"
+                / "full-outliers"
+                / "outliers.csv"
+            )
+            sids.append(sid)
+            outlier_count.append(len(outliers_df))
+
+        outlier_count_df = pd.DataFrame(
+            {"S_ID": sids, "outliers": outlier_count}
+        ).sort_values("outliers", ascending=False, ignore_index=True)
+        outlier_count_df.to_csv(
+            self.get_output_path() / "rq2_outlier_count.csv", index=False
+        )
+
+        def get_all_and_outliers_results(subjects):
+            a_builds = []
+            a_apfdcs = []
+            o_builds = []
+            o_apfdcs = []
+            for subject, sid in self.subject_id_map.items():
+                if sid not in subjects:
+                    continue
+                res = pd.read_csv(
+                    self.config.data_path
+                    / subject
+                    / "tsp_accuracy_results"
+                    / "full"
+                    / "results.csv"
+                )
+                a_builds.extend(res["build"].values.tolist())
+                a_apfdcs.extend(res["apfdc"].values.tolist())
+                out_res = pd.read_csv(
+                    self.config.data_path
+                    / subject
+                    / "tsp_accuracy_results"
+                    / "full-outliers"
+                    / "results.csv"
+                )
+                o_builds.extend(out_res["build"].values.tolist())
+                o_apfdcs.extend(out_res["apfdc"].values.tolist())
+            a_df = pd.DataFrame({"build": a_builds, "apfdc": a_apfdcs})
+            o_df = pd.DataFrame({"build": o_builds, "apfdc": o_apfdcs})
+            return a_df.merge(o_df, on="build", suffixes=["_a", "_o"])
+
+        a_res = get_all_and_outliers_results(outlier_count_df["S_ID"].values.tolist())
+        z, a_p = wilcoxon(a_res["apfdc_a"], a_res["apfdc_o"])
+        a_cl = pg.compute_effsize(
+            a_res["apfdc_a"], a_res["apfdc_o"], paired=True, eftype="CLES"
+        )
+
+        outlier_subjects = outlier_count_df[outlier_count_df["outliers"] > 0][
+            "S_ID"
+        ].values.tolist()
+        o_res = get_all_and_outliers_results(outlier_subjects)
+        z, o_p = wilcoxon(o_res["apfdc_a"], o_res["apfdc_o"])
+        o_cl = pg.compute_effsize(
+            o_res["apfdc_a"], o_res["apfdc_o"], paired=True, eftype="CLES"
+        )
+
+        comp_df = pd.DataFrame(
+            {
+                "name": ["AllProjects", "OutlierProjects"],
+                "a_avg": [a_res["apfdc_a"].mean(), o_res["apfdc_a"].mean()],
+                "o_avg": [a_res["apfdc_o"].mean(), o_res["apfdc_o"].mean()],
+                "p-value": [a_p, o_p],
+                "cl": [a_cl, o_cl],
+            }
+        )
+        comp_df.to_csv(
+            self.get_output_path() / "rq2_outlier_ml_comparison.csv", index=False
         )
