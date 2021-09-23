@@ -45,7 +45,7 @@ def add_dataset_parser_arguments(parser):
         "--ci-data-path",
         help="Path to CI datasource root directory, including RTP-Torrent and Travis Torrent.",
         type=Path,
-        default=None,
+        required=True,
     )
     parser.add_argument(
         "-t",
@@ -59,8 +59,8 @@ def add_dataset_parser_arguments(parser):
         "--level",
         help="Specifies the granularity of feature extraction.",
         type=AnalysisLevel,
-        choices=list(AnalysisLevel),
-        required=True,
+        choices=[AnalysisLevel.FILE],
+        default=AnalysisLevel.FILE,
     )
     parser.add_argument(
         "-o",
@@ -73,8 +73,8 @@ def add_dataset_parser_arguments(parser):
         "--language",
         help="Project's main language",
         type=Language,
-        choices=list(Language),
-        required=True,
+        choices=[Language.JAVA],
+        default=Language.JAVA,
     )
     parser.add_argument(
         "-n",
@@ -89,13 +89,13 @@ def add_dataset_parser_arguments(parser):
 def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
-    dataset_parser = subparsers.add_parser(
-        "dataset",
-        help="Create training dataset including all test case features for each CI cycle.",
-    )
     tr_torrent_parser = subparsers.add_parser(
         "tr_torrent",
         help="Process travis torrent logs and build info.",
+    )
+    dataset_parser = subparsers.add_parser(
+        "dataset",
+        help="Create training dataset including all test case features for each CI cycle.",
     )
     learn_parser = subparsers.add_parser(
         "learn",
@@ -149,7 +149,7 @@ def main():
         "--test-count",
         help="Specifies the number of recent builds to test the trained models on.",
         type=int,
-        default=".",
+        default=50,
     )
 
     decay_test_parser.set_defaults(func=decay_test)
