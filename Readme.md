@@ -53,6 +53,9 @@ This project has been tested on *Build 1029* of Understand on Linux (specificall
 #### Adding Understand Python Package/Library
 Unlike typical projects, Understand does not provide its Python library in the well-known pip package installer, and you need to manually add the package to your Python environment. The instructions for adding the package are explained in [this link](https://support.scitools.com/t/getting-started-with-the-python-api/51).
 
+### Java
+This project uses [RankLib](https://sourceforge.net/p/lemur/wiki/RankLib) for training and testing machine learning ranking models. RankLib is a library of learning-to-rank algorithms, and it is written in Java. Hence, this project required Java for running training and testing experiments. This project is trained and tested on OpenJDK version `1.8.0_292` and `11.0.11`.
+
 ## Usage Instructions
 After setting up the environment, you are ready to start using the project.
 
