@@ -7,20 +7,22 @@ This project aims to extract and compute test case features from different data 
 In the following sections, we provide information on the requirements and instructions for running this project as well as descriptions regarding the data that this project generates. We also provide links to our **publication** and **public datasets** for reference and future work.
 
 ### Publication
-This repository is a supplement to our academic paper which can be found on [arxiv.org](https://arxiv.org). Please refer to the paper for details on definitions, experiments, and results. Please cite our paper in any published work that uses resources that are provided in this repository:
+This repository is a supplement to our academic paper which can be found on [arxiv.org/abs/2109.13168](https://arxiv.org/abs/2109.13168). Please refer to the paper for details on definitions, experiments, and results. Please cite our paper in any published work that uses resources that are provided in this repository:
 ```
-@article{saboor2021tcp,
+@article{yaraghi2021tcp,
       title={Scalable and Accurate Test Case Prioritization in Continuous Integration Contexts}, 
       author={Ahmadreza Saboor Yaraghi, Mojtaba Bagherzadeh, Nafiseh Kahani, and Lionel Briand},
       year={2021},
-      eprint={},
+      eprint={2109.13168},
+      archivePrefix={arXiv},
       primaryClass={cs.SE}
 }
 ```
 If the paper is accepted in a conference or journal, we will update the BibTeX and the link.
 
 ### Dataset
-In our work, we collected datasets for 25 carefully selected open-source projects using this repository. The datasets are publicly available here: [zenodo.org](https://zenodo.org).
+In our work, we collected datasets for 25 carefully selected open-source projects using this repository. The datasets are publicly available here: 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5532640.svg)](https://doi.org/10.5281/zenodo.5532640)
 
 ## Environment Setup
 ### Python Environment
