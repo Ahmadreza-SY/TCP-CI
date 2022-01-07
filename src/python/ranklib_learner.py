@@ -200,7 +200,7 @@ class RankLibLearner:
         feature_stats_df.sort_values("feature_id", ignore_index=True, inplace=True)
         feature_stats_df.to_csv(output_path / "feature_stats.csv", index=False)
 
-    def train_and_test(self, output_path):
+    def train_and_test(self, output_path, ranker):
         ranklib_path = Path("assets") / "RankLib.jar"
         math3_path = Path("assets") / "commons-math3.jar"
         results = {"build": [], "apfd": [], "apfdc": []}
@@ -212,7 +212,7 @@ class RankLibLearner:
             pred_path = build_ds_path / "pred.txt"
 
             if not model_path.exists():
-                train_command = f"java -jar {ranklib_path} -train {train_path} -ranker 0 -save {model_path} -tree 30 -silent"
+                train_command = f"java -jar {ranklib_path} -train {train_path} -ranker {ranker[0]} {ranker[1]} -save {model_path} -silent"
                 train_out = subprocess.run(
                     train_command, shell=True, capture_output=True
                 )
@@ -311,11 +311,11 @@ class RankLibLearner:
             results_path / "heuristic_apfdc_results.csv", index=False
         )
 
-    def run_accuracy_experiments(self, dataset_df, name, results_path):
+    def run_accuracy_experiments(self, dataset_df, name, results_path, ranker=(0, "")):
         ranklib_ds = self.convert_to_ranklib_dataset(dataset_df)
         traning_sets_path = results_path / name
         self.create_ranklib_training_sets(ranklib_ds, traning_sets_path)
-        results = self.train_and_test(traning_sets_path)
+        results = self.train_and_test(traning_sets_path, ranker)
         results.to_csv(traning_sets_path / "results.csv", index=False)
 
     def convert_decay_datasets(self, datasets_path):

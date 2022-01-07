@@ -144,6 +144,41 @@ class ExperimentsService:
             print()
 
     @staticmethod
+    def run_all_tcp_rankers(args):
+        dataset_path = args.output_path / "dataset.csv"
+        if not dataset_path.exists():
+            print("No dataset.csv found in the output directory. Aborting ...")
+            sys.exit()
+        print(f"##### Running experiments for {dataset_path.parent.name} #####")
+        learner = RankLibLearner(args)
+        dataset_df = pd.read_csv(dataset_path)
+        builds_count = dataset_df[Feature.BUILD].nunique()
+        if builds_count <= args.test_count:
+            print(
+                f"Not enough builds for training: require at least {args.test_count + 1}, found {builds_count}"
+            )
+            sys.exit()
+        outliers_dataset_df = ExperimentsService.remove_outlier_tests(args, dataset_df)
+        rankers = {
+            0: ("MART", "-tree 30"),
+            6: ("LambdaMART", "-tree 30"),
+            1: ("RankNet", "-epoch 50 -layer 2"),
+            2: ("RankBoost", ""),
+            4: ("CoordinateAscent", ""),
+            7: ("ListNet", ""),
+            8: ("RandomForest", ""),
+        }
+        results_path = args.output_path / "tcp_rankers"
+        for id, info in rankers.items():
+            name, params = info
+            print(
+                f"***** Running {name} full feature set without Outliers experiments *****"
+            )
+            learner.run_accuracy_experiments(
+                outliers_dataset_df, name, results_path, ranker=(id, params)
+            )
+
+    @staticmethod
     def run_decay_test_experiments(args):
         print(f"Running decay tests for {args.output_path.name}")
         repo_miner_class = ModuleFactory.get_repository_miner(AnalysisLevel.FILE)

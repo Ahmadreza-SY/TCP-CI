@@ -15,7 +15,10 @@ def tr_torrent(args):
 
 
 def learn(args):
-    ExperimentsService.run_all_tsp_accuracy_experiments(args)
+    if args.ranking_models == "MART":
+        ExperimentsService.run_all_tsp_accuracy_experiments(args)
+    elif args.ranking_models == "all":
+        ExperimentsService.run_all_tcp_rankers(args)
 
 
 def decay_test(args):
@@ -150,6 +153,14 @@ def main():
         help="Specifies the number of recent builds to test the trained models on.",
         type=int,
         default=50,
+    )
+    learn_parser.add_argument(
+        "-r",
+        "--ranking-models",
+        help="Specifies the ranking model(s) to use for learning.",
+        type=str,
+        default="MART",
+        choices=["MART", "all"],
     )
 
     decay_test_parser.set_defaults(func=decay_test)
