@@ -162,7 +162,6 @@ class ExperimentsService:
         rankers = {
             0: ("MART", "-tree 30"),
             6: ("LambdaMART", "-tree 30"),
-            1: ("RankNet", "-epoch 50 -layer 2"),
             2: ("RankBoost", ""),
             4: ("CoordinateAscent", ""),
             7: ("ListNet", ""),

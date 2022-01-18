@@ -23,6 +23,7 @@ class ResultAnalyzer:
 
     def analyze_results(self):
         self.generate_subject_stats_table()
+        self.generate_subject_changes_table()
         rq1_analyzer = RQ1ResultAnalyzer(self.config, self.subject_id_map)
         rq1_analyzer.analyze_results()
         rq2_analyzer = RQ2ResultAnalyzer(self.config, self.subject_id_map)
@@ -61,6 +62,71 @@ class ResultAnalyzer:
         os.remove(f"{source_path.name}.csv")
         return sloc, java_sloc
 
+    def extract_subject_size_stats(self, subject_stats, ds_path, exe_df):
+        sloc, java_sloc = self.compute_sloc(ds_path)
+        change_history = pd.read_csv(ds_path / "entity_change_history.csv")
+        builds = pd.read_csv(ds_path / "builds.csv", parse_dates=["started_at"])
+        time_period = (builds["started_at"].max() - builds["started_at"].min()).days
+        time_period = round(float(time_period) / 30.0)
+        subject_stats.setdefault("SLOC", []).append(sloc)
+        subject_stats.setdefault("Java SLOC", []).append(java_sloc)
+        subject_stats.setdefault("\\# Commits", []).append(
+            change_history[EntityChange.COMMIT].nunique()
+        )
+        subject_stats.setdefault("Time period (months)", []).append(time_period)
+
+    def compute_avg_tc_and_duration(self, exe_df):
+        avg_tc = (
+            exe_df.groupby(ExecutionRecord.BUILD).count()[ExecutionRecord.TEST].mean()
+        )
+        avg_duration = (
+            exe_df.groupby(ExecutionRecord.BUILD).sum()[ExecutionRecord.DURATION].mean()
+        )
+        avg_duration = (
+            int(avg_duration / 60000.0)
+            if avg_duration > 60000
+            else float("{:.2f}".format(float(avg_duration) / 60000.0))
+        )
+        return avg_tc, avg_duration
+
+    def extract_subject_test_stats(
+        self, subject_stats, exe_df, ds_df, outlier_tcs=None
+    ):
+        col_suffix = "-original"
+        if outlier_tcs is not None:
+            col_suffix = ""
+            if len(outlier_tcs) > 0:
+                exe_df = (
+                    exe_df[~exe_df[ExecutionRecord.TEST].isin(outlier_tcs)]
+                    .copy()
+                    .reset_index(drop=True)
+                )
+                ds_df = (
+                    ds_df[~ds_df[Feature.TEST].isin(outlier_tcs)]
+                    .copy()
+                    .reset_index(drop=True)
+                )
+                failed_builds = (
+                    ds_df[ds_df[Feature.VERDICT] > 0][Feature.BUILD].unique().tolist()
+                )
+                ds_df = ds_df[ds_df[Feature.BUILD].isin(failed_builds)]
+        builds_count = exe_df[ExecutionRecord.BUILD].nunique()
+        failed_builds_count = ds_df[Feature.BUILD].nunique()
+        avg_tc, avg_duration = self.compute_avg_tc_and_duration(exe_df)
+        subject_stats.setdefault("\\# Builds" + col_suffix, []).append(builds_count)
+        subject_stats.setdefault("\\# Failed Builds" + col_suffix, []).append(
+            failed_builds_count
+        )
+        subject_stats.setdefault("Failure Rate (%)" + col_suffix, []).append(
+            int((failed_builds_count * 100.0) / builds_count)
+        )
+        subject_stats.setdefault("Avg. \\# TC/Build" + col_suffix, []).append(
+            round(avg_tc)
+        )
+        subject_stats.setdefault("Avg. Test Time (min)" + col_suffix, []).append(
+            avg_duration
+        )
+
     def extract_subjects_stats(self, data_path):
         ds_paths = [p for p in data_path.glob("*") if p.is_dir()]
         subject_stats = {}
@@ -73,56 +139,27 @@ class ResultAnalyzer:
                     continue
 
                 exe_df = pd.read_csv(ds_path / "exe.csv")
-                avg_tc = (
-                    exe_df.groupby(ExecutionRecord.BUILD)
-                    .count()[ExecutionRecord.TEST]
-                    .mean()
-                )
-                avg_duration = (
-                    exe_df.groupby(ExecutionRecord.BUILD)
-                    .sum()[ExecutionRecord.DURATION]
-                    .mean()
-                )
-                avg_duration = (
-                    int(avg_duration / 60000.0)
-                    if avg_duration > 60000
-                    else float("{:.2f}".format(float(avg_duration) / 60000.0))
-                )
+                avg_tc, avg_duration = self.compute_avg_tc_and_duration(exe_df)
                 if avg_duration < ResultAnalyzer.DURATION_THRESHOLD:
                     continue
-
                 if round(avg_tc) < ResultAnalyzer.TC_THRESHOLD:
                     continue
 
-                change_history = pd.read_csv(ds_path / "entity_change_history.csv")
-                builds = pd.read_csv(ds_path / "builds.csv", parse_dates=["started_at"])
-                time_period = (
-                    builds["started_at"].max() - builds["started_at"].min()
-                ).days
-                time_period = round(float(time_period) / 30.0)
+                outlier_tcs = pd.read_csv(
+                    ds_path / "tsp_accuracy_results" / "full-outliers" / "outliers.csv"
+                )
 
                 subject_stats.setdefault("Subject", []).append(ds_path.name)
-                sloc, java_sloc = self.compute_sloc(ds_path)
-                subject_stats.setdefault("SLOC", []).append(sloc)
-                subject_stats.setdefault("Java SLOC", []).append(java_sloc)
-                subject_stats.setdefault("\\# Commits", []).append(
-                    change_history[EntityChange.COMMIT].nunique()
+                self.extract_subject_size_stats(subject_stats, ds_path, exe_df)
+                subject_stats.setdefault("\# FF TCs", []).append(len(outlier_tcs))
+                self.extract_subject_test_stats(subject_stats, exe_df, ds_df)
+                self.extract_subject_test_stats(
+                    subject_stats,
+                    exe_df,
+                    ds_df,
+                    outlier_tcs["test"].values.tolist(),
                 )
-                subject_stats.setdefault("Time period (months)", []).append(time_period)
-                builds_count = exe_df[ExecutionRecord.BUILD].nunique()
-                subject_stats.setdefault("\\# Builds", []).append(
-                    exe_df[ExecutionRecord.BUILD].nunique()
-                )
-                subject_stats.setdefault("\\# Failed Builds", []).append(
-                    failed_builds_count
-                )
-                subject_stats.setdefault("Failure Rate (%)", []).append(
-                    int((failed_builds_count * 100.0) / builds_count)
-                )
-                subject_stats.setdefault("Avg. \\# TC/Build", []).append(round(avg_tc))
-                subject_stats.setdefault("Avg. Test Time (min)", []).append(
-                    avg_duration
-                )
+
         results_df = pd.DataFrame(subject_stats)
         return results_df
 
@@ -159,11 +196,37 @@ class ResultAnalyzer:
         )
         stats_df["Subject"] = stats_df["Subject"].apply(lambda s: s.replace("@", "/"))
         cols = stats_df.columns.tolist()
+        cols = [c for c in cols if ("-original" not in c) and (c != "\# FF TCs")]
         cols = [cols.pop()] + cols
         stats_df = stats_df[cols]
         with (self.config.output_path / "subject_stats.tex").open("w") as f:
             f.write(
                 stats_df.to_latex(
                     index=False, caption="Subject statistics", escape=False
+                )
+            )
+
+    def generate_subject_changes_table(self):
+        stats_path = self.config.output_path / "subject_stats.csv"
+        stats_df = pd.read_csv(stats_path)
+
+        stats_df["$S_{ID}$"] = stats_df["Subject"].apply(
+            lambda s: f"$S_{{{self.subject_id_map[s]}}}$"
+        )
+        changed_cols = ["$S_{ID}$", "\# FF TCs"] + [
+            c
+            for oc in stats_df.columns.tolist()
+            if "-original" in oc
+            for c in [oc, oc.split("-original")[0]]
+        ]
+        stats_df.sort_values(
+            ["\# FF TCs", "SLOC"], ascending=False, ignore_index=True, inplace=True
+        )
+        stats_df = stats_df[changed_cols]
+        stats_df = stats_df[stats_df["\# FF TCs"] > 0]
+        with (self.config.output_path / "changed_subjects.tex").open("w") as f:
+            f.write(
+                stats_df.to_latex(
+                    index=False, caption="Changed subjects.", escape=False
                 )
             )
