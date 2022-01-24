@@ -161,7 +161,7 @@ class ExperimentsService:
         outliers_dataset_df = ExperimentsService.remove_outlier_tests(args, dataset_df)
         rankers = {
             0: ("MART", "-tree 30"),
-            6: ("LambdaMART", "-tree 30"),
+            6: ("LambdaMART", ""),
             2: ("RankBoost", ""),
             4: ("CoordinateAscent", ""),
             7: ("ListNet", ""),

@@ -7,6 +7,7 @@ from ..feature_extractor.feature import Feature
 import seaborn as sns
 from tqdm import tqdm
 import numpy as np
+from scipy.stats import friedmanchisquare
 
 
 class RQ2ResultAnalyzer:
@@ -25,6 +26,7 @@ class RQ2ResultAnalyzer:
         self.generate_heuristic_comparison_table()
         self.generate_apfdc_corr_tables()
         self.generate_outliers_stats()
+        self.generate_rankers_avg_table()
 
     def get_output_path(self):
         output_path = self.config.output_path / "RQ2"
@@ -604,4 +606,81 @@ class RQ2ResultAnalyzer:
         )
         comp_df.to_csv(
             self.get_output_path() / "rq2_outlier_ml_comparison.csv", index=False
+        )
+
+    def compute_rankers_results(self, rankers, metric="apfdc"):
+        avg_results = {}
+        results = {}
+        for subject, sid in self.subject_id_map.items():
+            avg_results.setdefault("S_ID", []).append(sid)
+            res_path = self.config.data_path / subject / "tcp_rankers"
+            exp_paths = [res_path / r for r in rankers]
+            for exp_path in exp_paths:
+                exp = exp_path.name
+                eval_df = pd.read_csv(exp_path / "results.csv").sort_values(
+                    "build", ignore_index=True
+                )
+                avg_results.setdefault(exp, []).append(eval_df[metric].mean())
+                avg_results.setdefault(f"{exp}-std", []).append(eval_df[metric].std())
+                results.setdefault(exp, []).extend(eval_df[metric].values.tolist())
+        return pd.DataFrame(avg_results), pd.DataFrame(results)
+
+    def run_friedman_nemenyi_tests(self, m_df, m_cols):
+        measurements = []
+        for c in m_cols:
+            measurements.append(m_df[c].values.tolist())
+        stat, p = friedmanchisquare(*measurements)
+        alpha = 0.05
+        with (self.get_output_path() / "rq2_ranker_friedman.txt").open("w") as f:
+            print(
+                "Number of Samples=%d, Degrees of Freedom=%d"
+                % (len(m_df), len(m_cols) - 1),
+                file=f,
+            )
+            print("Statistic=%.3f, p-value=%.3f" % (stat, p), file=f)
+            if p >= alpha:
+                print(
+                    "No statistically significant difference (fail to reject H0)",
+                    file=f,
+                )
+            else:
+                print(
+                    "There is at least one statistically significant difference (reject H0)",
+                    file=f,
+                )
+
+    def generate_rankers_avg_table(self):
+        rankers = [
+            "RandomForest",
+            "MART",
+            "ListNet",
+            "RankBoost",
+            "LambdaMART",
+            "CoordinateAscent",
+        ]
+        rankers_avg, rankers_results = self.compute_rankers_results(rankers)
+        rankers_avg = rankers_avg.sort_values(
+            "MART", ascending=False, ignore_index=True
+        )
+        rankers_avg["$S_{ID}$"] = rankers_avg["S_ID"].apply(lambda id: f"$S_{{{id}}}$")
+        for ranker in rankers:
+            rankers_avg[ranker] = rankers_avg.apply(
+                lambda r: float("{:.2f}".format(r[ranker])),
+                axis=1,
+            )
+        rankers_avg = rankers_avg[["$S_{ID}$"] + rankers]
+        best_rankers = rankers_avg[rankers].idxmax(axis=1)
+        for ranker in rankers:
+            rankers_avg[ranker] = rankers_avg[ranker].astype(str)
+        for i in rankers_avg.index:
+            best_apfdc = rankers_avg.at[i, best_rankers[i]]
+            rankers_avg.at[i, best_rankers[i]] = "\\textbf{{{:.2f}}}".format(
+                float(best_apfdc)
+            )
+        with (self.get_output_path() / "rq2_ranker_avg.tex").open("w") as f:
+            f.write(rankers_avg.to_latex(index=False, escape=False))
+
+        self.run_friedman_nemenyi_tests(rankers_results, rankers)
+        rankers_results.to_csv(
+            self.get_output_path() / "rq2_ranker_res.csv", index=False
         )
