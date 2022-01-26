@@ -45,6 +45,8 @@ class RankLibLearner:
                 builds_df["id"].values.tolist(), builds_df["started_at"].values.tolist()
             )
         )
+        self.ranklib_path = Path("assets") / "RankLib.jar"
+        self.math3_path = Path("assets") / "commons-math3.jar"
 
     def get_feature_id(self, feature_name):
         if feature_name not in self.feature_id_map:
@@ -200,28 +202,55 @@ class RankLibLearner:
         feature_stats_df.sort_values("feature_id", ignore_index=True, inplace=True)
         feature_stats_df.to_csv(output_path / "feature_stats.csv", index=False)
 
-    def train_and_test(self, output_path, ranker):
-        ranklib_path = Path("assets") / "RankLib.jar"
-        math3_path = Path("assets") / "commons-math3.jar"
+    def train_and_test(self, build_ds_path, ranker, params, resume=True):
+        train_path = build_ds_path / "train.txt"
+        test_path = build_ds_path / "test.txt"
+        model_path = build_ds_path / "model.txt"
+        pred_path = build_ds_path / "pred.txt"
+
+        if (not model_path.exists()) or (not resume):
+            params_cmd = " ".join(
+                [f"-{name} {value}" for name, value in params.items()]
+            )
+            train_command = f"java -jar {self.ranklib_path} -train {train_path} -ranker {ranker} {params_cmd} -save {model_path} -silent"
+            train_out = subprocess.run(train_command, shell=True, capture_output=True)
+            if train_out.returncode != 0:
+                print(f"Error in training:\n{train_out.stderr}")
+                sys.exit()
+            if resume:
+                os.remove(str(train_path))
+
+        if (not pred_path.exists()) or (not resume):
+            pred_command = f"java -jar {self.ranklib_path} -load {model_path} -rank {test_path} -indri {pred_path}"
+            pred_out = subprocess.run(pred_command, shell=True, capture_output=True)
+            if pred_out.returncode != 0:
+                print(f"Error in predicting:\n{pred_out.stderr}")
+                sys.exit()
+        pred_df = (
+            pd.read_csv(
+                pred_path,
+                sep=" ",
+                names=RankLibLearner.PRED_COLS,
+            )
+            # Shuffle predictions when predicted scores are equal to randomize the order.
+            .sample(frac=1).reset_index(drop=True)
+        )
+        pred_df.sort_values("score", ascending=False, inplace=True, ignore_index=True)
+        apfd = self.compute_apfd(pred_df)
+        apfdc = self.compute_apfdc(pred_df)
+        return apfd, apfdc
+
+    def train_and_test_all(self, output_path, ranker):
         results = {"build": [], "apfd": [], "apfdc": []}
         ds_paths = list(p for p in output_path.glob("*") if p.is_dir())
         for build_ds_path in tqdm(ds_paths, desc="Running full feature set training"):
-            train_path = build_ds_path / "train.txt"
-            test_path = build_ds_path / "test.txt"
-            model_path = build_ds_path / "model.txt"
-            pred_path = build_ds_path / "pred.txt"
+            apfd, apfdc = self.train_and_test(build_ds_path, ranker[0], ranker[1])
+            results["build"].append(int(build_ds_path.name))
+            results["apfd"].append(apfd)
+            results["apfdc"].append(apfdc)
 
-            if not model_path.exists():
-                train_command = f"java -jar {ranklib_path} -train {train_path} -ranker {ranker[0]} {ranker[1]} -save {model_path} -silent"
-                train_out = subprocess.run(
-                    train_command, shell=True, capture_output=True
-                )
-                if train_out.returncode != 0:
-                    print(f"Error in training:\n{train_out.stderr}")
-                    sys.exit()
-                os.remove(str(train_path))
             if not (build_ds_path / "feature_stats.csv").exists():
-                feature_stats_command = f"java -cp {ranklib_path}:{math3_path} ciir.umass.edu.features.FeatureManager -feature_stats {model_path}"
+                feature_stats_command = f"java -cp {self.ranklib_path}:{self.math3_path} ciir.umass.edu.features.FeatureManager -feature_stats {model_path}"
                 feature_stats_out = subprocess.run(
                     feature_stats_command, shell=True, capture_output=True
                 )
@@ -231,29 +260,6 @@ class RankLibLearner:
                 self.extract_and_save_feature_stats(
                     feature_stats_out.stdout.decode("utf-8"), build_ds_path
                 )
-            if not pred_path.exists():
-                pred_command = f"java -jar {ranklib_path} -load {model_path} -rank {test_path} -indri {pred_path}"
-                pred_out = subprocess.run(pred_command, shell=True, capture_output=True)
-                if pred_out.returncode != 0:
-                    print(f"Error in predicting:\n{pred_out.stderr}")
-                    sys.exit()
-            pred_df = (
-                pd.read_csv(
-                    pred_path,
-                    sep=" ",
-                    names=RankLibLearner.PRED_COLS,
-                )
-                # Shuffle predictions when predicted scores are equal to randomize the order.
-                .sample(frac=1).reset_index(drop=True)
-            )
-            pred_df.sort_values(
-                "score", ascending=False, inplace=True, ignore_index=True
-            )
-            apfd = self.compute_apfd(pred_df)
-            apfdc = self.compute_apfdc(pred_df)
-            results["build"].append(int(build_ds_path.name))
-            results["apfd"].append(apfd)
-            results["apfdc"].append(apfdc)
         results_df = pd.DataFrame(results)
         results_df["build_time"] = results_df["build"].apply(
             lambda b: self.build_time_d[b]
@@ -311,11 +317,13 @@ class RankLibLearner:
             results_path / "heuristic_apfdc_results.csv", index=False
         )
 
-    def run_accuracy_experiments(self, dataset_df, name, results_path, ranker=(0, "")):
+    def run_accuracy_experiments(self, dataset_df, name, results_path, ranker=None):
+        if ranker == None:
+            ranker = (self.config.best_ranker, {})
         ranklib_ds = self.convert_to_ranklib_dataset(dataset_df)
         traning_sets_path = results_path / name
         self.create_ranklib_training_sets(ranklib_ds, traning_sets_path)
-        results = self.train_and_test(traning_sets_path, ranker)
+        results = self.train_and_test_all(traning_sets_path, ranker)
         results.to_csv(traning_sets_path / "results.csv", index=False)
 
     def convert_decay_datasets(self, datasets_path):

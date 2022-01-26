@@ -8,11 +8,12 @@ from ..ranklib_learner import RankLibLearner
 from ..feature_extractor.feature import Feature
 from ..code_analyzer.code_analyzer import AnalysisLevel
 from ..results.results_analyzer import ResultAnalyzer
+from ..hyp_param_opt import HypParamOpt
 
 
 class ExperimentsService:
     @staticmethod
-    def remove_outlier_tests(args, dataset_df):
+    def remove_outlier_tests(output_path, dataset_df):
         test_f = dataset_df[dataset_df[Feature.VERDICT] > 0][
             [Feature.TEST, Feature.BUILD]
         ]
@@ -31,7 +32,7 @@ class ExperimentsService:
                 outliers.append(int(r[Feature.TEST]))
 
         outliers_path = (
-            args.output_path / "tsp_accuracy_results" / "full-outliers" / "outliers.csv"
+            output_path / "tsp_accuracy_results" / "full-outliers" / "outliers.csv"
         )
         outliers_path.parent.mkdir(parents=True, exist_ok=True)
         pd.DataFrame({"test": outliers}).to_csv(outliers_path, index=False)
@@ -65,7 +66,9 @@ class ExperimentsService:
         learner.run_accuracy_experiments(dataset_df, "full", results_path)
         learner.test_heuristics(dataset_df, results_path / "full")
         print("***** Running full feature set without Outliers experiments *****")
-        outliers_dataset_df = ExperimentsService.remove_outlier_tests(args, dataset_df)
+        outliers_dataset_df = ExperimentsService.remove_outlier_tests(
+            args.output_path, dataset_df
+        )
         learner.run_accuracy_experiments(
             outliers_dataset_df, "full-outliers", results_path
         )
@@ -158,14 +161,16 @@ class ExperimentsService:
                 f"Not enough builds for training: require at least {args.test_count + 1}, found {builds_count}"
             )
             sys.exit()
-        outliers_dataset_df = ExperimentsService.remove_outlier_tests(args, dataset_df)
+        outliers_dataset_df = ExperimentsService.remove_outlier_tests(
+            args.output_path, dataset_df
+        )
         rankers = {
-            0: ("MART", "-tree 30"),
-            6: ("LambdaMART", ""),
-            2: ("RankBoost", ""),
-            4: ("CoordinateAscent", ""),
-            7: ("ListNet", ""),
-            8: ("RandomForest", ""),
+            0: ("MART", {"tree": 30}),
+            6: ("LambdaMART", {}),
+            2: ("RankBoost", {}),
+            4: ("CoordinateAscent", {}),
+            7: ("ListNet", {}),
+            8: ("RandomForest", {}),
         }
         results_path = args.output_path / "tcp_rankers"
         for id, info in rankers.items():
@@ -203,3 +208,13 @@ class ExperimentsService:
     def analyze_results(args):
         result_analyzer = ResultAnalyzer(args)
         result_analyzer.analyze_results()
+
+    @staticmethod
+    def hyp_param_opt(args):
+        projects = []
+        with open(args.project_list) as f:
+            projects.extend(f.read().split("\n"))
+        optimizer = HypParamOpt(projects, args)
+        for p in projects:
+            best_params = optimizer.run_optimization(p)
+            print(best_params)

@@ -15,10 +15,14 @@ def tr_torrent(args):
 
 
 def learn(args):
-    if args.ranking_models == "MART":
+    if args.ranking_models == "best":
         ExperimentsService.run_all_tsp_accuracy_experiments(args)
     elif args.ranking_models == "all":
         ExperimentsService.run_all_tcp_rankers(args)
+
+
+def hypopt(args):
+    ExperimentsService.hyp_param_opt(args)
 
 
 def decay_test(args):
@@ -104,6 +108,10 @@ def main():
         "learn",
         help="Perform learning experiments on collected features using RankLib.",
     )
+    hypopt_parser = subparsers.add_parser(
+        "hypopt",
+        help="Perform hyperparameter optimization for the best ML ranking model in RankLib.",
+    )
     decay_test_parser = subparsers.add_parser(
         "decay_test",
         help="Perform ML ranking models decay test experiments on trained models.",
@@ -159,8 +167,31 @@ def main():
         "--ranking-models",
         help="Specifies the ranking model(s) to use for learning.",
         type=str,
-        default="MART",
-        choices=["MART", "all"],
+        default="best",
+        choices=["best", "all"],
+    )
+
+    hypopt_parser.set_defaults(func=hypopt)
+    hypopt_parser.add_argument(
+        "-o",
+        "--output-path",
+        help="Specifies the directory of all datasets.",
+        type=Path,
+        default=".",
+    )
+    hypopt_parser.add_argument(
+        "-t",
+        "--test-count",
+        help="Specifies the number of recent builds to use for evaluation.",
+        type=int,
+        default=50,
+    )
+    hypopt_parser.add_argument(
+        "-p",
+        "--project-list",
+        help="Specifies a path to a file that includes a list of projects to optimize.",
+        type=str,
+        required=True,
     )
 
     decay_test_parser.set_defaults(func=decay_test)
@@ -198,6 +229,7 @@ def main():
     args = parser.parse_args()
     args.output_path.mkdir(parents=True, exist_ok=True)
     args.unique_separator = "\t"
+    args.best_ranker = 8
     args.func(args)
 
 
