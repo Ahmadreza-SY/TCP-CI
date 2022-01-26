@@ -186,13 +186,6 @@ def main():
         type=int,
         default=50,
     )
-    hypopt_parser.add_argument(
-        "-p",
-        "--project-list",
-        help="Specifies a path to a file that includes a list of projects to optimize.",
-        type=str,
-        required=True,
-    )
 
     decay_test_parser.set_defaults(func=decay_test)
     decay_test_parser.add_argument(

@@ -202,13 +202,13 @@ class RankLibLearner:
         feature_stats_df.sort_values("feature_id", ignore_index=True, inplace=True)
         feature_stats_df.to_csv(output_path / "feature_stats.csv", index=False)
 
-    def train_and_test(self, build_ds_path, ranker, params, resume=True):
+    def train_and_test(self, build_ds_path, ranker, params, suffix=""):
         train_path = build_ds_path / "train.txt"
         test_path = build_ds_path / "test.txt"
-        model_path = build_ds_path / "model.txt"
-        pred_path = build_ds_path / "pred.txt"
+        model_path = build_ds_path / f"model{suffix}.txt"
+        pred_path = build_ds_path / f"pred{suffix}.txt"
 
-        if (not model_path.exists()) or (not resume):
+        if not model_path.exists():
             params_cmd = " ".join(
                 [f"-{name} {value}" for name, value in params.items()]
             )
@@ -217,11 +217,11 @@ class RankLibLearner:
             if train_out.returncode != 0:
                 print(f"Error in training:\n{train_out.stderr}")
                 sys.exit()
-            if resume:
-                os.remove(str(train_path))
 
-        if (not pred_path.exists()) or (not resume):
+        if not pred_path.exists():
             pred_command = f"java -jar {self.ranklib_path} -load {model_path} -rank {test_path} -indri {pred_path}"
+            if "metric2T" in params:
+                pred_command += f" -metric2T {params['metric2T']}"
             pred_out = subprocess.run(pred_command, shell=True, capture_output=True)
             if pred_out.returncode != 0:
                 print(f"Error in predicting:\n{pred_out.stderr}")
@@ -250,7 +250,7 @@ class RankLibLearner:
             results["apfdc"].append(apfdc)
 
             if not (build_ds_path / "feature_stats.csv").exists():
-                feature_stats_command = f"java -cp {self.ranklib_path}:{self.math3_path} ciir.umass.edu.features.FeatureManager -feature_stats {model_path}"
+                feature_stats_command = f"java -cp {self.ranklib_path}:{self.math3_path} ciir.umass.edu.features.FeatureManager -feature_stats {build_ds_path / 'model.txt'}"
                 feature_stats_out = subprocess.run(
                     feature_stats_command, shell=True, capture_output=True
                 )

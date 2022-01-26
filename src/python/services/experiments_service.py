@@ -5,47 +5,13 @@ from ..feature_extractor.feature import Feature
 from ..module_factory import ModuleFactory
 import sys
 from ..ranklib_learner import RankLibLearner
-from ..feature_extractor.feature import Feature
 from ..code_analyzer.code_analyzer import AnalysisLevel
 from ..results.results_analyzer import ResultAnalyzer
 from ..hyp_param_opt import HypParamOpt
+from .data_service import DataService
 
 
 class ExperimentsService:
-    @staticmethod
-    def remove_outlier_tests(output_path, dataset_df):
-        test_f = dataset_df[dataset_df[Feature.VERDICT] > 0][
-            [Feature.TEST, Feature.BUILD]
-        ]
-        test_fcount = (
-            test_f.groupby(Feature.TEST, as_index=False)
-            .count()
-            .sort_values(Feature.BUILD, ascending=False, ignore_index=True)
-        )
-        test_fcount["rate"] = (
-            test_fcount[Feature.BUILD] / dataset_df[Feature.BUILD].nunique()
-        )
-        mean, std = test_fcount["rate"].mean(), test_fcount["rate"].std()
-        outliers = []
-        for _, r in test_fcount.iterrows():
-            if abs(r["rate"] - mean) > 3 * std:
-                outliers.append(int(r[Feature.TEST]))
-
-        outliers_path = (
-            output_path / "tsp_accuracy_results" / "full-outliers" / "outliers.csv"
-        )
-        outliers_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({"test": outliers}).to_csv(outliers_path, index=False)
-        result_df = dataset_df[~dataset_df[Feature.TEST].isin(outliers)]
-        failed_builds = (
-            result_df[result_df[Feature.VERDICT] > 0][Feature.BUILD].unique().tolist()
-        )
-        return (
-            result_df[result_df[Feature.BUILD].isin(failed_builds)]
-            .copy()
-            .reset_index(drop=True)
-        )
-
     @staticmethod
     def run_all_tsp_accuracy_experiments(args):
         dataset_path = args.output_path / "dataset.csv"
@@ -66,7 +32,7 @@ class ExperimentsService:
         learner.run_accuracy_experiments(dataset_df, "full", results_path)
         learner.test_heuristics(dataset_df, results_path / "full")
         print("***** Running full feature set without Outliers experiments *****")
-        outliers_dataset_df = ExperimentsService.remove_outlier_tests(
+        outliers_dataset_df = DataService.remove_outlier_tests(
             args.output_path, dataset_df
         )
         learner.run_accuracy_experiments(
@@ -161,12 +127,12 @@ class ExperimentsService:
                 f"Not enough builds for training: require at least {args.test_count + 1}, found {builds_count}"
             )
             sys.exit()
-        outliers_dataset_df = ExperimentsService.remove_outlier_tests(
+        outliers_dataset_df = DataService.remove_outlier_tests(
             args.output_path, dataset_df
         )
         rankers = {
             0: ("MART", {"tree": 30}),
-            6: ("LambdaMART", {}),
+            6: ("LambdaMART", {"tree": 30, "metric2T": "NDCG@10"}),
             2: ("RankBoost", {}),
             4: ("CoordinateAscent", {}),
             7: ("ListNet", {}),
@@ -211,10 +177,7 @@ class ExperimentsService:
 
     @staticmethod
     def hyp_param_opt(args):
-        projects = []
-        with open(args.project_list) as f:
-            projects.extend(f.read().split("\n"))
-        optimizer = HypParamOpt(projects, args)
-        for p in projects:
-            best_params = optimizer.run_optimization(p)
-            print(best_params)
+        optimizer = HypParamOpt(args)
+        print(f"***** Running {args.output_path.name} hypopt *****")
+        best_params = optimizer.run_optimization()
+        print(best_params)
