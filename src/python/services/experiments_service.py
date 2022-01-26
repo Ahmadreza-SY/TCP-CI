@@ -132,7 +132,10 @@ class ExperimentsService:
         )
         rankers = {
             0: ("MART", {"tree": 30}),
-            6: ("LambdaMART", {"tree": 30, "metric2T": "NDCG@10"}),
+            6: (
+                "LambdaMART",
+                {"tree": 30, "metric2T": "NDCG@10", "metric2t": "NDCG@10"},
+            ),
             2: ("RankBoost", {}),
             4: ("CoordinateAscent", {}),
             7: ("ListNet", {}),
