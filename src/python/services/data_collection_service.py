@@ -80,6 +80,7 @@ class DataCollectionService:
                 ignore_index=True,
                 inplace=True,
             )
+            exe_df[ExecutionRecord.DURATION] = exe_df[ExecutionRecord.DURATION].abs()
             exe_df.to_csv(exe_path, index=False)
             builds_df.sort_values(
                 by=["started_at"],

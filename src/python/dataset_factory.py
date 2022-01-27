@@ -508,6 +508,7 @@ class DatasetFactory:
         cols.insert(0, Feature.TEST)
         cols.insert(0, Feature.BUILD)
         dataset_df = dataset_df[cols]
+        dataset_df[Feature.DURATION] = dataset_df[Feature.DURATION].abs()
         dataset_df.to_csv(self.config.output_path / "dataset.csv", index=False)
         self.repository_miner.clean_analysis_path()
         print(f'Saved dataset to {self.config.output_path / "dataset.csv"}')
