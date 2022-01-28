@@ -193,6 +193,14 @@ def main():
         type=int,
         required=True,
     )
+    hypopt_parser.add_argument(
+        "-c",
+        "--mysql-credentials",
+        help="""Specifies the credential for mysql server to run the optimization in parallel. 
+            The format should be <user>:<password> (if there is no password, just include <user>)""",
+        type=str,
+        required=True,
+    )
 
     decay_test_parser.set_defaults(func=decay_test)
     decay_test_parser.add_argument(

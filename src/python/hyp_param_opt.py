@@ -22,7 +22,7 @@ class HypParamOpt:
         )
         obj = self.create_objective(build_ds_path, learner)
         study_name = f"{self.config.output_path.name}-{build_ds_path.name}"
-        storage_name = f"sqlite:///{str(storage_path)}/{study_name}.db"
+        storage_name = f"mysql://{self.config.mysql_credentials}@localhost/hypopt"
         study = optuna.create_study(
             direction="maximize",
             study_name=study_name,
