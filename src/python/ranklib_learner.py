@@ -128,10 +128,15 @@ class RankLibLearner:
         self.save_feature_id_map()
         return pd.DataFrame(ranklib_ds_rows, columns=headers)
 
-    def create_ranklib_training_sets(self, ranklib_ds, output_path):
+    def create_ranklib_training_sets(
+        self, ranklib_ds, output_path, custom_test_builds=None
+    ):
         builds = ranklib_ds["i_build"].unique().tolist()
         builds.sort(key=lambda b: self.build_time_d[b])
-        test_builds = set(builds[-self.config.test_count :])
+        if custom_test_builds is None:
+            test_builds = set(builds[-self.config.test_count :])
+        else:
+            test_builds = [b for b in custom_test_builds if b in builds]
         for i, build in tqdm(list(enumerate(builds)), desc="Creating training sets"):
             if build not in test_builds:
                 continue

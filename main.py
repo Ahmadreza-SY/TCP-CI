@@ -180,11 +180,18 @@ def main():
         default=".",
     )
     hypopt_parser.add_argument(
-        "-t",
-        "--test-count",
-        help="Specifies the number of recent builds to use for evaluation.",
+        "-n",
+        "--n-trials",
+        help="Specifies the number of runs for optimization.",
         type=int,
-        default=50,
+        required=True,
+    )
+    hypopt_parser.add_argument(
+        "-b",
+        "--build",
+        help="Specifies the build id for running the optimization.",
+        type=int,
+        required=True,
     )
 
     decay_test_parser.set_defaults(func=decay_test)

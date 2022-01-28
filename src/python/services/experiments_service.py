@@ -9,6 +9,7 @@ from ..code_analyzer.code_analyzer import AnalysisLevel
 from ..results.results_analyzer import ResultAnalyzer
 from ..hyp_param_opt import HypParamOpt
 from .data_service import DataService
+from pathlib import Path
 
 
 class ExperimentsService:
@@ -182,5 +183,5 @@ class ExperimentsService:
     def hyp_param_opt(args):
         optimizer = HypParamOpt(args)
         print(f"***** Running {args.output_path.name} hypopt *****")
-        best_params = optimizer.run_optimization()
-        print(best_params)
+        build_ds_path = Path(args.output_path / "hyp_param_opt" / str(args.build))
+        optimizer.run_optimization(build_ds_path)
