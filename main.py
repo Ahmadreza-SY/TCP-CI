@@ -1,5 +1,5 @@
 from src.python.services.data_collection_service import DataCollectionService
-from src.python.services.experiments_service import ExperimentsService
+from src.python.services.experiments_service import ExperimentsService, Experiment
 import argparse
 from src.python.code_analyzer.code_analyzer import AnalysisLevel
 from src.python.entities.entity import Language
@@ -16,7 +16,7 @@ def tr_torrent(args):
 
 def learn(args):
     if args.ranking_models == "best":
-        ExperimentsService.run_all_tsp_accuracy_experiments(args)
+        ExperimentsService.run_best_ranker_experiments(args)
     elif args.ranking_models == "all":
         ExperimentsService.run_all_tcp_rankers(args)
 
@@ -170,6 +170,14 @@ def main():
         default="best",
         choices=["best", "all"],
     )
+    learn_parser.add_argument(
+        "-e",
+        "--experiment",
+        help="Specifies the experiment to run. Only works when the best ranking model is selected.",
+        type=Experiment,
+        default=Experiment.FULL,
+        choices=[e for e in Experiment],
+    )
 
     hypopt_parser.set_defaults(func=hypopt)
     hypopt_parser.add_argument(
@@ -238,6 +246,17 @@ def main():
     args.output_path.mkdir(parents=True, exist_ok=True)
     args.unique_separator = "\t"
     args.best_ranker = 8
+    args.best_ranker_params = {
+        "bag": 300,
+        "frate": 0.1,
+        "leaf": 100,
+        "rtype": 6,
+        "shrinkage": 0.01,
+        "srate": 0.5,
+        "tree": 1,
+        "metric2T": "NDCG@10",
+        "metric2t": "NDCG@10",
+    }
     args.func(args)
 
 

@@ -207,13 +207,16 @@ class RankLibLearner:
         feature_stats_df.sort_values("feature_id", ignore_index=True, inplace=True)
         feature_stats_df.to_csv(output_path / "feature_stats.csv", index=False)
 
-    def train_and_test(self, build_ds_path, ranker, params, suffix=""):
+    def train_and_test(self, build_ds_path, ranker, params, dataset_df, suffix=""):
         train_path = build_ds_path / "train.txt"
         test_path = build_ds_path / "test.txt"
         model_path = build_ds_path / f"model{suffix}.txt"
         pred_path = build_ds_path / f"pred{suffix}.txt"
 
         if not model_path.exists():
+            builds_count = dataset_df[Feature.BUILD].nunique()
+            if ranker == 8 and builds_count < 52:
+                params["srate"] = 1.0
             params_cmd = " ".join(
                 [f"-{name} {value}" for name, value in params.items()]
             )
@@ -245,11 +248,13 @@ class RankLibLearner:
         apfdc = self.compute_apfdc(pred_df)
         return apfd, apfdc
 
-    def train_and_test_all(self, output_path, ranker):
+    def train_and_test_all(self, output_path, ranker, dataset_df):
         results = {"build": [], "apfd": [], "apfdc": []}
         ds_paths = list(p for p in output_path.glob("*") if p.is_dir())
         for build_ds_path in tqdm(ds_paths, desc="Running full feature set training"):
-            apfd, apfdc = self.train_and_test(build_ds_path, ranker[0], ranker[1])
+            apfd, apfdc = self.train_and_test(
+                build_ds_path, ranker[0], ranker[1], dataset_df
+            )
             results["build"].append(int(build_ds_path.name))
             results["apfd"].append(apfd)
             results["apfdc"].append(apfdc)
@@ -324,11 +329,11 @@ class RankLibLearner:
 
     def run_accuracy_experiments(self, dataset_df, name, results_path, ranker=None):
         if ranker == None:
-            ranker = (self.config.best_ranker, {})
+            ranker = (self.config.best_ranker, self.config.best_ranker_params)
         ranklib_ds = self.convert_to_ranklib_dataset(dataset_df)
         traning_sets_path = results_path / name
         self.create_ranklib_training_sets(ranklib_ds, traning_sets_path)
-        results = self.train_and_test_all(traning_sets_path, ranker)
+        results = self.train_and_test_all(traning_sets_path, ranker, dataset_df)
         results.to_csv(traning_sets_path / "results.csv", index=False)
 
     def convert_decay_datasets(self, datasets_path):

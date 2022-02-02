@@ -20,7 +20,7 @@ class HypParamOpt:
         learner.create_ranklib_training_sets(
             ranklib_ds, results_path, custom_test_builds=[self.config.build]
         )
-        obj = self.create_objective(build_ds_path, learner)
+        obj = self.create_objective(build_ds_path, learner, ds_df)
         study_name = f"{self.config.output_path.name}-{build_ds_path.name}"
         storage_name = f"mysql://{self.config.mysql_credentials}@localhost/hypopt"
         study = optuna.create_study(
@@ -42,15 +42,15 @@ class HypParamOpt:
         )
         return outliers_dataset_df
 
-    def create_objective(self, build_ds_path, learner):
+    def create_objective(self, build_ds_path, learner, ds_df):
         def objective(trial):
-            bag = trial.suggest_categorical("bag", [300, 600, 1000])
-            srate = trial.suggest_categorical("srate", [1.0, 0.5])
-            frate = trial.suggest_categorical("frate", [0.1, 0.3, 1.0])
             rtype = trial.suggest_categorical("rtype", [6, 0])
-            tree = trial.suggest_categorical("tree", [1, 2, 3])
-            leaf = trial.suggest_categorical("leaf", [100, 300, 500])
-            shrinkage = trial.suggest_categorical("shrinkage", [0.01, 0.1, 0.2])
+            srate = trial.suggest_categorical("srate", [0.5, 1.0])
+            bag = trial.suggest_categorical("bag", [150, 600, 300])
+            frate = trial.suggest_categorical("frate", [0.15, 0.6, 0.3])
+            tree = trial.suggest_categorical("tree", [5, 3, 1])
+            leaf = trial.suggest_categorical("leaf", [50, 200, 100])
+            shrinkage = trial.suggest_categorical("shrinkage", [0.05, 0.2, 0.1])
             params = {
                 "bag": bag,
                 "srate": srate,
@@ -64,7 +64,11 @@ class HypParamOpt:
                 params["metric2T"] = "NDCG@10"
                 params["metric2t"] = "NDCG@10"
             _, apfdc = learner.train_and_test(
-                build_ds_path, self.config.best_ranker, params, suffix=trial.number
+                build_ds_path,
+                self.config.best_ranker,
+                params,
+                ds_df,
+                suffix=trial.number,
             )
             return apfdc
 
