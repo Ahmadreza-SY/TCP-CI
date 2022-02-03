@@ -24,8 +24,6 @@ class HypParamOpt:
         ds_df = self.prepare_dataset()
         learner = RankLibLearner(self.config)
         results_path = self.config.output_path / "hyp_param_opt"
-        storage_path = self.config.output_path / "hyp_param_opt" / "storage"
-        storage_path.mkdir(exist_ok=True, parents=True)
         ranklib_ds = learner.convert_to_ranklib_dataset(ds_df)
         learner.create_ranklib_training_sets(
             ranklib_ds, results_path, custom_test_builds=[self.config.build]
