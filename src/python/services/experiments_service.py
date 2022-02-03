@@ -186,4 +186,4 @@ class ExperimentsService:
         optimizer = HypParamOpt(args)
         print(f"***** Running {args.output_path.name} hypopt *****")
         build_ds_path = Path(args.output_path / "hyp_param_opt" / str(args.build))
-        optimizer.run_optimization(build_ds_path)
+        optimizer.run_optimization(build_ds_path, args.comb_index)

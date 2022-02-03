@@ -188,13 +188,6 @@ def main():
         default=".",
     )
     hypopt_parser.add_argument(
-        "-n",
-        "--n-trials",
-        help="Specifies the number of runs for optimization.",
-        type=int,
-        required=True,
-    )
-    hypopt_parser.add_argument(
         "-b",
         "--build",
         help="Specifies the build id for running the optimization.",
@@ -202,11 +195,10 @@ def main():
         required=True,
     )
     hypopt_parser.add_argument(
-        "-c",
-        "--mysql-credentials",
-        help="""Specifies the credential for mysql server to run the optimization in parallel. 
-            The format should be <user>:<password> (if there is no password, just include <user>)""",
-        type=str,
+        "-i",
+        "--comb-index",
+        help="Specifies the index of the hyperparameter combination.",
+        type=int,
         required=True,
     )
 
