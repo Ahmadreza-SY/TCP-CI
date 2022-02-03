@@ -234,6 +234,8 @@ class RankLibLearner:
             if pred_out.returncode != 0:
                 print(f"Error in predicting:\n{pred_out.stderr}")
                 sys.exit()
+            if suffix != "":
+                os.remove(str(model_path))
         pred_df = (
             pd.read_csv(
                 pred_path,
