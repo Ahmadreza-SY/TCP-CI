@@ -1,6 +1,7 @@
 import pandas as pd
 import re
 from tqdm import tqdm
+import logging
 
 
 class TrTorrentProcessor:
@@ -78,7 +79,7 @@ class TrTorrentProcessor:
         return builds_df
 
     def process_tr_torrent_data(self, source_path, output_path, repo):
-        print(f"Processing {repo} data")
+        logging.info(f"Processing {repo} data")
         logs_path = source_path / "build_logs" / repo
         data_path = source_path / "data" / repo
         repo_output_path = output_path / repo
@@ -96,4 +97,4 @@ class TrTorrentProcessor:
         repo_output_path.mkdir(parents=True, exist_ok=True)
         exe_df.to_csv(exe_output_file, index=False)
         builds_df.to_csv(builds_output_file, index=False)
-        print(f"Finished processing {repo} data")
+        logging.info(f"Finished processing {repo} data")

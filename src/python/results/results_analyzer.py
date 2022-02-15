@@ -10,6 +10,7 @@ from pydriller import GitRepository
 from .rq1_resutls_analyzer import RQ1ResultAnalyzer
 from .rq2_resutls_analyzer import RQ2ResultAnalyzer
 from .rq3_resutls_analyzer import RQ3ResultAnalyzer
+import logging
 
 
 class ResultAnalyzer:
@@ -170,7 +171,7 @@ class ResultAnalyzer:
         else:
             stats_df = self.extract_subjects_stats(self.config.data_path)
         if len(stats_df) == 0:
-            print("No valid subject available")
+            logging.error("No valid subject available")
             return
         stats_df.to_csv(stats_path, index=False)
         stats_df.sort_values("SLOC", ascending=False, ignore_index=True, inplace=True)

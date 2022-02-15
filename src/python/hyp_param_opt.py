@@ -3,6 +3,7 @@ import sys
 import pandas as pd
 from .ranklib_learner import RankLibLearner
 from .services.data_service import DataService
+import logging
 
 
 class HypParamOpt:
@@ -34,10 +35,10 @@ class HypParamOpt:
         for i, param_name in enumerate(self.hyp_names):
             param_value = self.hyp_values[param_name][combination[i]]
             params[param_name] = param_value
-        print(
+        logging.info(
             f"Running build {build_ds_path.name} with hyp-comb-index {hyp_comb_i} {combination}"
         )
-        print(params)
+        logging.info(params)
         if params["rtype"] == 6:
             params["metric2T"] = "NDCG@10"
             params["metric2t"] = "NDCG@10"
@@ -48,7 +49,7 @@ class HypParamOpt:
             ds_df,
             suffix=hyp_comb_i,
         )
-        print(f"APFDc {apfdc}")
+        logging.info(f"APFDc {apfdc}")
         apfdc_path = build_ds_path / "apfdc"
         apfdc_path.mkdir(parents=True, exist_ok=True)
         with open(str(apfdc_path / f"apfdc{hyp_comb_i}.txt"), "w") as f:
@@ -57,7 +58,7 @@ class HypParamOpt:
     def prepare_dataset(self):
         dataset_path = self.config.output_path / "dataset.csv"
         if not dataset_path.exists():
-            print("No dataset.csv found in the output directory. Aborting ...")
+            logging.error("No dataset.csv found in the output directory. Aborting ...")
             sys.exit()
         dataset_df = pd.read_csv(dataset_path)
         outliers_dataset_df = DataService.remove_outlier_tests(

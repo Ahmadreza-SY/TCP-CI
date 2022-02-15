@@ -1,16 +1,12 @@
 import pandas as pd
-from ..decay_dataset_factory import DecayDatasetFactory
 from ..entities.execution_record import ExecutionRecord
 from ..dataset_factory import DatasetFactory
-from ..feature_extractor.feature import Feature
 from ..module_factory import ModuleFactory
 import sys
 from ..timer import tik, tok, save_time_measures
-from ..ranklib_learner import RankLibLearner
 import subprocess
-from ..feature_extractor.feature import Feature
-from ..code_analyzer.code_analyzer import AnalysisLevel
 from ..execution_record_extractor.tr_torrent_processor import TrTorrentProcessor
+import logging
 
 
 class DataCollectionService:
@@ -19,7 +15,7 @@ class DataCollectionService:
         path = args.project_path
         slug = args.project_slug
         if path is None and slug is None:
-            print(
+            logging.error(
                 f"At least one of the --project-path or --project-slug should be provided."
             )
             sys.exit()
@@ -33,7 +29,7 @@ class DataCollectionService:
             )
             return_code = subprocess.call(clone_command, shell=True)
             if return_code != 0:
-                print("Failure in fetching source code for GitHub!")
+                logging.error("Failure in fetching source code for GitHub!")
                 sys.exit()
 
     @staticmethod
@@ -51,7 +47,7 @@ class DataCollectionService:
         )
         tok("Execution History")
         if len(builds) == 0:
-            print("No CI cycles found. Aborting...")
+            logging.error("No CI cycles found. Aborting...")
             sys.exit()
 
         tik("Feature Extraction")
@@ -90,7 +86,7 @@ class DataCollectionService:
             builds_df.to_csv(args.output_path / "builds.csv", index=False)
             return exe_records, builds
         else:
-            print("No execution history collected!")
+            logging.warn("No execution history collected!")
             return [], []
 
     @staticmethod

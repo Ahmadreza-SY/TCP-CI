@@ -11,6 +11,7 @@ from ..hyp_param_opt import HypParamOpt
 from .data_service import DataService
 from pathlib import Path
 from enum import Enum
+import logging
 
 
 class Experiment(Enum):
@@ -35,13 +36,14 @@ class ExperimentsService:
     def run_best_ranker_experiments(args):
         dataset_path = args.output_path / "dataset.csv"
         if not dataset_path.exists():
-            print("No dataset.csv found in the output directory. Aborting ...")
+            logging.error("No dataset.csv found in the output directory. Aborting ...")
             sys.exit()
+        logging.info("Reading the dataset.")
         learner = RankLibLearner(args)
         dataset_df = pd.read_csv(dataset_path)
         builds_count = dataset_df[Feature.BUILD].nunique()
         if builds_count <= args.test_count:
-            print(
+            logging.error(
                 f"Not enough builds for training: require at least {args.test_count + 1}, found {builds_count}"
             )
             sys.exit()
@@ -49,8 +51,9 @@ class ExperimentsService:
         outliers_dataset_df = DataService.remove_outlier_tests(
             args.output_path, dataset_df
         )
+        logging.info("Finished reading the dataset.")
 
-        print(
+        logging.info(
             f"***** Running {args.experiment.value} experiment for {dataset_path.parent.name} *****"
         )
         if args.experiment == Experiment.FULL:
@@ -114,19 +117,20 @@ class ExperimentsService:
                 f"W-{feature_group}-outliers",
                 results_path,
             )
+        logging.info("Done run_best_ranker_experiments")
 
     @staticmethod
     def run_all_tcp_rankers(args):
         dataset_path = args.output_path / "dataset.csv"
         if not dataset_path.exists():
-            print("No dataset.csv found in the output directory. Aborting ...")
+            logging.error("No dataset.csv found in the output directory. Aborting ...")
             sys.exit()
-        print(f"##### Running experiments for {dataset_path.parent.name} #####")
+        logging.info(f"##### Running experiments for {dataset_path.parent.name} #####")
         learner = RankLibLearner(args)
         dataset_df = pd.read_csv(dataset_path)
         builds_count = dataset_df[Feature.BUILD].nunique()
         if builds_count <= args.test_count:
-            print(
+            logging.error(
                 f"Not enough builds for training: require at least {args.test_count + 1}, found {builds_count}"
             )
             sys.exit()
@@ -147,7 +151,7 @@ class ExperimentsService:
         results_path = args.output_path / "tcp_rankers"
         for id, info in rankers.items():
             name, params = info
-            print(
+            logging.info(
                 f"***** Running {name} full feature set without Outliers experiments *****"
             )
             learner.run_accuracy_experiments(
@@ -156,7 +160,7 @@ class ExperimentsService:
 
     @staticmethod
     def run_decay_test_experiments(args):
-        print(f"Running decay tests for {args.output_path.name}")
+        logging.info(f"Running decay tests for {args.output_path.name}")
         repo_miner_class = ModuleFactory.get_repository_miner(AnalysisLevel.FILE)
         repo_miner = repo_miner_class(args)
         change_history_df = repo_miner.load_entity_change_history()
@@ -173,7 +177,7 @@ class ExperimentsService:
         learner = RankLibLearner(args)
         datasets_path = args.output_path / "decay_datasets"
         learner.run_decay_test_experiments(datasets_path, models_path)
-        print(f"All finished and results are saved at {datasets_path}")
+        logging.info(f"All finished and results are saved at {datasets_path}")
         print()
 
     @staticmethod
@@ -184,6 +188,6 @@ class ExperimentsService:
     @staticmethod
     def hyp_param_opt(args):
         optimizer = HypParamOpt(args)
-        print(f"***** Running {args.output_path.name} hypopt *****")
+        logging.info(f"***** Running {args.output_path.name} hypopt *****")
         build_ds_path = Path(args.output_path / "hyp_param_opt" / str(args.build))
         optimizer.run_optimization(build_ds_path, args.comb_index)

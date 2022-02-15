@@ -8,6 +8,7 @@ from tqdm import tqdm
 import sys
 import re
 import os
+import logging
 
 
 class RankLibLearner:
@@ -88,6 +89,7 @@ class RankLibLearner:
         normalized_dataset, feature_dataset, _ = self.normalize_dataset(dataset, scaler)
         builds = normalized_dataset[Feature.BUILD].unique()
         ranklib_ds_rows = []
+        logging.info("Converting data to RankLib format.")
         for i, build in list(enumerate(builds)):
             build_ds = normalized_dataset[
                 normalized_dataset[Feature.BUILD] == build
@@ -126,6 +128,7 @@ class RankLibLearner:
             + ["hashtag", "i_target", "i_verdict", "i_duration", "i_test", "i_build"]
         )
         self.save_feature_id_map()
+        logging.info("Finished converting data to RankLib format.")
         return pd.DataFrame(ranklib_ds_rows, columns=headers)
 
     def create_ranklib_training_sets(
@@ -137,6 +140,7 @@ class RankLibLearner:
             test_builds = set(builds[-self.config.test_count :])
         else:
             test_builds = [b for b in custom_test_builds if b in builds]
+        logging.info("Creating training sets")
         for i, build in tqdm(list(enumerate(builds)), desc="Creating training sets"):
             if build not in test_builds:
                 continue
@@ -223,7 +227,7 @@ class RankLibLearner:
             train_command = f"java -jar {self.ranklib_path} -train {train_path} -ranker {ranker} {params_cmd} -save {model_path} -silent"
             train_out = subprocess.run(train_command, shell=True, capture_output=True)
             if train_out.returncode != 0:
-                print(f"Error in training:\n{train_out.stderr}")
+                logging.error(f"Error in training:\n{train_out.stderr}")
                 sys.exit()
 
         if not pred_path.exists():
@@ -232,7 +236,7 @@ class RankLibLearner:
                 pred_command += f" -metric2T {params['metric2T']}"
             pred_out = subprocess.run(pred_command, shell=True, capture_output=True)
             if pred_out.returncode != 0:
-                print(f"Error in predicting:\n{pred_out.stderr}")
+                logging.error(f"Error in predicting:\n{pred_out.stderr}")
                 sys.exit()
             if suffix != "":
                 os.remove(str(model_path))
@@ -253,7 +257,8 @@ class RankLibLearner:
     def train_and_test_all(self, output_path, ranker, dataset_df):
         results = {"build": [], "apfd": [], "apfdc": []}
         ds_paths = list(p for p in output_path.glob("*") if p.is_dir())
-        for build_ds_path in tqdm(ds_paths, desc="Running full feature set training"):
+        logging.info("Starting training phase")
+        for build_ds_path in tqdm(ds_paths, desc="Training"):
             apfd, apfdc = self.train_and_test(
                 build_ds_path, ranker[0], ranker[1], dataset_df
             )
@@ -267,7 +272,7 @@ class RankLibLearner:
                     feature_stats_command, shell=True, capture_output=True
                 )
                 if feature_stats_out.returncode != 0:
-                    print(f"Error in training:\n{feature_stats_out.stderr}")
+                    logging.error(f"Error in training:\n{feature_stats_out.stderr}")
                     sys.exit()
                 self.extract_and_save_feature_stats(
                     feature_stats_out.stdout.decode("utf-8"), build_ds_path
@@ -310,6 +315,7 @@ class RankLibLearner:
         apfdc_results = {"build": []}
         all_builds = dataset_df[Feature.BUILD].unique().tolist()
         all_builds.sort(key=lambda b: self.build_time_d[b])
+        logging.info("Starting to test heuristics")
         for build in tqdm(all_builds, desc="Testing heuristics"):
             suite_ds = dataset_df[dataset_df[Feature.BUILD] == build]
             apfd_results["build"].append(build)
@@ -370,7 +376,7 @@ class RankLibLearner:
             pred_command = f"java -jar {ranklib_path} -load {model_file} -rank {test_file} -indri {pred_file}"
             pred_out = subprocess.run(pred_command, shell=True, capture_output=True)
             if pred_out.returncode != 0:
-                print(f"Error in predicting:\n{pred_out.stderr}")
+                logging.error(f"Error in predicting:\n{pred_out.stderr}")
                 sys.exit()
             preds_df = (
                 pd.read_csv(

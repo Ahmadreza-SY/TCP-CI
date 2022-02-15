@@ -3,6 +3,7 @@ from ..entities.execution_record import ExecutionRecord, TestVerdict, Build
 import pandas as pd
 from tqdm import tqdm
 from ..timer import tik_list, tok_list
+import logging
 
 
 class TorrentExtractor(ExecutionRecordExtractorInterface):
@@ -16,17 +17,17 @@ class TorrentExtractor(ExecutionRecordExtractorInterface):
 
     def fetch_execution_records(self) -> Tuple[List[ExecutionRecord], List[Build]]:
         if self.config.project_slug is None:
-            print(
+            logging.warn(
                 f"No project slug is provided, skipping test execution history retrival."
             )
             return [], []
         if self.config.ci_data_path is None:
-            print(
+            logging.warn(
                 f"No path for RTP-Torrent data is provided, skipping test execution history retrival."
             )
             return [], []
 
-        print("Reading RTP-Torrent execution records ...")
+        logging.info("Reading RTP-Torrent execution records ...")
         user_login, project_name = self.config.project_slug.split("/")
         rtp_exe_df = pd.read_csv(
             self.config.ci_data_path

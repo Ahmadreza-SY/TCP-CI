@@ -8,6 +8,7 @@ import understand
 from ...entities.entity import Language, EntityType
 from ..code_analyzer import AnalysisLevel
 from pathlib import Path
+import logging
 
 
 class UnderstandDatabase:
@@ -37,11 +38,10 @@ class UnderstandDatabase:
             und_db_path.parent.mkdir(parents=True, exist_ok=True)
             start = time.time()
             language_argument = UnderstandDatabase.language_map[self.config.language]
-            # print("Running understand analysis")
             und_command = f"und -verbose -db {und_db_path.as_posix()} create -languages {language_argument} add {self.config.project_path.as_posix()} analyze"
             rc = self.run_und_command(und_command)
             if rc != 0:
-                print(f"Understand command failed with {rc} error code!")
+                logging.error(f"Understand command failed with {rc} error code!")
                 sys.exit()
             self.db = understand.open(str(und_db_path))
 
@@ -104,7 +104,9 @@ class UnderstandDatabase:
 
     def get_entity_type(self, entity, rel_path):
         if self.config.test_path is None:
-            print("Test path cannot be None for this configuration. Aborting ...")
+            logging.error(
+                "Test path cannot be None for this configuration. Aborting ..."
+            )
             sys.exit()
         file_name = rel_path.name
         full_test_path = (self.config.project_path / self.config.test_path).absolute()

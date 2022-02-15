@@ -1,5 +1,6 @@
 from datetime import datetime
 import pandas as pd
+import logging
 
 time_measures = {}
 build_time_measures = {}
@@ -24,7 +25,7 @@ def internal_tok(name, tm):
 
 def tik(name, build=None, commit=None):
     if build is not None and commit is not None:
-        print("Only one of build or commit args should be provided!")
+        logging.error("Only one of build or commit args should be provided!")
         return
     global time_measures
     global build_time_measures
@@ -41,7 +42,7 @@ def tik(name, build=None, commit=None):
 
 def tok(name, build=None, commit=None):
     if build is not None and commit is not None:
-        print("Only one of build or commit args should be provided!")
+        logging.error("Only one of build or commit args should be provided!")
         return
     global time_measures
     global build_time_measures

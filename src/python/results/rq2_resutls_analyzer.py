@@ -8,6 +8,7 @@ import seaborn as sns
 from tqdm import tqdm
 import numpy as np
 from scipy.stats import friedmanchisquare
+import logging
 
 
 class RQ2ResultAnalyzer:
@@ -632,19 +633,19 @@ class RQ2ResultAnalyzer:
         stat, p = friedmanchisquare(*measurements)
         alpha = 0.05
         with (self.get_output_path() / "rq2_ranker_friedman.txt").open("w") as f:
-            print(
+            logging.info(
                 "Number of Samples=%d, Degrees of Freedom=%d"
                 % (len(m_df), len(m_cols) - 1),
                 file=f,
             )
-            print("Statistic=%.3f, p-value=%.3f" % (stat, p), file=f)
+            logging.info("Statistic=%.3f, p-value=%.3f" % (stat, p), file=f)
             if p >= alpha:
-                print(
+                logging.info(
                     "No statistically significant difference (fail to reject H0)",
                     file=f,
                 )
             else:
-                print(
+                logging.info(
                     "There is at least one statistically significant difference (reject H0)",
                     file=f,
                 )

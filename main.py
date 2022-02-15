@@ -4,6 +4,13 @@ import argparse
 from src.python.code_analyzer.code_analyzer import AnalysisLevel
 from src.python.entities.entity import Language
 from pathlib import Path
+import logging
+
+logging.basicConfig(
+    format="%(asctime)s %(levelname)-8s %(message)s",
+    level=logging.INFO,
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 
 def dataset(args):
@@ -239,13 +246,13 @@ def main():
     args.unique_separator = "\t"
     args.best_ranker = 8
     args.best_ranker_params = {
-        "bag": 300,
-        "frate": 0.1,
-        "leaf": 100,
         "rtype": 6,
-        "shrinkage": 0.01,
         "srate": 0.5,
+        "bag": 300,
+        "frate": 0.15,
         "tree": 1,
+        "leaf": 200,
+        "shrinkage": 0.2,
         "metric2T": "NDCG@10",
         "metric2t": "NDCG@10",
     }

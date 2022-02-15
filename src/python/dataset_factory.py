@@ -10,6 +10,7 @@ from .timer import tik, tok, tik_list, tok_list
 import sys
 from .feature_extractor.feature import Feature
 from .feature_extractor.rec_feature_extractor import RecFeatureExtractor
+import logging
 
 
 class DatasetFactory:
@@ -435,7 +436,7 @@ class DatasetFactory:
         )
 
         if len(valid_builds) == 0:
-            print("No valid builds found. Aborting ...")
+            logging.error("No valid builds found. Aborting ...")
             sys.exit()
 
         for build in tqdm(valid_builds[1:], desc="Creating dataset"):
@@ -499,7 +500,7 @@ class DatasetFactory:
     def create_and_save_dataset(self, builds, exe_records):
         dataset = self.create_dataset(builds, exe_records)
         if len(dataset) == 0:
-            print("No dataset created!")
+            logging.error("No dataset created!")
             return
         dataset_df = pd.DataFrame.from_records(dataset)
         cols = dataset_df.columns.tolist()
@@ -511,4 +512,4 @@ class DatasetFactory:
         dataset_df[Feature.DURATION] = dataset_df[Feature.DURATION].abs()
         dataset_df.to_csv(self.config.output_path / "dataset.csv", index=False)
         self.repository_miner.clean_analysis_path()
-        print(f'Saved dataset to {self.config.output_path / "dataset.csv"}')
+        logging.info(f'Saved dataset to {self.config.output_path / "dataset.csv"}')
