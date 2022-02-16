@@ -171,7 +171,7 @@ class ExperimentsService:
         )
         dataset_df = pd.read_csv(args.output_path / "dataset.csv")
         decay_ds_factory = DecayDatasetFactory(dataset_factory, args)
-        models_path = args.output_path / "tsp_accuracy_results" / "full"
+        models_path = args.output_path / "tsp_accuracy_results" / "full-outliers"
         decay_ds_factory.create_decay_datasets(dataset_df, models_path)
 
         learner = RankLibLearner(args)
