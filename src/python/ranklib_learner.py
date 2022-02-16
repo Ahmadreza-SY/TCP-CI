@@ -89,7 +89,6 @@ class RankLibLearner:
         normalized_dataset, feature_dataset, _ = self.normalize_dataset(dataset, scaler)
         builds = normalized_dataset[Feature.BUILD].unique()
         ranklib_ds_rows = []
-        logging.info("Converting data to RankLib format.")
         for i, build in list(enumerate(builds)):
             build_ds = normalized_dataset[
                 normalized_dataset[Feature.BUILD] == build
@@ -128,7 +127,6 @@ class RankLibLearner:
             + ["hashtag", "i_target", "i_verdict", "i_duration", "i_test", "i_build"]
         )
         self.save_feature_id_map()
-        logging.info("Finished converting data to RankLib format.")
         return pd.DataFrame(ranklib_ds_rows, columns=headers)
 
     def create_ranklib_training_sets(
@@ -338,7 +336,9 @@ class RankLibLearner:
     def run_accuracy_experiments(self, dataset_df, name, results_path, ranker=None):
         if ranker == None:
             ranker = (self.config.best_ranker, self.config.best_ranker_params)
+        logging.info("Converting data to RankLib format.")
         ranklib_ds = self.convert_to_ranklib_dataset(dataset_df)
+        logging.info("Finished converting data to RankLib format.")
         traning_sets_path = results_path / name
         self.create_ranklib_training_sets(ranklib_ds, traning_sets_path)
         results = self.train_and_test_all(traning_sets_path, ranker, dataset_df)
