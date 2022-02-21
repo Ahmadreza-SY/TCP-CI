@@ -54,6 +54,7 @@ class HypParamOpt:
         apfdc_path.mkdir(parents=True, exist_ok=True)
         with open(str(apfdc_path / f"apfdc{hyp_comb_i}.txt"), "w") as f:
             f.write(str(apfdc))
+        logging.info(f"Done run_optimization")
 
     def prepare_dataset(self):
         dataset_path = self.config.output_path / "dataset.csv"
