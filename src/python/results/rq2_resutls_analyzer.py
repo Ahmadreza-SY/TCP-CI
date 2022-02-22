@@ -26,7 +26,7 @@ class RQ2ResultAnalyzer:
         self.generate_tc_age_histogram()
         self.generate_heuristic_comparison_table()
         self.generate_apfdc_corr_tables()
-        self.generate_outliers_stats()
+        # self.generate_outliers_stats()
         self.generate_rankers_avg_table()
 
     def get_output_path(self):

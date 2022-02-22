@@ -54,7 +54,11 @@ class RQ3ResultAnalyzer:
             windows = win_avg_df["window"].values
             accuracies = win_avg_df[metric].values
             slopes.setdefault("S_ID", []).append(sid)
-            slope = (accuracies[10] - accuracies[0]) / (windows[10] - windows[0])
+            if len(windows) > 10:
+                slope = (accuracies[10] - accuracies[0]) / (windows[10] - windows[0])
+            else:
+                w_i = len(windows) - 1
+                slope = (accuracies[w_i] - accuracies[0]) / (windows[w_i] - windows[0])
             slopes.setdefault("slope", []).append(slope)
             ax.plot(windows, accuracies)
             ax.set_title(f"$S_{{{sid}}}$")
