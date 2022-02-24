@@ -22,6 +22,10 @@ class HypParamOpt:
         }
 
     def run_optimization(self, build_ds_path, hyp_comb_i):
+        apfdc_path = build_ds_path / "apfdc"
+        if (apfdc_path / f"apfdc{hyp_comb_i}.txt").exists():
+            logging.info("Results already exists, aborting ...")
+            return
         ds_df = self.prepare_dataset()
         learner = RankLibLearner(self.config)
         results_path = self.config.output_path / "hyp_param_opt"
@@ -50,7 +54,6 @@ class HypParamOpt:
             suffix=hyp_comb_i,
         )
         logging.info(f"APFDc {apfdc}")
-        apfdc_path = build_ds_path / "apfdc"
         apfdc_path.mkdir(parents=True, exist_ok=True)
         with open(str(apfdc_path / f"apfdc{hyp_comb_i}.txt"), "w") as f:
             f.write(str(apfdc))
