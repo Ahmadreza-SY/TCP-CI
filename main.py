@@ -246,15 +246,13 @@ def main():
     args.unique_separator = "\t"
     args.best_ranker = 8
     args.best_ranker_params = {
-        "rtype": 6,
+        "rtype": 0,
         "srate": 0.5,
-        "bag": 300,
-        "frate": 0.15,
-        "tree": 1,
+        "bag": 150,
+        "frate": 0.3,
+        "tree": 5,
         "leaf": 200,
         "shrinkage": 0.2,
-        "metric2T": "NDCG@10",
-        "metric2t": "NDCG@10",
     }
     args.func(args)
 
