@@ -8,7 +8,7 @@ more_itertools==8.7.0
 nltk==3.6.2
 spacy==3.0.6
 apyori==1.1.2
-pandas==1.0.3
+pandas==1.1.0
 numpy==1.20.1
 xgboost==1.4.2
 GitPython==3.1.24
