@@ -1,3 +1,7 @@
+import os
+
+os.environ["OUTDATED_IGNORE"] = "1"
+
 from src.python.services.data_collection_service import DataCollectionService
 from src.python.services.experiments_service import ExperimentsService, Experiment
 import argparse

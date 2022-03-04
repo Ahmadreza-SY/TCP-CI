@@ -8,7 +8,7 @@ import seaborn as sns
 from tqdm import tqdm
 import numpy as np
 from scipy.stats import friedmanchisquare
-import logging
+import matplotlib
 
 
 class RQ2ResultAnalyzer:
@@ -283,6 +283,8 @@ class RQ2ResultAnalyzer:
             ].values.tolist()
             x.extend(failed_norm_ages)
 
+        font = {"size": 16}
+        matplotlib.rc("font", **font)
         fig, ax = plt.subplots(1, 1, figsize=(8, 4), dpi=100)
         ax.set(xlabel="Normalized Age", ylabel="Failure Count")
         sns.histplot(x, ax=ax, kde=False, bins=10, color="blue")

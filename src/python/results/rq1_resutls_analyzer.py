@@ -6,6 +6,7 @@ import numpy as np
 from scipy.stats import wilcoxon
 import pingouin as pg
 import matplotlib.pyplot as plt
+import matplotlib
 
 
 class RQ1ResultAnalyzer:
@@ -337,9 +338,12 @@ class RQ1ResultAnalyzer:
             p = np.poly1d(z)
             ax.plot(x, y, "bo")
             ax.plot([min(x), max(x)], [p(min(x)), p(max(x))], "r--")
-            ax.set(xlabel=f1, ylabel=f2 + " (sec.)")
+            ax.set(xlabel=f1.replace("\\", ""), ylabel=f2.replace("\\", "") + " (sec.)")
 
-        fig, axs = plt.subplots(2, 3, figsize=(24, 9))
+        font = {"size": 20}
+        matplotlib.rc("font", **font)
+
+        fig, axs = plt.subplots(2, 3, figsize=(32, 12))
         plot_corr("SLOC", "Total", axs[0, 0])
         plot_corr("SLOC", "COV", axs[0, 1])
         plot_corr("SLOC", "REC", axs[0, 2])

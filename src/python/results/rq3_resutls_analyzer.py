@@ -55,7 +55,7 @@ class RQ3ResultAnalyzer:
 
         plt.figure(figsize=(16, 9))
         plt.plot(windows, accuracies)
-        steady_win = 6
+        steady_win = 11
         plt.plot(
             [windows[0], windows[steady_win]],
             [accuracies[0], accuracies[steady_win]],
