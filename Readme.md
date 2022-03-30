@@ -2,7 +2,7 @@
 
 ## Table of Contents
 - [Introduction](#introduction)
-- [The Dataset's Class Diagram](#the-dataset-s-class-diagram)
+- [The Dataset's Class Diagram](#the-datasets-class-diagram)
 - [Environment Setup](#environment-setup)
   * [Python Environment](#python-environment)
   * [Understand](#understand)
@@ -46,7 +46,7 @@ This project is tested on Python 3.7+. The required Python dependencies can be i
 pip install -r requirements.txt
 ```
 ### Understand
-Understand is a code analysis enterprise software with a wide variety of [supported languages](https://support.scitools.com/t/supported-languages/153) which provides static dependencies available in a source code between files, functions, classes, etc. For more details on the feature of this software, visit [this link](https://scitools.com/features). In this project, we utilize Understand to create static dependency graphs to collect a part of our features. 
+Understand is a code analysis enterprise software with a wide variety of [supported languages](https://support.scitools.com/support/solutions/articles/70000582794-supported-languages) which provides static dependencies available in a source code between files, functions, classes, etc. For more details on the feature of this software, visit [this link](https://scitools.com/features). In this project, we utilize Understand to create static dependency graphs to collect a part of our features. 
 
 In this section, we will explain how to install and set up Understand to obtain a file with `.und` format which is the output of Understand's analysis. Note that this project needs Understand's database for extracting features and will not work without it.
 
@@ -68,7 +68,7 @@ $ und version
 This project has been tested on *Build 1029* of Understand on Linux (specifically Ubuntu). It may require minor compatibility changes if it is used on other Understand builds or other operating systems.
 
 #### Adding Understand Python Package/Library
-Unlike typical projects, Understand does not provide its Python library in the well-known pip package installer, and you need to manually add the package to your Python environment. The instructions for adding the package are explained in [this link](https://support.scitools.com/t/getting-started-with-the-python-api/51).
+Unlike typical projects, Understand does not provide its Python library in the well-known pip package installer, and you need to manually add the package to your Python environment. The instructions for adding the package are explained in [this link](https://support.scitools.com/support/solutions/articles/70000582852-getting-started-with-the-python-api).
 
 ### Java
 This project uses [RankLib](https://sourceforge.net/p/lemur/wiki/RankLib) for training and testing machine learning ranking models. RankLib is a library of learning-to-rank algorithms, and it is written in Java. Hence, this project requires Java for running training and testing experiments. This project is trained and tested on OpenJDK version `1.8.0_292` and `11.0.11`.
@@ -76,7 +76,7 @@ This project uses [RankLib](https://sourceforge.net/p/lemur/wiki/RankLib) for tr
 ## Usage Instructions
 After setting up the environment, you are ready to start using the project.
 
-This project consists of multiple sub-commands and each performs different tasks. Each sub-command is explained in the following sections.
+This project consists of multiple sub-commands and each performs a different task. Each sub-command is explained in the following sections.
 
 ### The `tr_torrent` Sub-command
 
@@ -84,13 +84,13 @@ This sub-command processes *Maven* build logs that were downloaded by [*TravisTo
 
 Argument Name | Description
 --- | ---
--r REPO, --repo REPO | The login and name of the repo separated by `@` (e.g., neuland@jade4j).
+-r REPO, --repo REPO | The login and name of the repo separated by `@` (e.g., apache@commons).
 -i INPUT_PATH, --input-path INPUT_PATH | Specifies the directory of *TravisTorrent* raw data (builds info and logs).
 -o OUTPUT_PATH, --output-path OUTPUT_PATH | Specifies the directory to save resulting data.
 
 An example of using the `tr_torrent` sub-command:
 ```
-python main.py tr_torrent -i ../travistorrent-tools -o ../tr-torrent -r neuland@jade4j
+python main.py tr_torrent -i ../travistorrent-tools -o ../tr-torrent -r apache@commons
 ```
 
 ### The `dataset` Sub-command
@@ -108,8 +108,7 @@ An example of using the `dataset` sub-command:
 python main.py dataset -s apache/commons -c ../rtp-torrent -o ./datasets/apache@commons
 ```
 
-#### Notes
-At least one of the `--project-path` or `--project-slug` arguments should be provided since the project requires the source code for analysis.
+**Note:** At least one of the `--project-path` or `--project-slug` arguments should be provided since the project requires the source code for analysis.
 
 #### The CI Data File Format
 The CI data files for each project should be under a folder named with its repository name (login and name of the repo separated by `@`, e.g., `apache@commons`). The repository folder should contain two files with names `<repo-name>-full.csv` and `<repo-name>-builds.csv` (e.g., `apache@commons-full.csv`, `apache@commons-builds.csv`). The `<repo-name>-full.csv` file should contain test case execution records for all jobs across all builds, which includes the following columns:
@@ -122,7 +121,7 @@ The CI data files for each project should be under a folder named with its repos
 - `errors`: The number of errors that occurred in the execution of the test class.
 - `skipped`: The number of skipped test methods in the execution of the test class.
 
-**Notes:** The full test class name is required for matching it with its corresponding source file. Also, the last four columns are based on the data available in *Maven* logs. `failures` refer to test cases' failures due to wrong outputs or assertion errors, whereas `errors` refer to unexpected behaviors such as runtime exceptions.
+**Note:** The full test class name is required for matching it with its corresponding source file. Also, the last four columns are based on the data available in *Maven* logs. `failures` refer to test cases' failures due to wrong outputs or assertion errors, whereas `errors` refer to unexpected behaviors such as runtime exceptions.
 
 The `<repo-name>-builds.csv` file should contain build information, which includes the following columns:
 - `tr_build_id`: Id of the Travis CI build.
@@ -140,12 +139,12 @@ Argument Name | Description
 -r {best,all}, --ranking-models {best,all} | Specifies the ranking model(s) to use for learning.
 -e EXPERIMENT, --experiment EXPERIMENT | Specifies the experiment to run. Only works when the best ranking model is selected.
 
-The `all` option for the `--ranking-models` argument runs the learning experiments on six ranking algorithms including all test case features. Based on our study, the Random Forest (RF) model was the best algorithm, and therefore, when the option `best` is selected for `--ranking-models`, RF will be used. Finally, the `--experiment` can have the following values: {FULL, WO_IMP, WO_TES_COM, WO_TES_PRO, WO_TES_CHN, WO_REC, WO_COV, WO_COD_COV_COM, WO_COD_COV_PRO, WO_COD_COV_CHN, WO_DET_COV, W_Code, W_Execution, W_Coverage}. In the `FULL` experiment, all test case features will be included in the learning process. However, the options that begin with `WO_` will exclude the feature group in their name (e.g., `WO_TES_COM` will exclude `TES_COM`), and the options that begin with `W_` will only include the high-level feature group in their name. For detailed information regarding the experiments, please refer to our paper.
-
 An example of using the `learn` sub-command:
 ```
 python main.py learn -o ./datasets/apache@commons -t 50 -r best -e FULL
 ```
+
+**Note:** The `all` option for the `--ranking-models` argument runs the learning experiments on six ranking algorithms including all test case features. Based on our study, the Random Forest (RF) model was the best algorithm, and therefore, when the option `best` is selected for `--ranking-models`, RF will be used. Finally, the `--experiment` can have the following values: {FULL, WO_IMP, WO_TES_COM, WO_TES_PRO, WO_TES_CHN, WO_REC, WO_COV, WO_COD_COV_COM, WO_COD_COV_PRO, WO_COD_COV_CHN, WO_DET_COV, W_Code, W_Execution, W_Coverage}. In the `FULL` experiment, all test case features will be included in the learning process. However, the options that begin with `WO_` will exclude the feature group in their name (e.g., `WO_TES_COM` will exclude `TES_COM`), and the options that begin with `W_` will only include the high-level feature group in their name. For detailed information regarding the experiments, please refer to our paper.
 
 ### The `decay_test` Sub-command
 This sub-command performs TCP model decay experiments on trained models (for more details about this experiment, refer to the paper). Since it reuses the previously trained models, the `learn` sub-command should be successfully executed before executing this sub-command. The arguments for this sub-command are shown in the following table.
@@ -181,7 +180,7 @@ The `dataset` sub-command creates the following files as its outputs:
 - There might be more test cases found in the source code of some repositories than the test cases available in `exe.csv`. We extracted the test case execution data from Travis CI build logs where not all test cases were necessarily executed.
 
 #### The `analysis` Folder
-In addition to the above CSV files, the `dataset` sub-command creates a directory named `analysis` which includes a number of sub-folders for each build which are named with build ids. Each sub-folder contains a `metadata.csv` file, and additionally, each sub-folder corresponding to failed builds contains a `tar.csv` and a `dep.csv` file. The `metadata.csv` file represents static features for each entity (file) captured by Understand for each build. Please visit [this link](https://support.scitools.com/t/what-metrics-does-undertand-have/66) for descriptions of all Understand metrics. The `dep.csv` file represents static and historical dependencies between the entities of the system under test (SUT). Static dependencies are extracted from Understand's database, and historical dependencies are represented by association weights for each static dependency which can be found in the `weights` column. 
+In addition to the above CSV files, the `dataset` sub-command creates a directory named `analysis` which includes a number of sub-folders for each build which are named with build ids. Each sub-folder contains a `metadata.csv` file, and additionally, each sub-folder corresponding to failed builds contains a `tar.csv` and a `dep.csv` file. The `metadata.csv` file represents static features for each entity (file) captured by Understand for each build. Please visit [this link](https://support.scitools.com/support/solutions/articles/70000582223-what-metrics-does-understand-have-) for descriptions of all Understand metrics. The `dep.csv` file represents static and historical dependencies between the entities of the system under test (SUT). Static dependencies are extracted from Understand's database, and historical dependencies are represented by association weights for each static dependency which can be found in the `weights` column. 
 
 The association weights are extracted by analyzing co-changes across Git commits and applying association rule mining to them using the Apriori algorithm. For each dependency, the association weight is either a single zero or four real numbers. A single zero means although Understand detected a static relation, there is no historical dependency between these two entities. In other words, among all analyzed commits, there is no commit in which both entities have changed. On the other hand, the four real numbers represent `support`, `forward_confidence`, `backward_confidence`, and `lift`. Note that assuming A has a dependency on B, `forward_confidence` is the confidence for A given B (A|B) and `backward_confidence` is the confidence for B given A (B|A). For precise definitions of the mentioned association metrics, please refer to the paper. Additionally, the `tar.csv` file represents the dependencies between test entities and entities of the SUT. This file is similar to `dep.csv`.
 
