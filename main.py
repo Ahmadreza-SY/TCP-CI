@@ -187,7 +187,7 @@ def main():
         help="Specifies the experiment to run. Only works when the best ranking model is selected.",
         type=Experiment,
         default=Experiment.FULL,
-        choices=[e for e in Experiment],
+        choices=[e.name for e in Experiment],
     )
 
     hypopt_parser.set_defaults(func=hypopt)

@@ -1,8 +1,18 @@
 # Scalable and Accurate Test Case Prioritization in Continuous Integration Contexts
 
+## Table of Contents
+- [Introduction](#introduction)
+- [The Dataset's Class Diagram](#the-dataset-s-class-diagram)
+- [Environment Setup](#environment-setup)
+  * [Python Environment](#python-environment)
+  * [Understand](#understand)
+  * [Java](#java)
+- [Usage Instructions](#usage-instructions)
+- [Outputs](#outputs)
+
 ## Introduction
 
-This project aims to extract and compute test case features from different data sources related to a software repository. It analyzes the source code both statically and based on its version control history and creates dependency graphs containing the relationships between files/functions and their association weights. It also processes build logs and computes features based on test case execution records. Finally, since the goal of collecting these features is for solving the Test Case Prioritization (TCP) problem, it runs various experiments to measure the scalability and accuracy of TCP.
+This project aims to extract and compute test case features from different data sources related to a software repository. It analyzes the source code both statically and based on its version control history and creates dependency graphs containing the relationships between files/functions and their association weights. It also processes build logs and computes features based on test case execution records. Finally, since the goal of collecting these features is for solving the Test Case Prioritization (TCP) problem, it runs various experiments to measure the scalability and effectiveness of TCP.
 
 In the following sections, we provide information on the requirements and instructions for running this project as well as descriptions regarding the data that this project generates. We also provide links to our **publication** and **public datasets** for reference and future work.
 
@@ -23,6 +33,11 @@ If the paper is accepted in a conference or journal, we will update the BibTeX a
 ### Dataset
 In our work, we collected datasets for 25 carefully selected open-source projects using this repository. The datasets are publicly available here: 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5532640.svg)](https://doi.org/10.5281/zenodo.5532640)
+
+
+## The Dataset's Class Diagram
+![alt text](docs/tcp-ci-dataset.jpg "Dataset Class Diagram")
+The above class diagram summarizes the structure of the dataset. For detailed information regarding the dataset files, please refer to the [Outputs](#outputs) section.
 
 ## Environment Setup
 ### Python Environment
@@ -56,7 +71,7 @@ This project has been tested on *Build 1029* of Understand on Linux (specificall
 Unlike typical projects, Understand does not provide its Python library in the well-known pip package installer, and you need to manually add the package to your Python environment. The instructions for adding the package are explained in [this link](https://support.scitools.com/t/getting-started-with-the-python-api/51).
 
 ### Java
-This project uses [RankLib](https://sourceforge.net/p/lemur/wiki/RankLib) for training and testing machine learning ranking models. RankLib is a library of learning-to-rank algorithms, and it is written in Java. Hence, this project required Java for running training and testing experiments. This project is trained and tested on OpenJDK version `1.8.0_292` and `11.0.11`.
+This project uses [RankLib](https://sourceforge.net/p/lemur/wiki/RankLib) for training and testing machine learning ranking models. RankLib is a library of learning-to-rank algorithms, and it is written in Java. Hence, this project requires Java for running training and testing experiments. This project is trained and tested on OpenJDK version `1.8.0_292` and `11.0.11`.
 
 ## Usage Instructions
 After setting up the environment, you are ready to start using the project.
@@ -79,7 +94,7 @@ python main.py tr_torrent -i ../travistorrent-tools -o ../tr-torrent -r neuland@
 ```
 
 ### The `dataset` Sub-command
-This sub-command collects and creates a training dataset including all test case features for each failed CI build (cycle). It requires two main sources of data: source code and CI data. The source code can be either provided in form of a GitHub slug or a path to the source code. For CI data, a path should be provided which includes a repository folder containing two CSV files with a specific format (the file format will be discussed later). The arguments for this sub-command are shown in the following table.
+This sub-command collects and creates a training dataset including all test case features for each failed CI build (cycle). It requires two main sources of data: source code and CI data. The source code can be either provided in form of a GitHub repository or a path to the source code. For CI data, a path should be provided which includes a repository folder containing two CSV files with a specific format (the file format will be discussed later). The arguments for this sub-command are shown in the following table.
 
 Argument Name | Description
 --- | ---
@@ -90,14 +105,14 @@ Argument Name | Description
 
 An example of using the `dataset` sub-command:
 ```
-python main.py dataset -s neuland/jade4j -c ../rtp-torrent -o ./datasets/neuland@jade4j
+python main.py dataset -s apache/commons -c ../rtp-torrent -o ./datasets/apache@commons
 ```
 
 #### Notes
 At least one of the `--project-path` or `--project-slug` arguments should be provided since the project requires the source code for analysis.
 
 #### The CI Data File Format
-The CI data files for each project should be under a folder named with its repository name (login and name of the repo separated by `@`, e.g., `neuland@jade4j`). The repository folder should contain two files with names `<repo-name>-full.csv` and `<repo-name>-builds.csv` (e.g., `neuland@jade4j-full.csv`, `neuland@jade4j-builds.csv`). The `<repo-name>-full.csv` file should contain test case execution records for all jobs across all builds, which includes the following columns:
+The CI data files for each project should be under a folder named with its repository name (login and name of the repo separated by `@`, e.g., `apache@commons`). The repository folder should contain two files with names `<repo-name>-full.csv` and `<repo-name>-builds.csv` (e.g., `apache@commons-full.csv`, `apache@commons-builds.csv`). The `<repo-name>-full.csv` file should contain test case execution records for all jobs across all builds, which includes the following columns:
 - `travisBuildId`: Id of the Travis CI build.
 - `travisJobId`: Id of the Travis CI job.
 - `testName`: The class name of the test case including its package name (e.g., `com.example.Test`).
@@ -122,10 +137,14 @@ Argument Name | Description
 --- | ---
 -o OUTPUT_PATH, --output-path OUTPUT_PATH | Specifies the directory to load required data and save results.
 -t TEST_COUNT, --test-count TEST_COUNT | Specifies the number of recent builds to test the trained models on.
+-r {best,all}, --ranking-models {best,all} | Specifies the ranking model(s) to use for learning.
+-e EXPERIMENT, --experiment EXPERIMENT | Specifies the experiment to run. Only works when the best ranking model is selected.
+
+The `all` option for the `--ranking-models` argument runs the learning experiments on six ranking algorithms including all test case features. Based on our study, the Random Forest (RF) model was the best algorithm, and therefore, when the option `best` is selected for `--ranking-models`, RF will be used. Finally, the `--experiment` can have the following values: {FULL, WO_IMP, WO_TES_COM, WO_TES_PRO, WO_TES_CHN, WO_REC, WO_COV, WO_COD_COV_COM, WO_COD_COV_PRO, WO_COD_COV_CHN, WO_DET_COV, W_Code, W_Execution, W_Coverage}. In the `FULL` experiment, all test case features will be included in the learning process. However, the options that begin with `WO_` will exclude the feature group in their name (e.g., `WO_TES_COM` will exclude `TES_COM`), and the options that begin with `W_` will only include the high-level feature group in their name. For detailed information regarding the experiments, please refer to our paper.
 
 An example of using the `learn` sub-command:
 ```
-python main.py learn -o ./datasets/neuland@jade4j -t 50
+python main.py learn -o ./datasets/apache@commons -t 50 -r best -e FULL
 ```
 
 ### The `decay_test` Sub-command
@@ -138,22 +157,9 @@ Argument Name | Description
 
 An example of using the `decay_test` sub-command:
 ```
-python main.py decay_test -o ./datasets/neuland@jade4j -p ./datasets/neuland@jade4j/jade4j
+python main.py decay_test -o ./datasets/apache@commons -p ./datasets/apache@commons/commons
 ```
 
-
-### The `results` Sub-command
-This sub-command analyzes the results from the above experiments across all projects (subjects) and generates tables. It requires the execution of all other sub-commands across projects since it analyzes all results to answer the paper's research questions. The arguments for this sub-command are shown in the following table.
-
-Argument Name | Description
---- | ---
--d DATA_PATH, --data-path DATA_PATH | Path to the root folder of all datasets.
--o OUTPUT_PATH, --output-path OUTPUT_PATH | Specifies the directory to save resulting tables.
-
-An example of using the `results` sub-command:
-```
-python main.py results -d ./datasets -o ./results
-```
 
 ## Outputs
 
@@ -162,20 +168,22 @@ In this section, we will describe the output files that each sub-command creates
 ### `dataset` Output Files
 
 The `dataset` sub-command creates the following files as its outputs: 
-- `dataset.csv`: Contains all test case features across failed CI builds.
+- `dataset.csv`: Contains test case features across failed CI builds.
 - `exe.csv`: Contains the execution history of the test cases that is used to create the dataset.
 - `entity_change_history.csv`: Contains the change history of source code entities based on all Git commits.
 - `id_map.csv`: Contains a map that relates a source code file relative path to a unique integer identifier.
 - `builds.csv`: Contains information of CI builds.
 - `contributors.csv`: Contains information of contributors the project.
 
+#### Notes
+- The `test_result` column in the `exe.csv` file can have the 4 following values: 0 for success/passed, 1 for failure due to exception, 2 for failure due to assertion, and 3 for failure due to an unknown reason.
+- For some cases in the `id_map.csv` file, a number of paths have the same ID. The reason for assigning the same ID for these cases is that for creating the ID mapping, we tracked the change history of each file and if the file was renamed or moved to a different directory, we considered the new and old version of this file as a single source file with the same ID.
+- There might be more test cases found in the source code of some repositories than the test cases available in `exe.csv`. We extracted the test case execution data from Travis CI build logs where not all test cases were necessarily executed.
+
 #### The `analysis` Folder
 In addition to the above CSV files, the `dataset` sub-command creates a directory named `analysis` which includes a number of sub-folders for each build which are named with build ids. Each sub-folder contains a `metadata.csv` file, and additionally, each sub-folder corresponding to failed builds contains a `tar.csv` and a `dep.csv` file. The `metadata.csv` file represents static features for each entity (file) captured by Understand for each build. Please visit [this link](https://support.scitools.com/t/what-metrics-does-undertand-have/66) for descriptions of all Understand metrics. The `dep.csv` file represents static and historical dependencies between the entities of the system under test (SUT). Static dependencies are extracted from Understand's database, and historical dependencies are represented by association weights for each static dependency which can be found in the `weights` column. 
 
 The association weights are extracted by analyzing co-changes across Git commits and applying association rule mining to them using the Apriori algorithm. For each dependency, the association weight is either a single zero or four real numbers. A single zero means although Understand detected a static relation, there is no historical dependency between these two entities. In other words, among all analyzed commits, there is no commit in which both entities have changed. On the other hand, the four real numbers represent `support`, `forward_confidence`, `backward_confidence`, and `lift`. Note that assuming A has a dependency on B, `forward_confidence` is the confidence for A given B (A|B) and `backward_confidence` is the confidence for B given A (B|A). For precise definitions of the mentioned association metrics, please refer to the paper. Additionally, the `tar.csv` file represents the dependencies between test entities and entities of the SUT. This file is similar to `dep.csv`.
-
-#### Notes
-- The `test_result` column in the `exe.csv` file can have the 4 following values: 0 for success/passed, 1 for failure due to exception, 2 for failure due to assertion, and 3 for failure due to an unknown reason.
 
 ### `learn` Output Files
 The `learn` sub-command creates a folder named `tsp_accuracy_results` which includes sub-folders for each learning experiment (e.g. `full` for learning using all features). Under each learning experiment sub-folder, there is a `results.csv` file, which contains TCP accuracies across builds, and there are a number of folders named with failed build ids that were used for evaluation, and each folder contains a trained model (`model.txt`), its feature stats (`feature_stats.csv`), an evaluation test suite (`test.txt`), and its prioritized prediction (`pred.txt`).
@@ -183,10 +191,7 @@ The `learn` sub-command creates a folder named `tsp_accuracy_results` which incl
 - All `.txt` files are in the format required by RankLib.
 - The `W-` and `wo-` prefixes stand for with and without, respectively. The feature group after these prefixes indicates the features that the models were trained on.
 - The `-outliers` suffix refers to the experiments in which outlier (frequent-failing) test cases were removed. For more details about outlier tests, please refer to the paper.
-- For both `full` and `full-outliers` experiments, there are also two `heurisitc_<metric>_results.csv` (`<metric>` can be `apfd` or `apfdc`) files that include TCP evaluation results when using heuristics. For more details about our heuristic experiments, please refer to the paper.
+- For the `full-outliers` experiment, there is also two `heurisitc_<metric>_results.csv` (`<metric>` can be `apfd` or `apfdc`) files that include TCP evaluation results when using heuristics. For more details about our heuristic-based experiments, please refer to the paper.
 
 ### `decay` Output Files
 The `decay` sub-command creates a folder named `decay_datasets` which includes sub-folders named with failed build ids that were used for evaluation, and each sub-folder contains a `dataset.csv` file (the dataset is used for evaluation of subsequent builds), a `test.txt` and a `pred.txt` file which include all test builds and prioritization predictions, respectively, and a `results.csv` file which includes accuracies of the predictions. For more details about the decay experiment, please refer to the paper.
-
-### `results` Output Files
-The `results` sub-command creates a `subject_stats.csv` file which includes the statistics of the projects (subjects) that were given as input. This sub-command also creates three sub-folders: `RQ1`, `RQ2`, and `RQ3`. Each of these sub-folders includes results of the analysis done to answer the paper's research questions based on experiment outcomes. For more details about the research questions, please refer to the paper.
