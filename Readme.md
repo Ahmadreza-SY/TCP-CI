@@ -31,8 +31,8 @@ This repository is a supplement to our academic paper which can be found on [arx
 If the paper is accepted in a conference or journal, we will update the BibTeX and the link.
 
 ### Dataset
-In our work, we collected datasets for 25 carefully selected open-source projects using this repository. The datasets are publicly available here: 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5532640.svg)](https://doi.org/10.5281/zenodo.5532640)
+In our work, we collected datasets for 25 carefully selected open-source projects using this repository. The datasets are publicly available here:
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6399304.svg)](https://doi.org/10.5281/zenodo.6399304)
 
 
 ## The Dataset's Class Diagram
