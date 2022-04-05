@@ -32,7 +32,7 @@ If the paper is accepted in a conference or journal, we will update the BibTeX a
 
 ### Dataset
 In our work, we collected datasets for 25 carefully selected open-source projects using this repository. The datasets are publicly available here:
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6399304.svg)](https://doi.org/10.5281/zenodo.6399304)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6415365.svg)](https://doi.org/10.5281/zenodo.6415365)
 
 
 ## The Dataset's Class Diagram
