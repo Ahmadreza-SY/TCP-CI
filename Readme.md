@@ -17,18 +17,16 @@ This project aims to extract and compute test case features from different data 
 In the following sections, we provide information on the requirements and instructions for running this project as well as descriptions regarding the data that this project generates. We also provide links to our **publication** and **public datasets** for reference and future work.
 
 ### Publication
-This repository is a supplement to our academic paper which can be found on [arxiv.org/abs/2109.13168](https://arxiv.org/abs/2109.13168). Please refer to the paper for details on definitions, experiments, and results. Please cite our paper in any published work that uses resources that are provided in this repository:
+This repository is a supplement to our academic paper which can be found on [10.1109/TSE.2022.3184842](https://ieeexplore.ieee.org/document/9801672). Please refer to the paper for details on definitions, experiments, and results. Please cite our paper in any published work that uses resources that are provided in this repository:
 ```
 @article{yaraghi2021tcp,
-      title={Scalable and Accurate Test Case Prioritization in Continuous Integration Contexts}, 
-      author={Ahmadreza Saboor Yaraghi, Mojtaba Bagherzadeh, Nafiseh Kahani, and Lionel Briand},
-      year={2021},
-      eprint={2109.13168},
-      archivePrefix={arXiv},
-      primaryClass={cs.SE}
+    title={Scalable and Accurate Test Case Prioritization in Continuous Integration Contexts},
+    author={Saboor Yaraghi, Ahmadreza and Bagherzadeh, Mojtaba and Kahani, Nafiseh and Briand, Lionel},
+    journal={IEEE Transactions on Software Engineering},
+    year={2022},
+    doi={10.1109/TSE.2022.3184842}
 }
 ```
-If the paper is accepted in a conference or journal, we will update the BibTeX and the link.
 
 ### Dataset
 In our work, we collected datasets for 25 carefully selected open-source projects using this repository. The datasets are publicly available here:
